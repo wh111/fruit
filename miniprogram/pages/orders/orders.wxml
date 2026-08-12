@@ -1,0 +1,15 @@
+<view class="page">
+  <view class="card item" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="goDetail">
+    <view class="top">
+      <text class="name">{{item.productName}}</text>
+      <text class="status">{{item.statusText}}</text>
+    </view>
+    <view class="muted">{{item.specName}} ×{{item.quantity}}</view>
+    <view class="queue-tip" wx:if="{{item.queueTip}}">{{item.queueTip}}</view>
+    <view class="bottom">
+      <text class="code" wx:if="{{item.pickupCode}}">取餐码 {{item.pickupCode}}</text>
+      <text class="price">¥{{item.amount}}</text>
+    </view>
+  </view>
+  <view wx:if="{{!list.length}}" class="empty muted">还没有订单，去点一份果切吧</view>
+</view>

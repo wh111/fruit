@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>四季果先 · 门店管理</title>
+  <link rel="stylesheet" href="./css/admin.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 登录 -->
+    <section id="loginView" class="login-view">
+      <div class="login-card">
+        <img class="logo" src="/assets/logo.png" alt="四季果先" />
+        <h1>门店管理端</h1>
+        <p class="muted">接单 · 出码 · 打印贴纸</p>
+        <label>账号</label>
+        <input id="username" value="admin" autocomplete="username" />
+        <label>密码</label>
+        <input id="password" type="password" value="admin123" autocomplete="current-password" />
+        <button id="loginBtn" class="btn primary">登录</button>
+        <p id="loginError" class="error"></p>
+      </div>
+    </section>
+
+    <!-- 主界面 -->
+    <section id="mainView" class="main-view hidden">
+      <aside class="sider">
+        <div class="brand">
+          <img src="/assets/logo.png" alt="" />
+          <div>
+            <strong>四季果先</strong>
+            <span>SEASONAL FRUIT</span>
+          </div>
+        </div>
+        <nav>
+          <button data-tab="dashboard" class="nav active">今日概览</button>
+          <button data-tab="orders" class="nav">订单 / 打印</button>
+          <button data-tab="products" class="nav">商品规格</button>
+          <button data-tab="verify" class="nav">扫码核销</button>
+          <button data-tab="hardware" class="nav">打印硬件</button>
+        </nav>
+        <button id="logoutBtn" class="btn ghost logout">退出</button>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <h2 id="pageTitle">今日概览</h2>
+          <div class="top-actions">
+            <label class="switch">
+              <input type="checkbox" id="autoPrint" />
+              <span>新单自动打印</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="soundOn" checked />
+              <span>新单提示音</span>
+            </label>
+            <button id="refreshBtn" class="btn">刷新</button>
+          </div>
+        </header>
+        <div id="toast" class="toast hidden"></div>
+
+        <div id="tab-dashboard" class="tab">
+          <div class="stats" id="stats"></div>
+          <div class="panel">
+            <h3>待制作订单</h3>
+            <div id="pendingList" class="order-list"></div>
+          </div>
+        </div>
+
+        <div id="tab-orders" class="tab hidden">
+          <div class="toolbar">
+            <select id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="pending_pay">待支付</option>
+              <option value="paid">已支付</option>
+              <option value="making">制作中</option>
+              <option value="ready">待取餐</option>
+              <option value="done">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          <div id="orderTable" class="table-wrap"></div>
+        </div>
+
+        <div id="tab-products" class="tab hidden">
+          <div class="toolbar">
+            <button id="addProductBtn" class="btn primary">新增果切</button>
+          </div>
+          <div id="productTable" class="table-wrap"></div>
+        </div>
+
+        <div id="tab-verify" class="tab hidden">
+          <div class="panel verify-panel">
+            <h3>核销取餐</h3>
+            <p class="muted">输入取餐码（如 A001）或粘贴扫码内容</p>
+            <input id="verifyInput" placeholder="取餐码 / 扫码内容" />
+            <button id="verifyBtn" class="btn primary">核销完成</button>
+            <pre id="verifyResult"></pre>
+          </div>
+        </div>
+
+        <div id="tab-hardware" class="tab hidden">
+          <div class="panel prose">
+            <h3>贴纸打印需要什么硬件？</h3>
+            <ol>
+              <li><strong>热敏标签打印机</strong>（推荐）：汉印 / 佳博 / 芯烨，USB 接电脑，约 200–500 元</li>
+              <li><strong>标签纸</strong>：40×30mm 或 50×30mm 热敏不干胶（防水更好）</li>
+              <li>电脑打开本管理端 → 订单「打印标签」→ 选打印机即可贴杯</li>
+            </ol>
+            <p>也可买<strong>蓝牙标签机</strong>（精臣/汉印）用手机打；或买<strong>云打印机</strong>实现支付后自动出纸。</p>
+            <p>完整说明见项目 <code>docs/HARDWARE.md</code>。</p>
+          </div>
+        </div>
+      </main>
+    </section>
+  </div>
+
+  <!-- 商品编辑弹窗 -->
+  <dialog id="productDialog">
+    <form method="dialog" id="productForm">
+      <h3 id="productDialogTitle">编辑商品</h3>
+      <input type="hidden" id="p_id" />
+      <label>名称</label>
+      <input id="p_name" required />
+      <label>分类</label>
+      <input id="p_category" />
+      <label>简介</label>
+      <textarea id="p_desc" rows="2"></textarea>
+      <label>规格 JSON（id/name/price）</label>
+      <textarea id="p_specs" rows="4"></textarea>
+      <label>加料 JSON</label>
+      <textarea id="p_extras" rows="3"></textarea>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">取消</button>
+        <button id="saveProductBtn" value="default" class="btn primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="./js/admin.js"></script>
+</body>
+</html>

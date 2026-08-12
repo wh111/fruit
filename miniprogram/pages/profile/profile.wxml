@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="card head">
+    <image class="logo" src="/images/logo.png" mode="aspectFit" />
+    <view>
+      <view class="brand">四季果先</view>
+      <view class="muted">SEASONAL FRUIT · 鲜切现取</view>
+      <view class="muted" style="margin-top:8rpx">{{user.nickName || '果粉'}}</view>
+    </view>
+  </view>
+
+  <view class="card menu">
+    <view class="row" bindtap="goOrders">我的订单</view>
+    <view class="row" bindtap="reLogin">重新登录</view>
+  </view>
+
+  <view class="card tip">
+    <view class="title">取餐说明</view>
+    <view class="muted">支付成功后会生成取餐码与二维码。到店出示即可，店员打印贴纸贴在果杯上核对。</view>
+  </view>
+</view>

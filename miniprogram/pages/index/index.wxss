@@ -1,0 +1,59 @@
+.page { padding-bottom: 40rpx; }
+
+.hero {
+  margin: 24rpx;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #fff8e7 0%, #e8f5e9 100%);
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.hero-logo { width: 120rpx; height: 120rpx; background: #fff; border-radius: 24rpx; }
+.brand { display: block; font-size: 40rpx; font-weight: 800; color: #2a2a2a; }
+.slogan { display: block; margin-top: 8rpx; color: #4caf50; font-size: 24rpx; }
+
+.cats {
+  white-space: nowrap;
+  padding: 0 24rpx 8rpx;
+  display: flex;
+}
+.cat {
+  display: inline-block;
+  padding: 12rpx 28rpx;
+  margin-right: 16rpx;
+  background: #fff;
+  border-radius: 999rpx;
+  color: #666;
+  font-size: 26rpx;
+}
+.cat.on {
+  background: #f5a623;
+  color: #fff;
+  font-weight: 600;
+}
+
+.item {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx !important;
+}
+.cover {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 20rpx;
+  background: #f0ebe3;
+  flex-shrink: 0;
+}
+.info { flex: 1; display: flex; flex-direction: column; }
+.name { font-size: 32rpx; font-weight: 700; margin-bottom: 8rpx; }
+.row { margin-top: auto; display: flex; align-items: baseline; gap: 6rpx; }
+.buy {
+  margin-left: auto;
+  background: #4caf50;
+  color: #fff;
+  font-size: 24rpx;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+}
+.empty { text-align: center; padding: 80rpx; }

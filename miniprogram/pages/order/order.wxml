@@ -1,0 +1,51 @@
+<view class="page" wx:if="{{order}}">
+  <view class="success card">
+    <view class="ok">{{queue.title || statusText}}</view>
+    <view class="hint">{{queue.tip || '请向店员出示取餐码'}}</view>
+
+    <!-- 进度条 -->
+    <view class="steps" wx:if="{{queue.steps && queue.steps.length}}">
+      <view
+        class="step {{item.done ? 'done' : ''}} {{item.current ? 'current' : ''}}"
+        wx:for="{{queue.steps}}"
+        wx:key="key"
+      >
+        <view class="dot"></view>
+        <text class="step-label">{{item.label}}</text>
+      </view>
+    </view>
+
+    <!-- 排队位次 -->
+    <view class="queue-box" wx:if="{{queue.phase === 'queued' || queue.phase === 'making'}}">
+      <view class="queue-num" wx:if="{{queue.phase === 'queued'}}">
+        <text class="big">{{queue.position}}</text>
+        <text class="unit">位</text>
+      </view>
+      <view class="queue-num making" wx:else>
+        <text class="big">制作中</text>
+      </view>
+      <view class="queue-meta muted" wx:if="{{queue.phase === 'queued'}}">
+        前面还有 {{queue.ahead}} 单 · 今日排队共 {{queue.queueTotal}} 单
+      </view>
+      <view class="queue-meta muted" wx:else>请耐心等待，做好后会显示「请取餐」</view>
+    </view>
+
+    <view class="code">{{order.pickupCode}}</view>
+    <image wx:if="{{qrDataUrl}}" class="qr" src="{{qrDataUrl}}" mode="aspectFit" show-menu-by-longpress />
+    <view class="muted">长按二维码可保存 · 店员扫码核销</view>
+  </view>
+
+  <view class="card">
+    <view class="row"><text>商品</text><text>{{order.productName}}</text></view>
+    <view class="row"><text>规格</text><text>{{order.specName}} ×{{order.quantity}}</text></view>
+    <view class="row" wx:if="{{extraText}}"><text>加料</text><text>{{extraText}}</text></view>
+    <view class="row"><text>金额</text><text class="price">¥{{order.amount}}</text></view>
+    <view class="row"><text>订单号</text><text class="small">{{order.orderNo}}</text></view>
+    <view class="row"><text>状态</text><text>{{statusText}}</text></view>
+  </view>
+
+  <view class="actions">
+    <view class="btn-green" bindtap="goOrders">查看我的订单</view>
+    <view class="btn-primary" style="margin-top:20rpx" bindtap="goHome">再点一份</view>
+  </view>
+</view>

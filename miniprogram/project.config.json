@@ -1,0 +1,15 @@
+{
+  "description": "四季果先果切小程序",
+  "packOptions": {
+    "ignore": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "minified": true
+  },
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "四季果先",
+  "libVersion": "3.5.5"
+}

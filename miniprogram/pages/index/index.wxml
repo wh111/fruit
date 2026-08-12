@@ -1,0 +1,42 @@
+<view class="page">
+  <view class="hero">
+    <image class="hero-logo" src="/images/logo.png" mode="aspectFit" />
+    <view class="hero-text">
+      <text class="brand">四季果先</text>
+      <text class="slogan">当季鲜切 · 现切现取</text>
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="cats" enable-flex>
+    <view
+      class="cat {{activeCat === item ? 'on' : ''}}"
+      wx:for="{{categories}}"
+      wx:key="*this"
+      data-cat="{{item}}"
+      bindtap="onCat"
+    >{{item}}</view>
+  </scroll-view>
+
+  <view class="list">
+    <view
+      class="item card"
+      wx:for="{{filtered}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="goDetail"
+    >
+      <image class="cover" src="{{item.coverUrl}}" mode="aspectFill" />
+      <view class="info">
+        <view class="name">{{item.name}}</view>
+        <view class="muted">{{item.desc}}</view>
+        <view class="row">
+          <text class="price">¥{{item.minPrice}}</text>
+          <text class="muted">起</text>
+          <view class="buy">选规格</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!filtered.length}}" class="empty muted">暂无果切，请稍后再来</view>
+</view>

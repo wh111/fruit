@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" rx="40" fill="#FCE4EC"/>
+  <circle cx="150" cy="190" r="40" fill="#E53935"/>
+  <circle cx="220" cy="160" r="28" fill="#AD1457"/>
+  <circle cx="250" cy="220" r="32" fill="#D81B60"/>
+  <circle cx="180" cy="240" r="22" fill="#C62828"/>
+  <text x="200" y="360" text-anchor="middle" font-size="28" fill="#880E4F" font-family="sans-serif">“œ{ßÒ</text>
+</svg>

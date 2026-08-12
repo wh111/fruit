@@ -1,0 +1,50 @@
+<view class="page" wx:if="{{product}}">
+  <image class="banner" src="{{coverUrl}}" mode="aspectFill" />
+  <view class="card main">
+    <view class="name">{{product.name}}</view>
+    <view class="muted">{{product.desc}}</view>
+    <view class="price">¥{{unitPrice}}</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">规格</view>
+    <view class="chips">
+      <view
+        class="chip {{specId === item.id ? 'on' : ''}}"
+        wx:for="{{product.specs}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onSpec"
+      >{{item.name}} ¥{{item.price}}</view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{product.extras.length}}">
+    <view class="section-title">加料（可多选）</view>
+    <view class="chips">
+      <view
+        class="chip {{extraMap[item.id] ? 'on' : ''}}"
+        wx:for="{{product.extras}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onExtra"
+      >{{item.name}} +¥{{item.price}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">数量</view>
+    <view class="qty">
+      <view class="qbtn" bindtap="dec">-</view>
+      <text>{{quantity}}</text>
+      <view class="qbtn" bindtap="inc">+</view>
+    </view>
+    <view class="section-title" style="margin-top:24rpx">备注</view>
+    <input class="remark" placeholder="少冰 / 分开装等" value="{{remark}}" bindinput="onRemark" />
+  </view>
+
+  <view class="footer">
+    <view class="total">合计 <text class="price">¥{{total}}</text></view>
+    <view class="btn-primary pay" bindtap="submit">去支付</view>
+  </view>
+</view>

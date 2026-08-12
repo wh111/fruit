@@ -1,0 +1,43 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/detail/detail",
+    "pages/order/order",
+    "pages/orders/orders",
+    "pages/profile/profile"
+  ],
+  "window": {
+    "navigationBarTitleText": "四季果先",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F7F4EE"
+  },
+  "tabBar": {
+    "color": "#8A8A8A",
+    "selectedColor": "#F5A623",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "点果切",
+        "iconPath": "images/tab-home.png",
+        "selectedIconPath": "images/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/orders/orders",
+        "text": "订单",
+        "iconPath": "images/tab-order.png",
+        "selectedIconPath": "images/tab-order-active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "images/tab-me.png",
+        "selectedIconPath": "images/tab-me-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

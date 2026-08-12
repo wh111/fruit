@@ -1,0 +1,12 @@
+.item .top { display: flex; justify-content: space-between; margin-bottom: 8rpx; }
+.name { font-weight: 700; font-size: 30rpx; }
+.status { color: #f5a623; font-size: 24rpx; }
+.queue-tip {
+  margin-top: 10rpx;
+  color: #4caf50;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 16rpx; }
+.code { font-size: 32rpx; font-weight: 800; color: #4caf50; }
+.empty { text-align: center; padding: 120rpx 40rpx; }

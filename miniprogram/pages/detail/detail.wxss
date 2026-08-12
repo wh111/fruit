@@ -1,0 +1,45 @@
+.banner {
+  width: 100%;
+  height: 420rpx;
+  background: #f0ebe3;
+}
+.main .name { font-size: 40rpx; font-weight: 800; margin-bottom: 8rpx; }
+.main .price { margin-top: 16rpx; font-size: 40rpx; }
+
+.section-title { font-weight: 700; margin-bottom: 16rpx; }
+.chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.chip {
+  padding: 14rpx 24rpx;
+  border-radius: 999rpx;
+  background: #f5f1ea;
+  color: #555;
+  font-size: 26rpx;
+}
+.chip.on {
+  background: #fff3e0;
+  color: #e8910f;
+  outline: 2rpx solid #f5a623;
+  font-weight: 600;
+}
+
+.qty { display: flex; align-items: center; gap: 28rpx; }
+.qbtn {
+  width: 56rpx; height: 56rpx; border-radius: 50%;
+  background: #f5f1ea; text-align: center; line-height: 56rpx; font-size: 32rpx;
+}
+.remark {
+  background: #f7f4ee;
+  border-radius: 12rpx;
+  padding: 16rpx;
+}
+
+.footer {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  background: #fff;
+  padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 20rpx;
+  box-shadow: 0 -8rpx 24rpx rgba(0,0,0,0.04);
+}
+.total { flex: 1; font-size: 28rpx; }
+.pay { flex: 1.2; }
+.page { padding-bottom: 160rpx; }

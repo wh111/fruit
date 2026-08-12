@@ -1,0 +1,41 @@
+page {
+  background: #f7f4ee;
+  color: #2a2a2a;
+  font-size: 28rpx;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f5a623, #e8910f);
+  color: #fff;
+  border-radius: 999rpx;
+  text-align: center;
+  padding: 22rpx 0;
+  font-weight: 600;
+}
+
+.btn-green {
+  background: linear-gradient(135deg, #4caf50, #3d8b40);
+  color: #fff;
+  border-radius: 999rpx;
+  text-align: center;
+  padding: 22rpx 0;
+  font-weight: 600;
+}
+
+.card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 24rpx;
+  margin: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(80, 50, 10, 0.04);
+}
+
+.muted {
+  color: #8a8a8a;
+  font-size: 24rpx;
+}
+
+.price {
+  color: #e8910f;
+  font-weight: 700;
+}

@@ -1,0 +1,10 @@
+.head { display: flex; gap: 24rpx; align-items: center; }
+.logo { width: 120rpx; height: 120rpx; border-radius: 24rpx; background: #fff; }
+.brand { font-size: 36rpx; font-weight: 800; }
+.menu .row {
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #f0ebe3;
+  font-size: 30rpx;
+}
+.menu .row:last-child { border-bottom: none; }
+.title { font-weight: 700; margin-bottom: 12rpx; }

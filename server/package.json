@@ -1,10 +1,16 @@
 {
   "name": "sijiguoxian-server",
   "version": "1.0.0",
-  "description": "四季果先 · 果切小程序后端（零 npm 依赖，Node 18+）",
+  "description": "四季果先 · 果切小程序后端",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.12.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

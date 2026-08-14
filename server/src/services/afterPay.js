@@ -8,10 +8,10 @@ async function onOrderPaid(order) {
   if (!order || !order.pickupCode) return { printed: false };
 
   if (process.env.CLOUD_PRINT_ENABLED !== 'true') {
-    return { printed: false, skip: 'cloud打印未开启' };
+    return { printed: false, skip: '云打印未开启' };
   }
 
-  const db = load();
+  const db = await load();
   const shopName = db.settings?.shopName || '四季果先';
   const provider = (process.env.CLOUD_PRINT_PROVIDER || 'feie').toLowerCase();
 
@@ -23,7 +23,7 @@ async function onOrderPaid(order) {
       result = await pushFeie(order, shopName);
     }
 
-    const latest = load();
+    const latest = await load();
     const o = latest.orders.find((x) => x.id === order.id);
     if (o) {
       o.printed = true;
@@ -31,7 +31,7 @@ async function onOrderPaid(order) {
       o.printProvider = provider;
       o.printResult = typeof result === 'object' ? result : { raw: result };
       o.updatedAt = Date.now();
-      save(latest);
+      await save(latest);
     }
     console.log(`[cloud-print] ${order.pickupCode} via ${provider} ok`);
     return { printed: true, provider, result };

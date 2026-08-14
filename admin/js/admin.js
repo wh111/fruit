@@ -149,25 +149,84 @@ async function loadStats() {
   const newest = pending[0]?.id;
   $('#pendingList').innerHTML = pending.length
     ? pending
-        .map(
-          (o) => `
+        .map((o) => {
+          const canBatch = ['paid', 'making'].includes(o.status);
+          const batchNote =
+            o.makeBatchCodes && o.makeBatchCodes.length > 1
+              ? `<div class="batch-codes">同批：${o.makeBatchCodes.join('、')}</div>`
+              : '';
+          const videoNote = o.videoUrl
+            ? `<div class="batch-codes" style="color:#4caf50">制作视频已就绪</div>`
+            : ['making', 'ready', 'done'].includes(o.status)
+              ? `<div class="batch-codes">可上传手机拍摄视频</div>`
+              : '';
+          return `
       <div class="order-card ${o.id === newest ? 'new' : ''}">
+        <label class="pick">${
+          canBatch ? `<input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" />` : ''
+        }</label>
         <div class="pickup">${o.pickupCode || '--'}</div>
         <div style="flex:1">
           <div><strong>${o.productName}</strong> · ${o.specName} ×${o.quantity}</div>
           <div class="muted">${STATUS_TEXT[o.status]} · ¥${o.amount}${o.printed ? ' · 已打标' : ''}</div>
+          ${batchNote}${videoNote}
         </div>
         <div class="actions">
           <button class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
+          ${
+            !o.videoUrl && ['making', 'ready', 'done', 'paid'].includes(o.status)
+              ? `<button class="btn sm primary" onclick="uploadPhoneVideo('${o.id}','${o.makeBatchId || ''}')">上传视频</button>`
+              : ''
+          }
           <button class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>
           <button class="btn sm" onclick="setStatus('${o.id}','making')">制作中</button>
           <button class="btn sm" onclick="setStatus('${o.id}','ready')">待取</button>
           <button class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>
         </div>
-      </div>`
-        )
+      </div>`;
+        })
         .join('')
     : '<p class="muted">暂无待制作订单</p>';
+  updateBatchHint();
+}
+
+function selectedOrderIds() {
+  return $$('.order-check:checked').map((el) => el.value);
+}
+
+function updateBatchHint() {
+  const ids = selectedOrderIds();
+  const hint = $('#batchHint');
+  if (!hint) return;
+  if (!ids.length) {
+    hint.textContent = '可勾选多个单号，一人同时做多份';
+    return;
+  }
+  const codes = $$('.order-check:checked')
+    .map((el) => el.dataset.code)
+    .filter(Boolean);
+  hint.textContent = `已选 ${ids.length} 单：${codes.join('、')}`;
+}
+
+async function batchSetStatus(status) {
+  const ids = selectedOrderIds();
+  if (!ids.length) {
+    toast('请先勾选订单');
+    return;
+  }
+  const labels = { making: '开始制作', ready: '待取餐', done: '完成' };
+  try {
+    const data = await api('/api/orders/batch-status', {
+      method: 'POST',
+      body: JSON.stringify({ ids, status }),
+    });
+    toast(data.tip || `已${labels[status] || '更新'} ${data.count} 单`);
+    const sel = $('#selectAllPending');
+    if (sel) sel.checked = false;
+    refresh();
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 async function loadOrders() {
@@ -310,6 +369,44 @@ window.cloudPrint = async function cloudPrint(orderId) {
   }
 };
 
+let pendingUpload = { orderId: '', makeBatchId: '' };
+
+window.uploadPhoneVideo = function uploadPhoneVideo(orderId, makeBatchId) {
+  pendingUpload = { orderId, makeBatchId: makeBatchId || '' };
+  const input = $('#phoneVideoInput');
+  input.value = '';
+  input.click();
+};
+
+async function onPhoneVideoPicked(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!pendingUpload.orderId && !pendingUpload.makeBatchId) {
+    toast('未选择订单');
+    return;
+  }
+  toast('正在上传视频…');
+  try {
+    const q = pendingUpload.makeBatchId
+      ? `makeBatchId=${encodeURIComponent(pendingUpload.makeBatchId)}`
+      : `orderId=${encodeURIComponent(pendingUpload.orderId)}`;
+    const res = await fetch(`${API}/api/admin/videos/upload?${q}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${state.token}`,
+        'Content-Type': file.type || 'video/mp4',
+      },
+      body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '上传失败');
+    toast(`上传成功，已绑定 ${data.boundOrders} 单`);
+    refresh();
+  } catch (err) {
+    toast(err.message || '上传失败');
+  }
+}
+
 async function verify() {
   const raw = $('#verifyInput').value.trim();
   if (!raw) return;
@@ -362,6 +459,20 @@ $('#verifyBtn').addEventListener('click', verify);
 $('#addProductBtn').addEventListener('click', () => editProduct(null));
 $('#saveProductBtn').addEventListener('click', saveProduct);
 $$('.nav').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+$('#batchMakingBtn')?.addEventListener('click', () => batchSetStatus('making'));
+$('#batchReadyBtn')?.addEventListener('click', () => batchSetStatus('ready'));
+$('#batchDoneBtn')?.addEventListener('click', () => batchSetStatus('done'));
+$('#phoneVideoInput')?.addEventListener('change', onPhoneVideoPicked);
+$('#selectAllPending')?.addEventListener('change', (e) => {
+  $$('.order-check').forEach((c) => {
+    c.checked = e.target.checked;
+  });
+  updateBatchHint();
+});
+document.addEventListener('change', (e) => {
+  if (e.target.classList?.contains('order-check')) updateBatchHint();
+});
 
 if (state.token) {
   showMain(true);

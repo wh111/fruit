@@ -4,6 +4,7 @@
     "pages/detail/detail",
     "pages/order/order",
     "pages/orders/orders",
+    "pages/video/video",
     "pages/profile/profile"
   ],
   "window": {

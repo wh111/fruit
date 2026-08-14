@@ -1,9 +1,12 @@
 node_modules/
 server/data/
 server/.env
+server/uploads/videos/
 *.log
 .DS_Store
 .idea/
 .vscode/
 *.swp
 miniprogram/node_modules/
+recorder/tmp/
+recorder/.env

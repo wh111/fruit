@@ -26,8 +26,6 @@ const { load, save, ensure } = require('./db');
 const { createOrder, markPaid, orderQrDataUrl, getQueueInfo } = require('./services/order');
 const { buildLabelHtml } = require('./services/label');
 
-ensure();
-
 const ROOT = path.join(__dirname, '..', '..');
 const PORT = Number(process.env.PORT) || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'sijiguoxian_dev_secret_change_me';
@@ -93,6 +91,8 @@ function sendFile(res, filePath) {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.webp': 'image/webp',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
   };
   res.writeHead(200, {
     'Content-Type': types[ext] || 'application/octet-stream',
@@ -114,6 +114,24 @@ function readBody(req) {
         resolve({ raw });
       }
     });
+    req.on('error', reject);
+  });
+}
+
+function readBuffer(req, limitBytes = 500 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limitBytes) {
+        reject(Object.assign(new Error('视频过大'), { status: 413 }));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
@@ -147,7 +165,7 @@ async function handleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/auth/wxlogin' && method === 'POST') {
-    const db = load();
+    const db = await load();
     let openid = '';
     const wechat = require('./services/wechat');
     if (process.env.WX_APPID && process.env.WX_SECRET && body.code && !String(body.code).startsWith('dev')) {
@@ -170,11 +188,11 @@ async function handleApi(req, res, pathname) {
         createdAt: Date.now(),
       };
       db.users.push(user);
-      save(db);
+      await save(db);
     } else if (body.nickName) {
       user.nickName = body.nickName;
       user.avatarUrl = body.avatarUrl || user.avatarUrl;
-      save(db);
+      await save(db);
     }
     const token = signToken({ role: 'user', userId: user.id, openid }, 30);
     return send(res, 200, {
@@ -184,13 +202,13 @@ async function handleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/products' && method === 'GET') {
-    const db = load();
+    const db = await load();
     return send(res, 200, { list: db.products.filter((p) => p.status === 1).sort((a, b) => a.sort - b.sort) });
   }
 
   if (pathname.startsWith('/api/products/') && method === 'GET') {
     const id = pathname.split('/').pop();
-    const db = load();
+    const db = await load();
     const p = db.products.find((x) => x.id === id && x.status === 1);
     if (!p) return send(res, 404, { error: '商品不存在' });
     return send(res, 200, p);
@@ -216,7 +234,7 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/orders/mine' && method === 'GET') {
     const user = auth(req);
-    const db = load();
+    const db = await load();
     const url = new URL(req.url, `http://${req.headers.host}`);
     let list = db.orders;
     if (user?.userId) {
@@ -246,7 +264,7 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/orders/verify' && method === 'POST') {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     let order = null;
     if (body.payload) {
       try {
@@ -266,15 +284,63 @@ async function handleApi(req, res, pathname) {
     }
     order.status = 'done';
     order.updatedAt = Date.now();
-    save(db);
+    await save(db);
     return send(res, 200, { order });
+  }
+
+  /** 批量改状态：一人同时做多单 */
+  if (pathname === '/api/orders/batch-status' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    const ids = Array.isArray(body.ids) ? body.ids : [];
+    const status = body.status;
+    const allow = ['making', 'ready', 'done', 'cancelled'];
+    if (!ids.length) return send(res, 400, { error: '请选择订单' });
+    if (!allow.includes(status)) return send(res, 400, { error: '状态无效' });
+
+    const db = await load();
+    const now = Date.now();
+    const makeBatchId = status === 'making' ? `MB${now}` : null;
+    const updated = [];
+
+    for (const id of ids) {
+      const order = db.orders.find((o) => o.id === id);
+      if (!order) continue;
+      order.status = status;
+      order.updatedAt = now;
+      if (status === 'making') {
+        order.makingAt = now;
+        order.makeBatchId = makeBatchId;
+        // 同批单号列表，方便以后挂同一段制作视频
+        order.makeBatchCodes = ids
+          .map((oid) => db.orders.find((x) => x.id === oid)?.pickupCode)
+          .filter(Boolean);
+      }
+      if (status === 'ready') {
+        order.readyAt = now;
+      }
+      if (status === 'done') {
+        order.doneAt = now;
+      }
+      updated.push(order);
+    }
+    await save(db);
+    return send(res, 200, {
+      ok: true,
+      count: updated.length,
+      makeBatchId,
+      orders: updated,
+      tip:
+        status === 'making' && updated.length > 1
+          ? `已开始同时制作 ${updated.map((o) => o.pickupCode).join('、')}`
+          : undefined,
+    });
   }
 
   const orderMatch = pathname.match(/^\/api\/orders\/([^/]+)(?:\/(status|cancel))?$/);
   if (orderMatch) {
     const orderId = orderMatch[1];
     const action = orderMatch[2];
-    const db = load();
+    const db = await load();
     const order = db.orders.find((o) => o.id === orderId || o.orderNo === orderId);
 
     if (method === 'GET' && !action) {
@@ -288,7 +354,14 @@ async function handleApi(req, res, pathname) {
       if (!order) return send(res, 404, { error: '订单不存在' });
       order.status = body.status;
       order.updatedAt = Date.now();
-      save(db);
+      if (body.status === 'making') {
+        order.makingAt = Date.now();
+        if (!order.makeBatchId) {
+          order.makeBatchId = `MB${Date.now()}`;
+          order.makeBatchCodes = [order.pickupCode].filter(Boolean);
+        }
+      }
+      await save(db);
       return send(res, 200, { order });
     }
     if (method === 'POST' && action === 'cancel') {
@@ -296,7 +369,7 @@ async function handleApi(req, res, pathname) {
       if (order.status !== 'pending_pay') return send(res, 400, { error: '仅未支付订单可取消' });
       order.status = 'cancelled';
       order.updatedAt = Date.now();
-      save(db);
+      await save(db);
       return send(res, 200, { order });
     }
   }
@@ -304,19 +377,19 @@ async function handleApi(req, res, pathname) {
   const printedMatch = pathname.match(/^\/api\/orders\/([^/]+)\/printed$/);
   if (printedMatch && method === 'POST') {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     const order = db.orders.find((o) => o.id === printedMatch[1]);
     if (!order) return send(res, 404, { error: '订单不存在' });
     order.printed = true;
     order.printedAt = Date.now();
     order.updatedAt = Date.now();
-    save(db);
+    await save(db);
     return send(res, 200, { order });
   }
 
   if (pathname === '/api/pay/create' && method === 'POST') {
     const user = auth(req);
-    const db = load();
+    const db = await load();
     const order = db.orders.find((o) => o.id === body.orderId);
     if (!order) return send(res, 404, { error: '订单不存在' });
     if (order.status !== 'pending_pay') return send(res, 400, { error: '订单不可支付' });
@@ -355,7 +428,7 @@ async function handleApi(req, res, pathname) {
       // 若订单尚未绑定 openid，补写
       if (!order.openid) {
         order.openid = openid;
-        save(db);
+        await save(db);
       }
       const { payment, prepayId } = await wechat.createJsapiPrepay({
         orderNo: order.orderNo,
@@ -366,7 +439,7 @@ async function handleApi(req, res, pathname) {
       });
       order.prepayId = prepayId;
       order.updatedAt = Date.now();
-      save(db);
+      await save(db);
       return send(res, 200, {
         mode: 'wechat',
         paid: false,
@@ -391,7 +464,7 @@ async function handleApi(req, res, pathname) {
       if (data.return_code !== 'SUCCESS' || data.result_code !== 'SUCCESS') {
         return send(res, 200, wechat.notifySuccessXml(), { 'Content-Type': 'text/xml' });
       }
-      const db = load();
+      const db = await load();
       const order = db.orders.find((o) => o.orderNo === data.out_trade_no);
       if (!order) {
         return send(res, 200, wechat.notifyFailXml('ORDER'), { 'Content-Type': 'text/xml' });
@@ -412,7 +485,7 @@ async function handleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/pay/confirm' && method === 'POST') {
-    const db = load();
+    const db = await load();
     let order = db.orders.find((o) => o.id === body.orderId);
     if (!order) return send(res, 404, { error: '订单不存在' });
 
@@ -441,14 +514,14 @@ async function handleApi(req, res, pathname) {
     }
 
     // 重新读取最新订单
-    order = load().orders.find((o) => o.id === body.orderId) || order;
+    order = (await load()).orders.find((o) => o.id === body.orderId) || order;
     const qrDataUrl = order.pickupCode ? await orderQrDataUrl(order) : null;
     return send(res, 200, { order, qrDataUrl });
   }
 
   if (pathname === '/api/admin/stats' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const start = today.getTime();
@@ -465,7 +538,7 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/admin/orders' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     const url = new URL(req.url, `http://${req.headers.host}`);
     const status = url.searchParams.get('status');
     let list = db.orders;
@@ -475,12 +548,12 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/admin/products' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
-    return send(res, 200, { list: load().products });
+    return send(res, 200, { list: (await load()).products });
   }
 
   if (pathname === '/api/admin/products' && method === 'POST') {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     const product = {
       id: crypto.randomUUID(),
       name: body.name || '未命名果切',
@@ -494,24 +567,24 @@ async function handleApi(req, res, pathname) {
       createdAt: Date.now(),
     };
     db.products.push(product);
-    save(db);
+    await save(db);
     return send(res, 200, { product });
   }
 
   const adminProduct = pathname.match(/^\/api\/admin\/products\/([^/]+)$/);
   if (adminProduct) {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     const idx = db.products.findIndex((p) => p.id === adminProduct[1]);
     if (idx < 0) return send(res, 404, { error: '商品不存在' });
     if (method === 'PUT') {
       db.products[idx] = { ...db.products[idx], ...body, id: db.products[idx].id };
-      save(db);
+      await save(db);
       return send(res, 200, { product: db.products[idx] });
     }
     if (method === 'DELETE') {
       db.products[idx].status = 0;
-      save(db);
+      await save(db);
       return send(res, 200, { ok: true });
     }
   }
@@ -519,7 +592,7 @@ async function handleApi(req, res, pathname) {
   const labelMatch = pathname.match(/^\/api\/print\/label\/([^/]+)$/);
   if (labelMatch && method === 'GET') {
     if (!requireAdmin(req, res)) return;
-    const db = load();
+    const db = await load();
     const order = db.orders.find((o) => o.id === labelMatch[1]);
     if (!order) return send(res, 404, { error: '订单不存在' });
     if (!order.pickupCode) return send(res, 400, { error: '订单尚未支付，无取餐码' });
@@ -537,17 +610,38 @@ async function handleApi(req, res, pathname) {
     }
     try {
       const { pushFeie } = require('./services/cloudPrint');
-      const db = load();
+      const db = await load();
       const order = db.orders.find((o) => o.id === body.orderId);
       if (!order) return send(res, 404, { error: '订单不存在' });
       const result = await pushFeie(order, db.settings.shopName);
       order.printed = true;
       order.printedAt = Date.now();
-      save(db);
+      await save(db);
       return send(res, 200, { ok: true, result });
     } catch (e) {
       return send(res, 500, { error: e.message });
     }
+  }
+
+  /** 录像助手：拉取应录/应结束的批次 */
+  if (pathname === '/api/admin/record-jobs' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const video = require('./services/video');
+    const db = await load();
+    return send(res, 200, video.listRecordJobs(db));
+  }
+
+  /** 绑定已有视频 URL 到批次 */
+  if (pathname === '/api/orders/batch-video' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    const { makeBatchId, videoUrl, duration, size } = body;
+    if (!makeBatchId || !videoUrl) return send(res, 400, { error: '需要 makeBatchId 和 videoUrl' });
+    const video = require('./services/video');
+    const db = await load();
+    const count = video.bindVideoToBatch(db, makeBatchId, videoUrl, { duration, size });
+    if (!count) return send(res, 404, { error: '未找到该制作批次' });
+    await save(db);
+    return send(res, 200, { ok: true, count, makeBatchId, videoUrl });
   }
 
   return send(res, 404, { error: '接口不存在' });
@@ -559,6 +653,50 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     let pathname = decodeURIComponent(url.pathname);
+
+    // 视频二进制上传（勿走 JSON body）— 支持 makeBatchId 或 orderId（手机拍摄上传）
+    if (pathname === '/api/admin/videos/upload' && req.method === 'POST') {
+      if (!requireAdmin(req, res)) return;
+      const makeBatchId = url.searchParams.get('makeBatchId');
+      const orderId = url.searchParams.get('orderId');
+      if (!makeBatchId && !orderId) return send(res, 400, { error: '缺少 makeBatchId 或 orderId' });
+      try {
+        const buf = await readBuffer(req);
+        if (!buf.length) return send(res, 400, { error: '空文件' });
+        const video = require('./services/video');
+        const key = makeBatchId || orderId;
+        const saved = video.saveUploadedVideo(buf, key);
+        const videoUrl = video.toPublicUrl(req, saved.filename);
+        const db = await load();
+        let count = 0;
+        if (makeBatchId) {
+          count = video.bindVideoToBatch(db, makeBatchId, videoUrl, {
+            size: saved.size,
+            filename: saved.filename,
+            source: 'upload',
+          });
+        } else {
+          count = video.bindVideoForOrder(db, orderId, videoUrl, {
+            size: saved.size,
+            filename: saved.filename,
+            source: 'phone',
+          });
+        }
+        if (!count) return send(res, 404, { error: '未找到对应订单' });
+        await save(db);
+        return send(res, 200, {
+          ok: true,
+          videoUrl,
+          filename: saved.filename,
+          size: saved.size,
+          boundOrders: count,
+          makeBatchId: makeBatchId || null,
+          orderId: orderId || null,
+        });
+      } catch (e) {
+        return send(res, e.status || 500, { error: e.message });
+      }
+    }
 
     if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
 
@@ -582,8 +720,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+ensure()
+  .then(() => {
 server.listen(PORT, () => {
   console.log(`四季果先 API 已启动: http://localhost:${PORT}`);
   console.log(`管理端: http://localhost:${PORT}/admin/`);
   console.log(`账号: ${ADMIN_USER} / ${ADMIN_PASS}  支付模式: ${PAY_MODE}`);
 });
+  })
+  .catch((e) => {
+    console.error('数据库初始化失败:', e);
+    process.exit(1);
+  });

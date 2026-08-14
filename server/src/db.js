@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+const DRIVER = (process.env.DB_DRIVER || 'json').toLowerCase();
 
 const defaultDb = () => ({
   products: [],
@@ -16,24 +17,6 @@ const defaultDb = () => ({
   },
   seq: { orderDay: '', pickupNo: 0 },
 });
-
-function ensure() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(DB_FILE)) {
-    const db = defaultDb();
-    seedProducts(db);
-    save(db);
-  }
-}
-
-function load() {
-  ensure();
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-}
-
-function save(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
-}
 
 function seedProducts(db) {
   const now = Date.now();
@@ -114,4 +97,41 @@ function seedProducts(db) {
   ];
 }
 
-module.exports = { load, save, ensure, DATA_DIR, DB_FILE };
+function ensureJson() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(DB_FILE)) {
+    const db = defaultDb();
+    seedProducts(db);
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+  }
+}
+
+async function ensure() {
+  if (DRIVER === 'mysql') {
+    const mysql = require('./db-mysql');
+    await mysql.ensureMysql(seedProducts);
+    return;
+  }
+  ensureJson();
+}
+
+async function load() {
+  if (DRIVER === 'mysql') {
+    const mysql = require('./db-mysql');
+    return mysql.loadMysql();
+  }
+  ensureJson();
+  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+}
+
+async function save(db) {
+  if (DRIVER === 'mysql') {
+    const mysql = require('./db-mysql');
+    await mysql.saveMysql(db);
+    return;
+  }
+  ensureJson();
+  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+}
+
+module.exports = { load, save, ensure, seedProducts, DATA_DIR, DB_FILE, DRIVER };

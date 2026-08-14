@@ -43,7 +43,7 @@ function calcAmount(product, specId, extras = [], quantity = 1) {
 }
 
 async function createOrder({ userId, openid, productId, specId, extras, quantity, remark }) {
-  const db = load();
+  const db = await load();
   const product = db.products.find((p) => p.id === productId && p.status === 1);
   if (!product) throw Object.assign(new Error('商品不存在'), { status: 404 });
   if (!productId || !specId) throw Object.assign(new Error('请选择商品和规格'), { status: 400 });
@@ -74,12 +74,12 @@ async function createOrder({ userId, openid, productId, specId, extras, quantity
   };
 
   db.orders.unshift(order);
-  save(db);
+  await save(db);
   return order;
 }
 
 async function markPaid(orderId, { transactionId, payMode } = {}) {
-  const db = load();
+  const db = await load();
   const order = db.orders.find((o) => o.id === orderId);
   if (!order) throw Object.assign(new Error('订单不存在'), { status: 404 });
   if (['paid', 'making', 'ready', 'done'].includes(order.status)) return order;
@@ -96,7 +96,7 @@ async function markPaid(orderId, { transactionId, payMode } = {}) {
   order.paidAt = Date.now();
   order.printed = false;
   order.updatedAt = Date.now();
-  save(db);
+  await save(db);
   return order;
 }
 
@@ -184,18 +184,25 @@ function getQueueInfo(order, db) {
   const ahead = aheadList.length;
   const position = ahead + 1;
   const making = status === 'making';
+  const batchCodes = (order.makeBatchCodes || []).filter((c) => c && c !== order.pickupCode);
+  const batchTip =
+    making && batchCodes.length
+      ? `（与 ${batchCodes.join('、')} 一同制作）`
+      : '';
 
   return {
     phase: making ? 'making' : 'queued',
     title: making ? '正在制作' : '排队中',
     tip: making
-      ? `师傅正在制作您的果切（取餐码 ${order.pickupCode}）`
+      ? `师傅正在制作您的果切（取餐码 ${order.pickupCode}）${batchTip}`
       : ahead === 0
         ? '马上轮到您，请稍候'
         : `前面还有 ${ahead} 单，您排第 ${position} 位`,
     ahead,
     position,
     queueTotal: active.length,
+    makeBatchId: order.makeBatchId || null,
+    makeBatchCodes: order.makeBatchCodes || [],
     steps: [
       { key: 'pay', label: '下单支付', done: true, current: false },
       { key: 'queue', label: making ? '制作中' : '排队制作', done: false, current: true },

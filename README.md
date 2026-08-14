@@ -60,17 +60,15 @@ cd server && node src/index.js
 
 完整说明见 [docs/HARDWARE.md](./docs/HARDWARE.md)。
 
+## 数据存在哪？
+
+- 开发默认：`DB_DRIVER=json` → 本地 `server/data/db.json`
+- **正式**：`DB_DRIVER=mysql` → 腾讯云 / 阿里云 MySQL（表结构见 `server/sql/schema.sql`）
+
+摄像头制作录像：见 [docs/摄像头录像.md](./docs/摄像头录像.md)（RTSP 助手在 `recorder/`）。
+
+你还缺哪些账号/资源，见 [docs/缺什么.md](./docs/缺什么.md)。
+
 ## 上线微信支付 + 云打印
 
 完整步骤见 [docs/PAY_AND_PRINT.md](./docs/PAY_AND_PRINT.md)。
-
-摘要：
-
-1. `.env` 设 `PAY_MODE=wechat`，填写 `WX_APPID / WX_SECRET / WX_MCH_ID / WX_API_KEY / WX_NOTIFY_URL`
-2. `.env` 设 `CLOUD_PRINT_ENABLED=true`，按飞鹅或易联云填写对应参数
-3. 支付成功后自动：出取餐码 → 推送到云打印机
-
-## 品牌色
-
-- 主橙 `#F5A623`
-- 叶绿 `#4CAF50`

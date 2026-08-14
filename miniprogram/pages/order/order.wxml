@@ -33,6 +33,12 @@
     <view class="code">{{order.pickupCode}}</view>
     <image wx:if="{{qrDataUrl}}" class="qr" src="{{qrDataUrl}}" mode="aspectFit" show-menu-by-longpress />
     <view class="muted">长按二维码可保存 · 店员扫码核销</view>
+
+    <view
+      class="btn-primary watch"
+      wx:if="{{order.videoUrl || queue.phase === 'making' || queue.phase === 'ready' || queue.phase === 'done'}}"
+      bindtap="goVideo"
+    >{{order.videoUrl ? '观看制作过程' : '制作视频生成中…'}}</view>
   </view>
 
   <view class="card">

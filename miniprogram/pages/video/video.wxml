@@ -1,0 +1,28 @@
+<view class="page" wx:if="{{order}}">
+  <view class="card head">
+    <view class="code">取餐码 {{order.pickupCode}}</view>
+    <view class="muted">{{order.productName}} · {{order.specName}}</view>
+    <view class="muted" wx:if="{{batchText}}">同批：{{batchText}}</view>
+  </view>
+
+  <view class="player-wrap" wx:if="{{videoUrl}}">
+    <video
+      id="makerVideo"
+      class="player"
+      src="{{videoUrl}}"
+      controls
+      show-center-play-btn
+      enable-play-gesture
+      object-fit="contain"
+      poster=""
+    />
+  </view>
+
+  <view class="card empty" wx:else>
+    <view class="title">制作视频生成中</view>
+    <view class="muted">店员完成制作并上传后即可观看，请下拉刷新或稍后再来</view>
+    <view class="btn-primary" style="margin-top:32rpx" bindtap="reload">刷新</view>
+  </view>
+
+  <view class="tip muted">视频仅供查看本单制作过程，请勿外传。</view>
+</view>

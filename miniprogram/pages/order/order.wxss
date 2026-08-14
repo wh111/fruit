@@ -59,6 +59,7 @@
   line-height: 1.1;
   margin: 16rpx 0;
 }
+.watch { margin: 28rpx 24rpx 8rpx; }
 .qr {
   width: 360rpx;
   height: 360rpx;

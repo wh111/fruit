@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>四季果先 · 制作台</title>
+  <link rel="stylesheet" href="./css/make.css" />
+</head>
+<body>
+  <div id="login" class="screen">
+    <img class="logo" src="/assets/logo.png" alt="" />
+    <h1>制作台</h1>
+    <p class="muted">点「开始制作」自动录像，点「待取」自动上传<br/>无需店内电脑</p>
+    <input id="user" value="admin" placeholder="账号" />
+    <input id="pass" type="password" value="admin123" placeholder="密码" />
+    <button id="loginBtn" class="btn primary">进入</button>
+    <p id="loginErr" class="err"></p>
+  </div>
+
+  <div id="main" class="screen hidden">
+    <header>
+      <div>
+        <strong>制作台</strong>
+        <span id="recBadge" class="badge">未录像</span>
+      </div>
+      <button id="logoutBtn" class="btn ghost">退出</button>
+    </header>
+
+    <section class="cam">
+      <video id="preview" playsinline muted autoplay></video>
+      <p class="muted tip">请允许摄像头权限，把镜头对准操作台</p>
+    </section>
+
+    <section class="batch">
+      <div class="row">
+        <button id="selectPaid" class="btn">全选待制作</button>
+        <span id="selHint" class="muted">未选择</span>
+      </div>
+      <button id="startBtn" class="btn primary big">开始制作（自动录像）</button>
+      <button id="readyBtn" class="btn green big">制作完成 · 待取（自动上传）</button>
+      <p id="statusText" class="status"></p>
+    </section>
+
+    <section class="list" id="list"></section>
+  </div>
+
+  <script src="./js/make.js"></script>
+</body>
+</html>

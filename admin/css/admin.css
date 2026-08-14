@@ -106,6 +106,11 @@ body {
   cursor: pointer;
   font-size: 14px;
 }
+a.nav.link {
+  display: block;
+  text-decoration: none;
+  color: #ffe082;
+}
 .nav.active, .nav:hover { background: rgba(76, 175, 80, 0.25); color: #fff; }
 .logout { margin-top: auto; color: #a5d6a7 !important; }
 
@@ -115,6 +120,34 @@ body {
 .top-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .switch { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
 .switch input { accent-color: var(--orange); width: auto; }
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  background: #faf8f3;
+  border-radius: 12px;
+}
+.order-card .pick {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+.order-card .pick input { width: 18px; height: 18px; accent-color: var(--orange); }
+.batch-codes { color: #e8910f; font-size: 12px; margin-top: 4px; }
+
+.phone-video-tip {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: #e8f5e9;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.phone-video-tip strong { color: #2e7d32; display: block; margin-bottom: 4px; }
+
 .toast {
   position: fixed; top: 24px; right: 24px; z-index: 99;
   background: #1f2a1f; color: #fff; padding: 14px 18px; border-radius: 12px;

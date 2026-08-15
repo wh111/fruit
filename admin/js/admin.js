@@ -264,17 +264,42 @@ async function loadOrders() {
     </table>`;
 }
 
+function mediaSrc(url) {
+  if (!url) return '';
+  if (/^https?:\/\//.test(url)) return url;
+  return url;
+}
+
+function setCoverPreview(url) {
+  const img = $('#p_cover_preview');
+  const cover = (url || '').trim();
+  $('#p_cover').value = cover;
+  if (cover) {
+    img.src = mediaSrc(cover);
+    img.classList.remove('hidden');
+  } else {
+    img.removeAttribute('src');
+    img.classList.add('hidden');
+  }
+  $$('#coverGallery button').forEach((btn) => {
+    btn.classList.toggle('on', btn.dataset.url === cover);
+  });
+}
+
 async function loadProducts() {
   const { list } = await api('/api/admin/products');
   $('#productTable').innerHTML = `
     <table>
-      <thead><tr><th>名称</th><th>分类</th><th>规格</th><th>状态</th><th>操作</th></tr></thead>
+      <thead><tr><th>商品</th><th>分类</th><th>规格</th><th>状态</th><th>操作</th></tr></thead>
       <tbody>
         ${list
           .map((p) => {
             const specs = (p.specs || []).map((s) => `${s.name}¥${s.price}`).join(' / ');
+            const thumb = p.cover
+              ? `<img class="product-thumb" src="${mediaSrc(p.cover)}" alt="" />`
+              : '';
             return `<tr>
-              <td><strong>${p.name}</strong><br/><span class="muted">${p.desc || ''}</span></td>
+              <td>${thumb}<strong>${p.name}</strong><br/><span class="muted">${p.desc || ''}</span></td>
               <td>${p.category}</td>
               <td>${specs}</td>
               <td>${p.status === 1 ? '上架' : '下架'}</td>
@@ -293,13 +318,13 @@ window.editProduct = function editProduct(p) {
   $('#productDialogTitle').textContent = p?.id ? '编辑商品' : '新增果切';
   $('#p_id').value = p?.id || '';
   $('#p_name').value = p?.name || '';
-  $('#p_category').value = p?.category || '经典果切';
+  $('#p_category').value = p?.category || '果切系列';
   $('#p_desc').value = p?.desc || '';
+  setCoverPreview(p?.cover || '');
+  $('#coverGallery').classList.add('hidden');
+  $('#coverGallery').innerHTML = '';
   $('#p_specs').value = JSON.stringify(
-    p?.specs || [
-      { id: 's', name: '小杯', price: 12.9, stock: 999 },
-      { id: 'm', name: '中杯', price: 18.9, stock: 999 },
-    ],
+    p?.specs || [{ id: 'std', name: '标准', price: 15, stock: 999 }],
     null,
     2
   );
@@ -322,6 +347,7 @@ async function saveProduct(e) {
     name: $('#p_name').value.trim(),
     category: $('#p_category').value.trim(),
     desc: $('#p_desc').value.trim(),
+    cover: $('#p_cover').value.trim(),
     specs,
     extras,
     status: 1,
@@ -330,6 +356,56 @@ async function saveProduct(e) {
   else await api('/api/admin/products', { method: 'POST', body: JSON.stringify(body) });
   $('#productDialog').close();
   loadProducts();
+}
+
+async function showCoverGallery() {
+  const box = $('#coverGallery');
+  box.classList.remove('hidden');
+  box.innerHTML = '<span class="muted">加载图库…</span>';
+  try {
+    const { list } = await api('/api/admin/product-covers');
+    if (!list.length) {
+      box.innerHTML = '<span class="muted">暂无图片，请先上传</span>';
+      return;
+    }
+    const current = $('#p_cover').value.trim();
+    box.innerHTML = list
+      .map(
+        (item) => `
+      <button type="button" class="${item.url === current ? 'on' : ''}" data-url="${item.url}" title="${item.name}">
+        <img src="${mediaSrc(item.url)}" alt="${item.name}" />
+      </button>`
+      )
+      .join('');
+    box.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => setCoverPreview(btn.dataset.url));
+    });
+  } catch (err) {
+    box.innerHTML = `<span class="error">${err.message || '加载失败'}</span>`;
+  }
+}
+
+async function onCoverFilePicked(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  toast('正在上传图片…');
+  try {
+    const res = await fetch(`${API}/api/admin/product-cover/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${state.token}`,
+        'Content-Type': file.type || 'image/jpeg',
+      },
+      body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '上传失败');
+    setCoverPreview(data.cover);
+    toast('图片已上传');
+    if (!$('#coverGallery').classList.contains('hidden')) showCoverGallery();
+  } catch (err) {
+    toast(err.message || '上传失败');
+  }
 }
 
 window.offProduct = async function offProduct(id) {
@@ -458,6 +534,16 @@ $('#statusFilter').addEventListener('change', loadOrders);
 $('#verifyBtn').addEventListener('click', verify);
 $('#addProductBtn').addEventListener('click', () => editProduct(null));
 $('#saveProductBtn').addEventListener('click', saveProduct);
+$('#pickCoverBtn')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  showCoverGallery();
+});
+$('#uploadCoverBtn')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  $('#p_cover_file').click();
+});
+$('#p_cover_file')?.addEventListener('change', onCoverFilePicked);
+$('#p_cover')?.addEventListener('input', () => setCoverPreview($('#p_cover').value));
 $$('.nav').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
 $('#batchMakingBtn')?.addEventListener('click', () => batchSetStatus('making'));

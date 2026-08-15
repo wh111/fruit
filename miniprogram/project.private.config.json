@@ -1,0 +1,14 @@
+{
+  "description": "本地私有配置",
+  "projectname": "四季果先",
+  "appid": "wx7f915cfcf3f86b92",
+  "setting": {
+    "urlCheck": false,
+    "coverView": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "compileHotReLoad": false,
+    "checkSiteMap": false
+  }
+}

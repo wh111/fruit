@@ -7,14 +7,16 @@
     </view>
   </view>
 
-  <scroll-view scroll-x class="cats" enable-flex>
+  <scroll-view scroll-x class="cats" enhanced show-scrollbar="{{false}}">
     <view
       class="cat {{activeCat === item ? 'on' : ''}}"
       wx:for="{{categories}}"
       wx:key="*this"
       data-cat="{{item}}"
       bindtap="onCat"
-    >{{item}}</view>
+    >
+      <text class="cat-text">{{item}}</text>
+    </view>
   </scroll-view>
 
   <view class="list">

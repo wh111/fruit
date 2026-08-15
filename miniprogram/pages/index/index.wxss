@@ -15,22 +15,34 @@
 
 .cats {
   white-space: nowrap;
-  padding: 0 24rpx 8rpx;
-  display: flex;
+  padding: 8rpx 24rpx 16rpx;
+  height: 88rpx;
+  box-sizing: border-box;
 }
 .cat {
-  display: inline-block;
-  padding: 12rpx 28rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 64rpx;
+  padding: 0 28rpx;
   margin-right: 16rpx;
   background: #fff;
   border-radius: 999rpx;
   color: #666;
   font-size: 26rpx;
+  line-height: 1;
+  box-sizing: border-box;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 .cat.on {
   background: #f5a623;
   color: #fff;
   font-weight: 600;
+}
+.cat-text {
+  line-height: 1.2;
+  display: block;
 }
 
 .item {

@@ -551,6 +551,33 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, { list: (await load()).products });
   }
 
+  /** 可选商品封面图（菜单素材库） */
+  if (pathname === '/api/admin/product-covers' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const dirs = [
+      path.join(ROOT, 'assets', 'products', 'menu'),
+      path.join(ROOT, 'assets', 'products'),
+      path.join(__dirname, '..', 'uploads'),
+    ];
+    const list = [];
+    const seen = new Set();
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      for (const name of fs.readdirSync(dir)) {
+        if (!/\.(png|jpe?g|webp|gif|svg)$/i.test(name)) continue;
+        const full = path.join(dir, name);
+        if (!fs.statSync(full).isFile()) continue;
+        const rel = dir.includes(`${path.sep}uploads`)
+          ? `/uploads/${name}`
+          : `/assets/products/${dir.endsWith('menu') ? `menu/${name}` : name}`;
+        if (seen.has(rel)) continue;
+        seen.add(rel);
+        list.push({ url: rel, name });
+      }
+    }
+    return send(res, 200, { list });
+  }
+
   if (pathname === '/api/admin/products' && method === 'POST') {
     if (!requireAdmin(req, res)) return;
     const db = await load();
@@ -653,6 +680,30 @@ const server = http.createServer(async (req, res) => {
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     let pathname = decodeURIComponent(url.pathname);
+
+    // 商品封面图上传
+    if (pathname === '/api/admin/product-cover/upload' && req.method === 'POST') {
+      if (!requireAdmin(req, res)) return;
+      try {
+        const buf = await readBuffer(req, 8 * 1024 * 1024);
+        if (!buf.length) return send(res, 400, { error: '空文件' });
+        const ct = (req.headers['content-type'] || '').toLowerCase();
+        const ext = ct.includes('png')
+          ? 'png'
+          : ct.includes('webp')
+            ? 'webp'
+            : ct.includes('gif')
+              ? 'gif'
+              : 'jpg';
+        const dir = path.join(ROOT, 'assets', 'products', 'menu');
+        fs.mkdirSync(dir, { recursive: true });
+        const filename = `upload-${Date.now()}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
+        fs.writeFileSync(path.join(dir, filename), buf);
+        return send(res, 200, { ok: true, cover: `/assets/products/menu/${filename}` });
+      } catch (e) {
+        return send(res, e.status || 500, { error: e.message });
+      }
+    }
 
     // 视频二进制上传（勿走 JSON body）— 支持 makeBatchId 或 orderId（手机拍摄上传）
     if (pathname === '/api/admin/videos/upload' && req.method === 'POST') {

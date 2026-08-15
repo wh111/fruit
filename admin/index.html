@@ -140,6 +140,19 @@
       <input id="p_category" />
       <label>简介</label>
       <textarea id="p_desc" rows="2"></textarea>
+      <label>商品图片</label>
+      <div class="cover-editor">
+        <img id="p_cover_preview" class="cover-preview" alt="封面预览" />
+        <div class="cover-fields">
+          <input id="p_cover" placeholder="/assets/products/menu/xxx.png" />
+          <div class="cover-actions">
+            <button type="button" class="btn sm" id="pickCoverBtn">从图库选择</button>
+            <button type="button" class="btn sm" id="uploadCoverBtn">上传图片</button>
+            <input type="file" id="p_cover_file" accept="image/*" hidden />
+          </div>
+        </div>
+      </div>
+      <div id="coverGallery" class="cover-gallery hidden"></div>
       <label>规格 JSON（id/name/price）</label>
       <textarea id="p_specs" rows="4"></textarea>
       <label>加料 JSON</label>

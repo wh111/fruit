@@ -1,9 +1,9 @@
 /**
- * 真机调试必须用电脑局域网 IP，不能用 127.0.0.1（那是手机自己）
- * 手机和电脑要同一网段；浏览器打开 http://IP:3000/api/health 能通即可
+ * 临时走 HTTP 80（当前网络会 RST TCP 443）。
+ * 体验版 / 正式版请改回 https://sijixiansheng.xin
  */
 const config = {
-  baseUrl: 'http://10.17.0.44:3000',
+  baseUrl: 'http://sijixiansheng.xin',
   shopName: '四季果先',
 };
 

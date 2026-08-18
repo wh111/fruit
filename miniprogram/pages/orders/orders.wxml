@@ -4,7 +4,7 @@
       <text class="name">{{item.productName}}</text>
       <text class="status">{{item.statusText}}</text>
     </view>
-    <view class="muted">{{item.specName}} ×{{item.quantity}}</view>
+    <view class="muted">{{item.specName}} ×{{item.quantity}}<text wx:if="{{item.fulfillmentType === 'reserve'}}"> · {{item.pickupAtText}}</text></view>
     <view class="queue-tip" wx:if="{{item.queueTip}}">{{item.queueTip}}</view>
     <view class="bottom">
       <text class="code" wx:if="{{item.pickupCode}}">取餐码 {{item.pickupCode}}</text>

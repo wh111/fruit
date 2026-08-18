@@ -3,9 +3,13 @@
     <image class="hero-logo" src="/images/logo.png" mode="aspectFit" />
     <view class="hero-text">
       <text class="brand">四季果先</text>
-      <text class="slogan">当季鲜切 · 现切现取</text>
+      <text class="slogan">当季鲜切 · 提前订更优惠</text>
     </view>
   </view>
+
+  <view class="promo" wx:if="{{promoHint}}">{{promoHint}}</view>
+  <view class="err" wx:if="{{loadError}}">{{loadError}}</view>
+  <view class="debug">接口 {{debugApi}} · {{debugEnv}}</view>
 
   <scroll-view scroll-x class="cats" enhanced show-scrollbar="{{false}}">
     <view
@@ -34,6 +38,7 @@
         <view class="row">
           <text class="price">¥{{item.minPrice}}</text>
           <text class="muted">起</text>
+          <text class="preorder" wx:if="{{item.preorderPrice}}">预订¥{{item.preorderPrice}}</text>
           <view class="buy">选规格</view>
         </view>
       </view>

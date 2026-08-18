@@ -167,7 +167,14 @@ function updateSelHint() {
 
 async function refreshList() {
   const { list } = await api('/api/admin/orders');
-  const show = list.filter((o) => ['paid', 'making', 'ready'].includes(o.status));
+  const show = list
+    .filter((o) => ['paid', 'making', 'ready'].includes(o.status))
+    .sort((a, b) => {
+      const ar = a.fulfillmentType === 'reserve' && a.status === 'paid' ? 1 : 0;
+      const br = b.fulfillmentType === 'reserve' && b.status === 'paid' ? 1 : 0;
+      if (ar !== br) return ar - br;
+      return (a.pickupAt || a.paidAt || 0) - (b.pickupAt || b.paidAt || 0);
+    });
   $('#list').innerHTML = show.length
     ? show
         .map((o) => {
@@ -178,6 +185,7 @@ async function refreshList() {
             <div class="meta">
               <div>${o.productName} · ${o.specName}</div>
               <div class="tag ${o.status}">${STATUS[o.status] || o.status}${o.videoUrl ? ' · 已有视频' : ''}</div>
+              <div class="muted">${o.fulfillmentType === 'reserve' ? `预约 ${o.pickupAtText || ''}` : '现取'} · ¥${o.amount}</div>
             </div>
           </label>`;
         })

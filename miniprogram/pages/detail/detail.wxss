@@ -33,6 +33,29 @@
   padding: 16rpx;
 }
 
+.promo-card {
+  background: linear-gradient(135deg, #fff8e7 0%, #e8f5e9 100%);
+}
+.promo-title { font-weight: 800; margin-bottom: 8rpx; }
+.promo-line { color: #3d8b40; font-size: 26rpx; line-height: 1.5; margin-bottom: 8rpx; }
+
+.modes { display: flex; gap: 16rpx; }
+.mode {
+  flex: 1;
+  padding: 20rpx 18rpx;
+  border-radius: 20rpx;
+  background: #f7f4ee;
+  border: 2rpx solid transparent;
+}
+.mode.on {
+  background: #fff8e7;
+  border-color: #f5a623;
+}
+.mode.off { opacity: 0.45; }
+.mode-name { font-weight: 700; font-size: 28rpx; }
+.mode-desc { margin-top: 8rpx; color: #8a8a8a; font-size: 22rpx; line-height: 1.4; }
+.chip.sale { color: #c86100; }
+
 .footer {
   position: fixed; left: 0; right: 0; bottom: 0;
   background: #fff;
@@ -41,5 +64,13 @@
   box-shadow: 0 -8rpx 24rpx rgba(0,0,0,0.04);
 }
 .total { flex: 1; font-size: 28rpx; }
+.save { color: #4caf50; font-size: 22rpx; font-weight: 700; margin-bottom: 4rpx; }
+.strike {
+  margin-left: 10rpx;
+  color: #b0b0b0;
+  font-size: 24rpx;
+  text-decoration: line-through;
+  font-weight: 400;
+}
 .pay { flex: 1.2; }
-.page { padding-bottom: 160rpx; }
+.page { padding-bottom: 180rpx; }

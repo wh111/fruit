@@ -16,6 +16,13 @@
     </view>
 
     <!-- 排队位次 -->
+    <view class="queue-box" wx:if="{{queue.phase === 'reserved'}}">
+      <view class="queue-num reserved">
+        <text class="big">{{order.pickupAtText}}</text>
+      </view>
+      <view class="queue-meta muted">店员会按该时间集中制作，高峰不用现场等</view>
+    </view>
+
     <view class="queue-box" wx:if="{{queue.phase === 'queued' || queue.phase === 'making'}}">
       <view class="queue-num" wx:if="{{queue.phase === 'queued'}}">
         <text class="big">{{queue.position}}</text>
@@ -45,7 +52,12 @@
     <view class="row"><text>商品</text><text>{{order.productName}}</text></view>
     <view class="row"><text>规格</text><text>{{order.specName}} ×{{order.quantity}}</text></view>
     <view class="row" wx:if="{{extraText}}"><text>加料</text><text>{{extraText}}</text></view>
-    <view class="row"><text>金额</text><text class="price">¥{{order.amount}}</text></view>
+    <view class="row"><text>取餐</text><text>{{order.fulfillmentType === 'reserve' ? (order.pickupAtText || '预约') : '现作现取'}}</text></view>
+    <view class="row" wx:if="{{order.discountRate > 0}}"><text>优惠</text><text>{{order.discountLabel}}</text></view>
+    <view class="row">
+      <text>金额</text>
+      <text class="price">¥{{order.amount}}<text class="strike" wx:if="{{order.originalAmount && order.discountRate > 0}}">¥{{order.originalAmount}}</text></text>
+    </view>
     <view class="row"><text>订单号</text><text class="small">{{order.orderNo}}</text></view>
     <view class="row"><text>状态</text><text>{{statusText}}</text></view>
   </view>

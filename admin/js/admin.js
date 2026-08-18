@@ -135,6 +135,31 @@ function logout() {
   showMain(false);
 }
 
+function fulfillmentNote(o) {
+  if (o.fulfillmentType === 'reserve') {
+    return `预约 ${o.pickupAtText || ''}`.trim();
+  }
+  return '现取';
+}
+
+function amountNote(o) {
+  if (o.discountRate > 0 && o.originalAmount) {
+    return `¥${o.amount}<span class="muted"> 原价¥${o.originalAmount}</span>`;
+  }
+  return `¥${o.amount}`;
+}
+
+function sortDeskOrders(list) {
+  return [...list].sort((a, b) => {
+    const ar = a.fulfillmentType === 'reserve' && a.status === 'paid' ? 1 : 0;
+    const br = b.fulfillmentType === 'reserve' && b.status === 'paid' ? 1 : 0;
+    if (ar !== br) return ar - br;
+    const at = a.pickupAt || a.paidAt || a.createdAt || 0;
+    const bt = b.pickupAt || b.paidAt || b.createdAt || 0;
+    return at - bt;
+  });
+}
+
 async function loadStats() {
   const s = await api('/api/admin/stats');
   $('#stats').innerHTML = `
@@ -145,7 +170,7 @@ async function loadStats() {
   `;
   const { list } = await api('/api/admin/orders');
   await watchNewOrders(list);
-  const pending = list.filter((o) => ['paid', 'making', 'ready'].includes(o.status));
+  const pending = sortDeskOrders(list.filter((o) => ['paid', 'making', 'ready'].includes(o.status)));
   const newest = pending[0]?.id;
   $('#pendingList').innerHTML = pending.length
     ? pending
@@ -168,7 +193,7 @@ async function loadStats() {
         <div class="pickup">${o.pickupCode || '--'}</div>
         <div style="flex:1">
           <div><strong>${o.productName}</strong> · ${o.specName} ×${o.quantity}</div>
-          <div class="muted">${STATUS_TEXT[o.status]} · ¥${o.amount}${o.printed ? ' · 已打标' : ''}</div>
+          <div class="muted">${STATUS_TEXT[o.status]} · ${fulfillmentNote(o)} · ${amountNote(o)}${o.printed ? ' · 已打标' : ''}</div>
           ${batchNote}${videoNote}
         </div>
         <div class="actions">
@@ -238,7 +263,7 @@ async function loadOrders() {
     <table>
       <thead>
         <tr>
-          <th>取餐码</th><th>商品</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th>
+          <th>取餐码</th><th>商品</th><th>取餐</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th>
         </tr>
       </thead>
       <tbody>
@@ -249,7 +274,8 @@ async function loadOrders() {
             return `<tr>
               <td><strong>${o.pickupCode || '-'}</strong></td>
               <td>${o.productName}<br/><span class="muted">${o.specName} ×${o.quantity}</span></td>
-              <td>¥${o.amount}</td>
+              <td>${fulfillmentNote(o)}</td>
+              <td>${amountNote(o)}</td>
               <td><span class="tag ${o.status}">${STATUS_TEXT[o.status] || o.status}</span></td>
               <td>${ts}</td>
               <td class="actions">

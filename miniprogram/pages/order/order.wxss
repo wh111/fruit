@@ -47,7 +47,8 @@
   color: #e8910f;
   line-height: 1;
 }
-.queue-num.making .big { font-size: 48rpx; color: #4caf50; }
+.queue-num.making .big { font-size: 40rpx; color: #4caf50; }
+.queue-num.reserved .big { font-size: 40rpx; color: #e8910f; }
 .queue-num .unit { font-size: 28rpx; color: #e8910f; font-weight: 700; }
 .queue-meta { margin-top: 12rpx; }
 
@@ -76,4 +77,11 @@
 }
 .row text:first-child { color: #8a8a8a; flex-shrink: 0; }
 .small { font-size: 22rpx; word-break: break-all; text-align: right; }
+.strike {
+  margin-left: 10rpx;
+  color: #b0b0b0;
+  font-size: 24rpx;
+  text-decoration: line-through;
+  font-weight: 400;
+}
 .actions { margin: 24rpx; }

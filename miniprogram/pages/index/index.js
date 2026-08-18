@@ -6,6 +6,11 @@ Page({
     filtered: [],
     categories: ['全部'],
     activeCat: '全部',
+    promoHint: '',
+    promoOpen: false,
+    loadError: '',
+    debugApi: '',
+    debugEnv: '',
   },
 
   onShow() {
@@ -17,22 +22,44 @@ Page({
   },
 
   async load() {
+    let debugEnv = '';
+    try {
+      debugEnv = wx.getAccountInfoSync().miniProgram.envVersion || '';
+    } catch (_) {
+      /* ignore */
+    }
+    const { config } = require('../../utils/api');
+    this.setData({ debugApi: config.baseUrl, debugEnv });
     try {
       await ensureLogin().catch(() => null);
-      const { list } = await request('/api/products');
-      const products = list.map((p) => {
+      const [productRes, promo] = await Promise.all([
+        request('/api/products'),
+        request('/api/promo').catch(() => ({})),
+      ]);
+      const promoOpen = !!(promo.lunchOpen || promo.eveningOpen);
+      const products = productRes.list.map((p) => {
         const prices = (p.specs || []).map((s) => Number(s.price));
+        const min = prices.length ? Math.min(...prices) : 0;
         return {
           ...p,
           coverUrl: mediaUrl(p.cover),
-          minPrice: prices.length ? Math.min(...prices).toFixed(1) : '0',
+          minPrice: min ? min.toFixed(1) : '0',
+          preorderPrice: promoOpen && min ? (min * 0.8).toFixed(1) : '',
         };
       });
       const cats = ['全部', ...new Set(products.map((p) => p.category))];
-      this.setData({ products, categories: cats });
+      this.setData({
+        products,
+        categories: cats,
+        promoHint: promo.hint || '',
+        promoOpen,
+        loadError: '',
+      });
       this.filter(this.data.activeCat);
     } catch (e) {
-      wx.showToast({ title: e.message || '加载失败', icon: 'none' });
+      const loadError = e.message || '加载失败';
+      this.setData({ loadError, products: [], filtered: [] });
+      wx.showModal({ title: '连不上后端', content: loadError, showCancel: false });
     }
   },
 

@@ -28,7 +28,10 @@ Page({
       this.setData({
         list: list.map((o) => ({
           ...o,
-          statusText: STATUS[o.status] || o.status,
+          statusText:
+            o.fulfillmentType === 'reserve' && o.status === 'paid'
+              ? '已预约'
+              : STATUS[o.status] || o.status,
           queueTip: o.queueTip || '',
         })),
       });

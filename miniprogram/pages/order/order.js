@@ -40,7 +40,7 @@ Page({
     this.stopPoll();
     this._timer = setInterval(() => {
       const phase = this.data.queue && this.data.queue.phase;
-      if (['queued', 'making', 'ready', 'paid'].includes(phase) || ['paid', 'making', 'ready'].includes(this.data.order && this.data.order.status)) {
+      if (['queued', 'making', 'ready', 'paid', 'reserved'].includes(phase) || ['paid', 'making', 'ready'].includes(this.data.order && this.data.order.status)) {
         if (this.data.order && this.data.order.status === 'done') {
           this.stopPoll();
           return;
@@ -66,7 +66,10 @@ Page({
         order: data.order,
         qrDataUrl: data.qrDataUrl || '',
         extraText: extras,
-        statusText: STATUS[data.order.status] || data.order.status,
+        statusText:
+          data.order.fulfillmentType === 'reserve' && data.order.status === 'paid'
+            ? '已预约'
+            : STATUS[data.order.status] || data.order.status,
         queue,
       });
       if (data.order.status === 'done' || data.order.status === 'cancelled') {

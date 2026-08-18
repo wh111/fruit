@@ -99,3 +99,4 @@ header {
 .tag { font-size: 12px; color: var(--muted); }
 .tag.making { color: #81c784; }
 .tag.ready { color: #64b5f6; }
+.muted { color: var(--muted); font-size: 12px; margin-top: 4px; }

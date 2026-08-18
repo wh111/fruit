@@ -6,6 +6,12 @@
     <view class="price">¥{{unitPrice}}</view>
   </view>
 
+  <view class="card promo-card" wx:if="{{promoHint}}">
+    <view class="promo-title">提前下单更优惠</view>
+    <view class="promo-line">{{promoHint}}</view>
+    <view class="muted">现作现取原价。预定只有两档：12 点取 / 6 点取。</view>
+  </view>
+
   <view class="card">
     <view class="section-title">规格</view>
     <view class="chips">
@@ -33,6 +39,41 @@
   </view>
 
   <view class="card">
+    <view class="section-title">取餐方式</view>
+    <view class="modes">
+      <view
+        class="mode {{fulfillmentType === 'now' ? 'on' : ''}}"
+        data-type="now"
+        bindtap="onFulfillment"
+      >
+        <view class="mode-name">现作现取</view>
+        <view class="mode-desc">下单后立即制作，原价</view>
+      </view>
+      <view
+        class="mode {{fulfillmentType === 'reserve' ? 'on' : ''}} {{canReserve ? '' : 'off'}}"
+        data-type="reserve"
+        bindtap="onFulfillment"
+      >
+        <view class="mode-name">提前预定</view>
+        <view class="mode-desc">{{reserveDesc}}</view>
+      </view>
+    </view>
+    <view class="slot-wrap" wx:if="{{fulfillmentType === 'reserve' && canReserve}}">
+      <view class="section-title" style="margin-top:24rpx">取餐时间</view>
+      <view class="chips">
+        <view
+          class="chip {{slotIndex === index ? 'on' : ''}} {{item.discount ? 'sale' : ''}}"
+          wx:for="{{slots}}"
+          wx:key="pickupAt"
+          wx:for-index="index"
+          data-index="{{index}}"
+          bindtap="onSlot"
+        >{{item.label}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
     <view class="section-title">数量</view>
     <view class="qty">
       <view class="qbtn" bindtap="dec">-</view>
@@ -44,7 +85,13 @@
   </view>
 
   <view class="footer">
-    <view class="total">合计 <text class="price">¥{{total}}</text></view>
+    <view class="total">
+      <view wx:if="{{hasDiscount}}" class="save">{{discountLabel}}</view>
+      <view>
+        合计 <text class="price">¥{{total}}</text>
+        <text class="strike" wx:if="{{hasDiscount}}">¥{{originalTotal}}</text>
+      </view>
+    </view>
     <view class="btn-primary pay" bindtap="submit">去支付</view>
   </view>
 </view>

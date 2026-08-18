@@ -23,14 +23,14 @@ function request(path, options = {}) {
       fail(err) {
         const msg = (err && err.errMsg) || '网络错误';
         const tip = config.baseUrl;
-        if (/timeout/i.test(msg)) {
-          reject(new Error(`请求超时：${tip}（真机请用局域网IP，勿用127.0.0.1）`));
+        if (/合法域名|url not in domain list|not in domain/i.test(msg)) {
+          reject(new Error(`域名未加入小程序白名单：${tip}。请在公众平台→开发管理→服务器域名，把 request/uploadFile/downloadFile 都填成该地址（需已 ICP 备案）`));
+        } else if (/ssl|tls|certificate|握手/i.test(msg)) {
+          reject(new Error(`HTTPS 失败：${tip}。请改用 4G 再试，办公室网络可能拦截该域名`));
+        } else if (/timeout/i.test(msg)) {
+          reject(new Error(`请求超时：${tip}`));
         } else if (/fail/i.test(msg)) {
-          reject(
-            new Error(
-              `连不上后端 ${tip}。请确认：1)手机与电脑同一WiFi/网段 2)详情→本地设置勾选不校验合法域名 3)电脑已启动服务`
-            )
-          );
+          reject(new Error(`连不上后端 ${tip}。${msg}`));
         } else {
           reject(new Error(msg));
         }

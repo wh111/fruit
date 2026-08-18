@@ -1,3 +1,5 @@
+const { formatHm } = require('./promo');
+
 function escapeHtml(s) {
   return String(s || '')
     .replace(/&/g, '&amp;')
@@ -10,6 +12,14 @@ function buildLabelHtml({ order, qrDataUrl, shopName }) {
   const extras = (order.extras || []).map((e) => e.name).join('+') || '无加料';
   const time = new Date(order.paidAt || order.createdAt);
   const timeStr = `${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')} ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+  const pickupStr =
+    order.fulfillmentType === 'reserve' && order.pickupAt
+      ? `预约 ${formatHm(order.pickupAt)}`
+      : `现取 ${timeStr}`;
+  const priceStr =
+    order.discountRate > 0 && order.originalAmount
+      ? `¥${order.amount}（原价¥${order.originalAmount}）`
+      : `¥${order.amount}`;
 
   return `<!DOCTYPE html>
 <html>
@@ -41,9 +51,9 @@ function buildLabelHtml({ order, qrDataUrl, shopName }) {
         <div class="brand">${escapeHtml(shopName || '四季果先')}</div>
         <div class="code">${escapeHtml(order.pickupCode)}</div>
         <div class="name">${escapeHtml(order.productName)} · ${escapeHtml(order.specName)}</div>
-        <div class="sub">${escapeHtml(extras)} ×${order.quantity}</div>
+        <div class="sub">${escapeHtml(extras)} ×${order.quantity} · ${escapeHtml(priceStr)}</div>
       </div>
-      <div class="time">${timeStr}</div>
+      <div class="time">${escapeHtml(pickupStr)}</div>
     </div>
   </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},200)}</script>

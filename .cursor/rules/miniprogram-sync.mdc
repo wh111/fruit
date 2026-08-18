@@ -1,0 +1,12 @@
+---
+description: Keep WeChat DevTools miniprogram copy in sync with git
+globs: miniprogram/**
+alwaysApply: true
+---
+
+# 小程序只有一份源码
+
+- 源码只改 `miniprogram/`（本仓库）。
+- 微信开发者工具目录 `/home/wujie/WeChatProjects/sijiguoxian-miniprogram` 必须是指向 `miniprogram/` 的符号链接，不要在那边单独改文件。
+- 改完 `miniprogram/` 后执行 `scripts/sync-miniprogram.sh`（Cursor `afterFileEdit` hook 也会跑）。
+- 不要再维护两套互拷的小程序代码。

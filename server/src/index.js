@@ -23,7 +23,8 @@ const { URL } = require('url');
 })();
 
 const { load, save, ensure } = require('./db');
-const { createOrder, markPaid, orderQrDataUrl, getQueueInfo } = require('./services/order');
+const { createOrder, quoteOrder, markPaid, orderQrDataUrl, getQueueInfo } = require('./services/order');
+const { getPromoState } = require('./services/promo');
 const { buildLabelHtml } = require('./services/label');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -201,6 +202,10 @@ async function handleApi(req, res, pathname) {
     });
   }
 
+  if (pathname === '/api/promo' && method === 'GET') {
+    return send(res, 200, getPromoState());
+  }
+
   if (pathname === '/api/products' && method === 'GET') {
     const db = await load();
     return send(res, 200, { list: db.products.filter((p) => p.status === 1).sort((a, b) => a.sort - b.sort) });
@@ -214,6 +219,22 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, p);
   }
 
+  if (pathname === '/api/orders/quote' && method === 'POST') {
+    try {
+      const quote = await quoteOrder({
+        productId: body.productId,
+        specId: body.specId,
+        extras: body.extras || [],
+        quantity: body.quantity || 1,
+        fulfillmentType: body.fulfillmentType,
+        pickupAt: body.pickupAt,
+      });
+      return send(res, 200, { quote });
+    } catch (e) {
+      return send(res, e.status || 500, { error: e.message });
+    }
+  }
+
   if (pathname === '/api/orders' && method === 'POST') {
     const user = auth(req);
     try {
@@ -225,6 +246,8 @@ async function handleApi(req, res, pathname) {
         extras: body.extras || [],
         quantity: body.quantity || 1,
         remark: body.remark,
+        fulfillmentType: body.fulfillmentType,
+        pickupAt: body.pickupAt,
       });
       return send(res, 200, { order });
     } catch (e) {
@@ -256,7 +279,9 @@ async function handleApi(req, res, pathname) {
               ? '正在制作'
               : queue.phase === 'ready'
                 ? '请取餐'
-                : queue.title || '',
+                : queue.phase === 'reserved'
+                  ? `预约 ${o.pickupAtText || '稍后'} 取餐`
+                  : queue.title || '',
       };
     });
     return send(res, 200, { list });

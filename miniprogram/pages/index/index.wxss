@@ -13,6 +13,30 @@
 .brand { display: block; font-size: 40rpx; font-weight: 800; color: #2a2a2a; }
 .slogan { display: block; margin-top: 8rpx; color: #4caf50; font-size: 24rpx; }
 
+.promo {
+  margin: 0 24rpx 16rpx;
+  padding: 18rpx 22rpx;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+.err {
+  margin: 0 24rpx 16rpx;
+  padding: 18rpx 22rpx;
+  background: #fdecea;
+  color: #c62828;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+.debug {
+  margin: 0 24rpx 12rpx;
+  color: #b0b0b0;
+  font-size: 20rpx;
+}
+
 .cats {
   white-space: nowrap;
   padding: 8rpx 24rpx 16rpx;
@@ -60,6 +84,12 @@
 .info { flex: 1; display: flex; flex-direction: column; }
 .name { font-size: 32rpx; font-weight: 700; margin-bottom: 8rpx; }
 .row { margin-top: auto; display: flex; align-items: baseline; gap: 6rpx; }
+.preorder {
+  margin-left: 8rpx;
+  color: #4caf50;
+  font-size: 22rpx;
+  font-weight: 700;
+}
 .buy {
   margin-left: auto;
   background: #4caf50;

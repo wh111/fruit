@@ -15,6 +15,20 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
+function pickupLine(order) {
+  if (order.fulfillmentType === 'reserve' && (order.pickupAtText || order.pickupAt)) {
+    return `预约取餐：${order.pickupAtText || order.pickupAt}`;
+  }
+  return '现作现取';
+}
+
+function amountLine(order) {
+  if (order.discountRate > 0 && order.originalAmount) {
+    return `金额：￥${order.amount}（原价￥${order.originalAmount} ${order.discountLabel || '8折'}）`;
+  }
+  return `金额：￥${order.amount}`;
+}
+
 function buildCloudTicket(order, shopName = '四季果先') {
   const extras = (order.extras || []).map((e) => e.name).join('+') || '无';
   const time = new Date(order.paidAt || order.createdAt);
@@ -26,8 +40,9 @@ function buildCloudTicket(order, shopName = '四季果先') {
     `商品：${order.productName}`,
     `规格：${order.specName} x${order.quantity}`,
     `加料：${extras}`,
-    `金额：￥${order.amount}`,
-    `时间：${ts}`,
+    amountLine(order),
+    pickupLine(order),
+    `下单：${ts}`,
     `单号：${order.orderNo}`,
     `--------------------------------`,
     `<QR>${order.qrPayload || order.orderNo}</QR>`,
@@ -47,8 +62,9 @@ function buildYlyContent(order, shopName = '四季果先') {
     `商品：${order.productName}`,
     `规格：${order.specName} x${order.quantity}`,
     `加料：${extras}`,
-    `金额：￥${order.amount}`,
-    `时间：${ts}`,
+    amountLine(order),
+    pickupLine(order),
+    `下单：${ts}`,
     `单号：${order.orderNo}`,
     `请核对取餐码制作`,
   ].join('\n');

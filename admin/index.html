@@ -39,7 +39,6 @@
           <button data-tab="products" class="nav">商品规格</button>
           <button data-tab="verify" class="nav">扫码核销</button>
           <button data-tab="hardware" class="nav">打印硬件</button>
-          <a class="nav link" href="/admin/make.html">制作台（自动录像）</a>
         </nav>
         <button id="logoutBtn" class="btn ghost logout">退出</button>
       </aside>
@@ -72,11 +71,6 @@
               <button type="button" class="btn" id="batchDoneBtn">批量完成</button>
               <span class="muted" id="batchHint">可勾选多个单号，一人同时做多份</span>
             </div>
-            <div class="phone-video-tip">
-              <strong>制作视频（用手机，不用电脑）</strong>
-              <p class="muted">做完后点订单上的「上传视频」，用手机拍摄或从相册选择，顾客即可在小程序观看。无需店内电脑、无需 RTSP 摄像头。</p>
-            </div>
-            <input type="file" id="phoneVideoInput" accept="video/*" capture="environment" hidden />
             <div id="pendingList" class="order-list"></div>
           </div>
         </div>

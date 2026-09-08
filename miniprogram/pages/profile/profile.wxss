@@ -5,6 +5,16 @@
   padding: 28rpx 0;
   border-bottom: 1rpx solid #f0ebe3;
   font-size: 30rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .menu .row:last-child { border-bottom: none; }
+.badge {
+  font-size: 22rpx;
+  color: #e8910f;
+  background: #fff3e0;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+}
 .title { font-weight: 700; margin-bottom: 12rpx; }

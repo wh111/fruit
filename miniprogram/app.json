@@ -4,7 +4,8 @@
     "pages/detail/detail",
     "pages/order/order",
     "pages/orders/orders",
-    "pages/video/video",
+    "pages/coupons/coupons",
+    "pages/groupbuy/groupbuy",
     "pages/profile/profile"
   ],
   "window": {
@@ -21,7 +22,7 @@
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "点果切",
+        "text": "点单",
         "iconPath": "images/tab-home.png",
         "selectedIconPath": "images/tab-home-active.png"
       },

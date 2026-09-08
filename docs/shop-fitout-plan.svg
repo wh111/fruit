@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="659" height="718" viewBox="0 0 659 718">
+  <defs>
+    <pattern id="hatch0" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1.2"/></pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="#FAFAFA"/>
+  <text x="329" y="42" text-anchor="middle" font-size="26" font-weight="bold"
+        font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" fill="#222222">平面图</text>
+  <rect x="290.00" y="250.00" width="78.60" height="97.80" fill="#FFFFFF" stroke="#222222" stroke-width="2.5"/>
+  <text x="329.30" y="393.80" font-size="14" fill="#666666" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">公共走廊</text>
+  <rect x="290.00" y="250.00" width="25.60" height="14.00" fill="#BDBDBD" stroke="#222222" stroke-width="1.5"/>
+  <rect x="290.00" y="250.00" width="25.60" height="14.00" fill="url(#hatch0)"/>
+  <text x="302.80" y="262.00" font-size="12" fill="#444" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">结构柱</text>
+  <text x="302.80" y="279.00" font-size="11" fill="#444" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">1280×700</text>
+  <line x1="315.60" y1="250.00" x2="368.60" y2="250.00" stroke="#2E7D32" stroke-width="3"/>
+  <text x="342.10" y="236.00" font-size="12" fill="#2E7D32" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">门面可视开间 ≈ 2.65m</text>
+  <rect x="290.00" y="250.00" width="11.80" height="11.00" fill="#C8A46E" stroke="#222222" stroke-width="1.2"/>
+  <text x="295.90" y="260.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">菜单灯箱
+柱面</text>
+  <rect x="301.80" y="250.00" width="15.80" height="11.00" fill="#E8F5E9" stroke="#222222" stroke-width="1.2"/>
+  <text x="309.70" y="260.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">收银/扫码台</text>
+  <rect x="317.60" y="250.00" width="23.60" height="11.00" fill="#E3F2FD" stroke="#222222" stroke-width="1.2"/>
+  <text x="329.40" y="260.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">玻璃观察面</text>
+  <rect x="341.20" y="250.00" width="7.80" height="11.00" fill="#FFF3E0" stroke="#222222" stroke-width="1.2"/>
+  <text x="345.10" y="260.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">取货口</text>
+  <rect x="349.00" y="250.00" width="19.60" height="11.00" fill="#ECEFF1" stroke="#222222" stroke-width="1.2"/>
+  <text x="358.80" y="260.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">冷柜区</text>
+  <rect x="308.00" y="279.00" width="39.00" height="47.00" fill="#F1F8E9" stroke="#2E7D32" stroke-width="2"/>
+  <text x="327.50" y="286.00" font-size="13" fill="#2E7D32" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">鲜切制作间（到顶玻璃）</text>
+  <rect x="311.00" y="290.00" width="33.00" height="14.00" fill="#FFFFFF" stroke="#666666" stroke-width="1"/>
+  <text x="327.50" y="297.40" font-size="11" fill="#666666" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">不锈钢切配台</text>
+  <rect x="311.00" y="308.00" width="11.00" height="9.00" fill="#FFFFFF" stroke="#666666" stroke-width="1"/>
+  <text x="316.40" y="313.40" font-size="10" fill="#666666" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">洗手池</text>
+  <rect x="333.00" y="308.00" width="11.00" height="9.00" fill="#FFFFFF" stroke="#666666" stroke-width="1"/>
+  <text x="338.60" y="313.40" font-size="10" fill="#666666" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">消毒/工具</text>
+  <rect x="342.80" y="251.00" width="4.60" height="7.00" fill="#FFE082" stroke="#222222" stroke-width="1.2"/>
+  <text x="345.10" y="254.80" font-size="10" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">传递窗</text>
+  <rect x="349.00" y="261.00" width="19.60" height="13.60" fill="#CFD8DC" stroke="#222222" stroke-width="1.5"/>
+  <text x="358.80" y="272.80" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">双门展示冷柜</text>
+  <rect x="295.00" y="334.80" width="11.00" height="11.00" fill="#FFFFFF" stroke="#666666" stroke-width="1" stroke-dasharray="5,4"/>
+  <text x="300.40" y="340.40" font-size="10" fill="#666666" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">储物</text>
+  <rect x="315.60" y="261.00" width="30.40" height="15.00" fill="#FFFFFF" stroke="#666666" stroke-width="1" stroke-dasharray="6,5"/>
+  <text x="326.60" y="269.40" font-size="11" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">顾客等候/取餐动线</text>
+  <line x1="290.00" y1="347.80" x2="290.00" y2="391.80" stroke="#1565C0" stroke-width="1"/>
+  <line x1="368.60" y1="347.80" x2="368.60" y2="391.80" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="383.80" x2="368.60" y2="383.80" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="379.80" x2="298.00" y2="387.80" stroke="#1565C0" stroke-width="1"/>
+  <line x1="360.60" y1="379.80" x2="368.60" y2="387.80" stroke="#1565C0" stroke-width="1"/>
+  <text x="329.30" y="401.80" font-size="13" fill="#1565C0" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">3930</text>
+  <line x1="368.60" y1="250.00" x2="318.60" y2="250.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="368.60" y1="347.80" x2="318.60" y2="347.80" stroke="#1565C0" stroke-width="1"/>
+  <line x1="326.60" y1="250.00" x2="326.60" y2="347.80" stroke="#1565C0" stroke-width="1"/>
+  <line x1="322.60" y1="250.00" x2="330.60" y2="258.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="322.60" y1="339.80" x2="330.60" y2="347.80" stroke="#1565C0" stroke-width="1"/>
+  <text x="316.60" y="303.90" font-size="13" fill="#1565C0" text-anchor="end" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">4890</text>
+  <line x1="290.00" y1="264.00" x2="290.00" y2="294.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="315.60" y1="264.00" x2="315.60" y2="294.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="286.00" x2="315.60" y2="286.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="282.00" x2="298.00" y2="290.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="307.60" y1="282.00" x2="315.60" y2="290.00" stroke="#1565C0" stroke-width="1"/>
+  <text x="302.80" y="304.00" font-size="13" fill="#1565C0" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">柱 1280</text>
+  <line x1="290.00" y1="250.00" x2="254.00" y2="250.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="264.00" x2="254.00" y2="264.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="262.00" y1="250.00" x2="262.00" y2="264.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="258.00" y1="250.00" x2="266.00" y2="258.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="258.00" y1="256.00" x2="266.00" y2="264.00" stroke="#1565C0" stroke-width="1"/>
+  <text x="252.00" y="262.00" font-size="13" fill="#1565C0" text-anchor="end" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">700</text>
+  <rect x="290.00" y="423.80" width="18.00" height="18.00" fill="#BDBDBD" stroke="#222222" stroke-width="1"/>
+  <text x="316.00" y="437.80" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">结构柱（不可拆）</text>
+  <rect x="460.00" y="423.80" width="18.00" height="18.00" fill="#E8F5E9" stroke="#222222" stroke-width="1"/>
+  <text x="486.00" y="437.80" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">前场收银区</text>
+  <rect x="630.00" y="423.80" width="18.00" height="18.00" fill="#F1F8E9" stroke="#222222" stroke-width="1"/>
+  <text x="656.00" y="437.80" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">玻璃封闭制作间</text>
+  <rect x="820.00" y="423.80" width="18.00" height="18.00" fill="#CFD8DC" stroke="#222222" stroke-width="1"/>
+  <text x="846.00" y="437.80" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">展示冷柜</text>
+  <rect x="268.60" y="567.80" width="360.00" height="118.00" fill="#FFFFFF" stroke="#222222" stroke-width="1.5"/>
+  <text x="284.60" y="597.80" font-size="18" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">四季果先 · 店铺装修施工图</text>
+  <text x="284.60" y="621.80" font-size="15" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">平面图</text>
+  <text x="284.60" y="645.80" font-size="13" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">铺位内净尺寸 3.93m × 4.89m</text>
+  <text x="284.60" y="665.80" font-size="12" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">比例 1:50  ·  单位 mm  ·  2026-08</text>
+</svg>

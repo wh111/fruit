@@ -6,10 +6,12 @@
     <view class="price">¥{{unitPrice}}</view>
   </view>
 
-  <view class="card promo-card" wx:if="{{promoHint}}">
-    <view class="promo-title">提前下单更优惠</view>
-    <view class="promo-line">{{promoHint}}</view>
-    <view class="muted">现作现取原价。预定只有两档：12 点取 / 6 点取。</view>
+  <view class="card promo-card" wx:if="{{promoHint || loyaltyLabel || loyaltyHint}}">
+    <view class="promo-title">优惠说明</view>
+    <view class="promo-line" wx:if="{{loyaltyLabel}}">{{loyaltyLabel}}（可与立减券同享）</view>
+    <view class="promo-line" wx:elif="{{loyaltyHint}}">{{loyaltyHint}}</view>
+    <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
+    <view class="muted">按单现切，取餐前最多 1 小时制作。预定仅 12 点 / 18 点取餐，一份也做。</view>
   </view>
 
   <view class="card">
@@ -42,14 +44,6 @@
     <view class="section-title">取餐方式</view>
     <view class="modes">
       <view
-        class="mode {{fulfillmentType === 'now' ? 'on' : ''}}"
-        data-type="now"
-        bindtap="onFulfillment"
-      >
-        <view class="mode-name">现作现取</view>
-        <view class="mode-desc">下单后立即制作，原价</view>
-      </view>
-      <view
         class="mode {{fulfillmentType === 'reserve' ? 'on' : ''}} {{canReserve ? '' : 'off'}}"
         data-type="reserve"
         bindtap="onFulfillment"
@@ -57,12 +51,20 @@
         <view class="mode-name">提前预定</view>
         <view class="mode-desc">{{reserveDesc}}</view>
       </view>
+      <view
+        class="mode {{fulfillmentType === 'now' ? 'on' : ''}}"
+        data-type="now"
+        bindtap="onFulfillment"
+      >
+        <view class="mode-name">现作现取</view>
+        <view class="mode-desc">马上做，高峰可能要等</view>
+      </view>
     </view>
     <view class="slot-wrap" wx:if="{{fulfillmentType === 'reserve' && canReserve}}">
       <view class="section-title" style="margin-top:24rpx">取餐时间</view>
       <view class="chips">
         <view
-          class="chip {{slotIndex === index ? 'on' : ''}} {{item.discount ? 'sale' : ''}}"
+          class="chip {{slotIndex === index ? 'on' : ''}}"
           wx:for="{{slots}}"
           wx:key="pickupAt"
           wx:for-index="index"
@@ -70,6 +72,17 @@
           bindtap="onSlot"
         >{{item.label}}</view>
       </view>
+    </view>
+  </view>
+
+  <view class="card coupon-card" bindtap="onPickCoupon">
+    <view class="coupon-row">
+      <view class="section-title" style="margin:0">优惠券</view>
+      <view class="coupon-value {{hasDiscount ? 'on' : ''}}">{{couponLabel}}</view>
+    </view>
+    <view class="muted" style="margin-top:8rpx">
+      每单限用 1 张 · 可与月累计折扣叠加
+      <text wx:if="{{monthPaid}}"> · 本月已付 {{monthPaid}} 单</text>
     </view>
   </view>
 

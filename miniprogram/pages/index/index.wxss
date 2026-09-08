@@ -11,7 +11,23 @@
 }
 .hero-logo { width: 120rpx; height: 120rpx; background: #fff; border-radius: 24rpx; }
 .brand { display: block; font-size: 40rpx; font-weight: 800; color: #2a2a2a; }
-.slogan { display: block; margin-top: 8rpx; color: #4caf50; font-size: 24rpx; }
+.slogan { display: block; margin-top: 8rpx; color: #2e7d32; font-size: 28rpx; font-weight: 700; }
+.slogan-sub { display: block; margin-top: 6rpx; color: #4caf50; font-size: 22rpx; }
+
+.fresh-pledge {
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 20rpx;
+  background: #fff;
+  border: 2rpx solid #c8e6c9;
+  border-radius: 16rpx;
+  color: #33691e;
+  font-size: 22rpx;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+}
+.fresh-dot { color: #4caf50; font-size: 16rpx; line-height: 1.8; flex-shrink: 0; }
 
 .promo {
   margin: 0 24rpx 16rpx;
@@ -22,6 +38,56 @@
   font-size: 24rpx;
   line-height: 1.5;
 }
+
+.banner {
+  margin: 0 24rpx 16rpx;
+  padding: 28rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(120deg, #2e7d32 0%, #43a047 48%, #f5a623 100%);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20rpx;
+  box-shadow: 0 12rpx 28rpx rgba(46, 125, 50, 0.22);
+}
+.banner-tag {
+  display: inline-block;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 20rpx;
+  margin-bottom: 10rpx;
+}
+.banner-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 1.3;
+}
+.banner-sub {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  opacity: 0.92;
+  line-height: 1.4;
+}
+.banner-right {
+  flex-shrink: 0;
+  text-align: center;
+}
+.banner-btn {
+  background: #fff;
+  color: #2e7d32;
+  font-weight: 700;
+  font-size: 24rpx;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+}
+.banner-count {
+  margin-top: 10rpx;
+  font-size: 20rpx;
+  opacity: 0.9;
+}
+
 .err {
   margin: 0 24rpx 16rpx;
   padding: 18rpx 22rpx;

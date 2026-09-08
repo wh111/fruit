@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="hero card">
+    <view class="tag">企业团购</view>
+    <view class="title">多份一起订，电话沟通就行</view>
+    <view class="sub">{{groupBuyHint}}</view>
+  </view>
+
+  <view class="card">
+    <view class="section">怎么订</view>
+    <view class="point" wx:for="{{points}}" wx:key="*this">· {{item}}</view>
+  </view>
+
+  <view class="card contact">
+    <view class="section">联系门店</view>
+    <view class="name">{{shopName}}<text wx:if="{{shopContact}}"> · {{shopContact}}</text></view>
+    <view class="phone" bindtap="copyPhone">{{shopPhone}}</view>
+    <view class="muted">点击号码可复制；下面按钮直接拨打</view>
+  </view>
+
+  <view class="btn-primary call" bindtap="callShop">打电话咨询团购</view>
+</view>

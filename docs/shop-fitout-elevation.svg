@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="659" height="695" viewBox="0 0 659 695">
+  <defs>
+    <pattern id="hatch0" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1.2"/></pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="#FAFAFA"/>
+  <text x="329" y="42" text-anchor="middle" font-size="26" font-weight="bold"
+        font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" fill="#222222">正立面图</text>
+  <line x1="260.00" y1="325.00" x2="398.60" y2="325.00" stroke="#222222" stroke-width="2"/>
+  <text x="329.30" y="353.00" font-size="13" fill="#666666" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">走廊地面 ±0.00</text>
+  <rect x="290.00" y="311.00" width="25.60" height="14.00" fill="#BDBDBD" stroke="#222222" stroke-width="1.5"/>
+  <rect x="290.00" y="311.00" width="25.60" height="14.00" fill="url(#hatch0)"/>
+  <text x="302.80" y="323.00" font-size="12" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">结构柱</text>
+  <rect x="290.00" y="270.00" width="78.60" height="8.40" fill="#2E7D32" stroke="#222222" stroke-width="1.5"/>
+  <text x="329.30" y="282.20" font-size="13" fill="#FFFFFF" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">四季果先  SEASONAL FRUIT  ·  门头招牌（绿色铝塑/发光字）</text>
+  <rect x="290.00" y="306.00" width="11.80" height="19.00" fill="#C8A46E" stroke="#222222" stroke-width="1.2"/>
+  <line x1="290.80" y1="307.60" x2="301.00" y2="307.60" stroke="#FFFFFF88" stroke-width="3"/>
+  <text x="295.90" y="320.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">菜单灯箱</text>
+  <rect x="301.80" y="306.00" width="15.80" height="19.00" fill="#C8A46E" stroke="#222222" stroke-width="1.2"/>
+  <line x1="302.60" y1="307.60" x2="316.80" y2="307.60" stroke="#FFFFFF88" stroke-width="3"/>
+  <text x="309.70" y="320.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">木饰面柜台</text>
+  <rect x="317.60" y="306.00" width="23.60" height="19.00" fill="#E3F2FD" stroke="#222222" stroke-width="1.2"/>
+  <rect x="318.80" y="307.00" width="21.20" height="8.00" fill="#FFFFFFAA" stroke="#2E7D32" stroke-width="1.5"/>
+  <text x="329.40" y="318.40" font-size="12" fill="#2E7D32" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">鲜切制作间</text>
+  <text x="329.40" y="320.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">钢化玻璃</text>
+  <rect x="341.20" y="306.00" width="7.80" height="19.00" fill="#C8A46E" stroke="#222222" stroke-width="1.2"/>
+  <line x1="342.00" y1="307.60" x2="348.20" y2="307.60" stroke="#FFFFFF88" stroke-width="3"/>
+  <text x="345.10" y="320.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">取货口</text>
+  <rect x="349.00" y="306.00" width="19.60" height="19.00" fill="#CFD8DC" stroke="#222222" stroke-width="1.2"/>
+  <line x1="358.80" y1="307.00" x2="358.80" y2="322.00" stroke="#666666" stroke-width="1.5"/>
+  <line x1="352.53" y1="307.00" x2="352.53" y2="322.00" stroke="#90A4AE" stroke-width="0.8"/>
+  <line x1="356.06" y1="307.00" x2="356.06" y2="322.00" stroke="#90A4AE" stroke-width="0.8"/>
+  <line x1="361.54" y1="307.00" x2="361.54" y2="322.00" stroke="#90A4AE" stroke-width="0.8"/>
+  <line x1="365.07" y1="307.00" x2="365.07" y2="322.00" stroke="#90A4AE" stroke-width="0.8"/>
+  <text x="358.80" y="320.50" font-size="11" fill="#222222" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">双门冷柜</text>
+  <rect x="290.00" y="305.00" width="78.60" height="1.00" fill="#FFFFFF" stroke="#222222" stroke-width="1"/>
+  <line x1="315.60" y1="325.00" x2="315.60" y2="357.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="368.60" y1="325.00" x2="368.60" y2="357.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="315.60" y1="349.00" x2="368.60" y2="349.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="315.60" y1="345.00" x2="323.60" y2="353.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="360.60" y1="345.00" x2="368.60" y2="353.00" stroke="#1565C0" stroke-width="1"/>
+  <text x="342.10" y="367.00" font-size="13" fill="#1565C0" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">可视开间 2.65m</text>
+  <line x1="290.00" y1="270.00" x2="290.00" y2="318.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="368.60" y1="270.00" x2="368.60" y2="318.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="310.00" x2="368.60" y2="310.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="306.00" x2="298.00" y2="314.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="360.60" y1="306.00" x2="368.60" y2="314.00" stroke="#1565C0" stroke-width="1"/>
+  <text x="329.30" y="328.00" font-size="13" fill="#1565C0" text-anchor="middle" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">总宽 3930</text>
+  <line x1="290.00" y1="325.00" x2="246.00" y2="325.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="290.00" y1="270.00" x2="246.00" y2="270.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="254.00" y1="325.00" x2="254.00" y2="270.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="250.00" y1="325.00" x2="258.00" y2="333.00" stroke="#1565C0" stroke-width="1"/>
+  <line x1="250.00" y1="262.00" x2="258.00" y2="270.00" stroke="#1565C0" stroke-width="1"/>
+  <text x="244.00" y="302.50" font-size="13" fill="#1565C0" text-anchor="end" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">2750000</text>
+  <rect x="290.00" y="385.00" width="18.00" height="18.00" fill="#2E7D32" stroke="#222222" stroke-width="1"/>
+  <text x="316.00" y="399.00" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">品牌绿色系</text>
+  <rect x="440.00" y="385.00" width="18.00" height="18.00" fill="#C8A46E" stroke="#222222" stroke-width="1"/>
+  <text x="466.00" y="399.00" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">木饰面/柜台</text>
+  <rect x="610.00" y="385.00" width="18.00" height="18.00" fill="#E3F2FD" stroke="#222222" stroke-width="1"/>
+  <text x="636.00" y="399.00" font-size="13" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">玻璃制作间可视面</text>
+  <rect x="268.60" y="545.00" width="360.00" height="118.00" fill="#FFFFFF" stroke="#222222" stroke-width="1.5"/>
+  <text x="284.60" y="575.00" font-size="18" fill="#222222" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="bold">四季果先 · 店铺装修施工图</text>
+  <text x="284.60" y="599.00" font-size="15" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">正立面图</text>
+  <text x="284.60" y="623.00" font-size="13" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">铺位内净尺寸 3.93m × 4.89m</text>
+  <text x="284.60" y="643.00" font-size="12" fill="#666666" text-anchor="start" font-family="Noto Sans CJK SC, Microsoft YaHei, sans-serif" font-weight="normal">比例 1:50  ·  单位 mm  ·  2026-08</text>
+</svg>

@@ -11,5 +11,5 @@
       <text class="price">¥{{item.amount}}</text>
     </view>
   </view>
-  <view wx:if="{{!list.length}}" class="empty muted">还没有订单，去点一份果切吧</view>
+  <view wx:if="{{!list.length}}" class="empty muted">还没有订单，去点一份吧</view>
 </view>

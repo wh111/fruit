@@ -87,9 +87,4 @@ Page({
   goHome() {
     wx.switchTab({ url: '/pages/index/index' });
   },
-
-  goVideo() {
-    if (!this.data.order) return;
-    wx.navigateTo({ url: `/pages/video/video?id=${this.data.order.id}` });
-  },
 });

@@ -23,8 +23,22 @@ const { URL } = require('url');
 })();
 
 const { load, save, ensure } = require('./db');
-const { createOrder, quoteOrder, markPaid, orderQrDataUrl, getQueueInfo } = require('./services/order');
+const {
+  createOrder,
+  quoteOrder,
+  markPaid,
+  orderQrDataUrl,
+  getQueueInfo,
+  restoreCouponForOrder,
+} = require('./services/order');
 const { getPromoState } = require('./services/promo');
+const {
+  grantLoginCoupons,
+  listUserCoupons,
+  campaignInfo,
+  ensureCoupons,
+} = require('./services/coupon');
+const { getLoyaltyState } = require('./services/loyalty');
 const { buildLabelHtml } = require('./services/label');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -158,6 +172,21 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/health') return send(res, 200, { ok: true, name: '四季果先', time: Date.now() });
 
+  if (pathname === '/api/shop' && method === 'GET') {
+    const db = await load();
+    const s = db.settings || {};
+    return send(res, 200, {
+      shopName: s.shopName || '四季果先',
+      shopPhone: s.shopPhone || '18813017847',
+      shopContact: s.shopContact || '',
+      tagline: s.tagline || '',
+      pickupHint: s.pickupHint || '',
+      groupBuyHint:
+        s.groupBuyHint ||
+        '企业团购、部门下午茶、会议用果，电话沟通即可。10 份起订，可按 12:00 / 18:00 取餐。',
+    });
+  }
+
   if (pathname === '/api/auth/admin/login' && method === 'POST') {
     if (body.username === ADMIN_USER && body.password === ADMIN_PASS) {
       return send(res, 200, { token: signToken({ role: 'admin', username: body.username }), username: body.username });
@@ -167,6 +196,7 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/auth/wxlogin' && method === 'POST') {
     const db = await load();
+    ensureCoupons(db);
     let openid = '';
     const wechat = require('./services/wechat');
     if (process.env.WX_APPID && process.env.WX_SECRET && body.code && !String(body.code).startsWith('dev')) {
@@ -180,7 +210,9 @@ async function handleApi(req, res, pathname) {
     if (!openid) openid = `dev_${body.code || 'guest'}`;
 
     let user = db.users.find((u) => u.openid === openid);
+    let isNew = false;
     if (!user) {
+      isNew = true;
       user = {
         id: crypto.randomUUID(),
         openid,
@@ -189,21 +221,96 @@ async function handleApi(req, res, pathname) {
         createdAt: Date.now(),
       };
       db.users.push(user);
-      await save(db);
     } else if (body.nickName) {
       user.nickName = body.nickName;
       user.avatarUrl = body.avatarUrl || user.avatarUrl;
-      await save(db);
     }
+
+    const grants = grantLoginCoupons(db, user);
+    await save(db);
+
     const token = signToken({ role: 'user', userId: user.id, openid }, 30);
+    const mine = listUserCoupons(db, user.id);
     return send(res, 200, {
       token,
-      user: { id: user.id, nickName: user.nickName, avatarUrl: user.avatarUrl, openid: openid.startsWith('dev_') ? undefined : openid },
+      user: {
+        id: user.id,
+        nickName: user.nickName,
+        avatarUrl: user.avatarUrl,
+        openid: openid.startsWith('dev_') ? undefined : openid,
+      },
+      isNew,
+      welcomeGranted: !!grants.welcome.granted,
+      welcomeCouponCount: grants.welcome.granted ? grants.welcome.coupons.length : 0,
+      monthlyGranted: !!grants.monthly.granted,
+      monthlyCouponCount: grants.monthly.granted ? grants.monthly.coupons.length : 0,
+      couponSummary: mine.summary,
+      campaign: campaignInfo(),
+    });
+  }
+
+  if (pathname === '/api/coupons/campaign' && method === 'GET') {
+    return send(res, 200, campaignInfo());
+  }
+
+  if (pathname === '/api/coupons/mine' && method === 'GET') {
+    const user = auth(req);
+    if (!user?.userId) return send(res, 401, { error: '请先登录' });
+    const db = await load();
+    ensureCoupons(db);
+    const u = db.users.find((x) => x.id === user.userId);
+    const grants = u ? grantLoginCoupons(db, u) : { welcome: { granted: false }, monthly: { granted: false }, changed: false };
+    if (grants.changed) await save(db);
+    const mine = listUserCoupons(db, user.userId);
+    return send(res, 200, {
+      ...mine,
+      welcomeGranted: !!grants.welcome.granted,
+      welcomeCouponCount: grants.welcome.granted ? grants.welcome.coupons.length : 0,
+      monthlyGranted: !!grants.monthly.granted,
+      monthlyCouponCount: grants.monthly.granted ? grants.monthly.coupons.length : 0,
     });
   }
 
   if (pathname === '/api/promo' && method === 'GET') {
-    return send(res, 200, getPromoState());
+    const user = auth(req);
+    const state = getPromoState();
+    if (user?.userId) {
+      const db = await load();
+      state.loyalty = getLoyaltyState(db, {
+        userId: user.userId,
+        openid: user.openid,
+        includeCurrent: false,
+      });
+    } else {
+      state.loyalty = {
+        monthPaid: 0,
+        monthCount: 0,
+        tier: 0,
+        rate: 0,
+        label: '',
+        nextHint: '本月满3单95折，满10单9折；可与立减券同享',
+        rules: [
+          '自然月累计：满 3 单享 95 折，满 10 单享 9 折',
+          '可与立减券叠加：先打折，再减券',
+        ],
+      };
+    }
+    return send(res, 200, state);
+  }
+
+  if (pathname === '/api/loyalty/mine' && method === 'GET') {
+    const user = auth(req);
+    if (!user?.userId) return send(res, 401, { error: '请先登录' });
+    const db = await load();
+    return send(
+      res,
+      200,
+      getLoyaltyState(db, {
+        userId: user.userId,
+        openid: user.openid,
+        includeCurrent: false,
+      })
+    );
   }
 
   if (pathname === '/api/products' && method === 'GET') {
@@ -220,6 +327,7 @@ async function handleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/orders/quote' && method === 'POST') {
+    const user = auth(req);
     try {
       const quote = await quoteOrder({
         productId: body.productId,
@@ -228,6 +336,10 @@ async function handleApi(req, res, pathname) {
         quantity: body.quantity || 1,
         fulfillmentType: body.fulfillmentType,
         pickupAt: body.pickupAt,
+        couponId: body.couponId,
+        userId: user?.userId,
+        openid: user?.openid,
+        autoCoupon: body.autoCoupon !== false,
       });
       return send(res, 200, { quote });
     } catch (e) {
@@ -248,6 +360,8 @@ async function handleApi(req, res, pathname) {
         remark: body.remark,
         fulfillmentType: body.fulfillmentType,
         pickupAt: body.pickupAt,
+        couponId: body.couponId,
+        autoCoupon: body.autoCoupon !== false,
       });
       return send(res, 200, { order });
     } catch (e) {
@@ -392,6 +506,7 @@ async function handleApi(req, res, pathname) {
     if (method === 'POST' && action === 'cancel') {
       if (!order) return send(res, 404, { error: '订单不存在' });
       if (order.status !== 'pending_pay') return send(res, 400, { error: '仅未支付订单可取消' });
+      restoreCouponForOrder(db, order);
       order.status = 'cancelled';
       order.updatedAt = Date.now();
       await save(db);

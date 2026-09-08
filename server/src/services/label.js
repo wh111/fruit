@@ -17,7 +17,7 @@ function buildLabelHtml({ order, qrDataUrl, shopName }) {
       ? `预约 ${formatHm(order.pickupAt)}`
       : `现取 ${timeStr}`;
   const priceStr =
-    order.discountRate > 0 && order.originalAmount
+    order.discountAmount > 0 && order.originalAmount
       ? `¥${order.amount}（原价¥${order.originalAmount}）`
       : `¥${order.amount}`;
 

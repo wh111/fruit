@@ -23,8 +23,8 @@ function pickupLine(order) {
 }
 
 function amountLine(order) {
-  if (order.discountRate > 0 && order.originalAmount) {
-    return `金额：￥${order.amount}（原价￥${order.originalAmount} ${order.discountLabel || '8折'}）`;
+  if (order.discountAmount > 0 && order.originalAmount) {
+    return `金额：￥${order.amount}（原价￥${order.originalAmount} ${order.discountLabel || '优惠券'}）`;
   }
   return `金额：￥${order.amount}`;
 }

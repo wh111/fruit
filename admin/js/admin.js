@@ -143,7 +143,7 @@ function fulfillmentNote(o) {
 }
 
 function amountNote(o) {
-  if (o.discountRate > 0 && o.originalAmount) {
+  if (o.discountAmount > 0 && o.originalAmount) {
     return `¥${o.amount}<span class="muted"> 原价¥${o.originalAmount}</span>`;
   }
   return `¥${o.amount}`;
@@ -180,11 +180,6 @@ async function loadStats() {
             o.makeBatchCodes && o.makeBatchCodes.length > 1
               ? `<div class="batch-codes">同批：${o.makeBatchCodes.join('、')}</div>`
               : '';
-          const videoNote = o.videoUrl
-            ? `<div class="batch-codes" style="color:#4caf50">制作视频已就绪</div>`
-            : ['making', 'ready', 'done'].includes(o.status)
-              ? `<div class="batch-codes">可上传手机拍摄视频</div>`
-              : '';
           return `
       <div class="order-card ${o.id === newest ? 'new' : ''}">
         <label class="pick">${
@@ -194,15 +189,10 @@ async function loadStats() {
         <div style="flex:1">
           <div><strong>${o.productName}</strong> · ${o.specName} ×${o.quantity}</div>
           <div class="muted">${STATUS_TEXT[o.status]} · ${fulfillmentNote(o)} · ${amountNote(o)}${o.printed ? ' · 已打标' : ''}</div>
-          ${batchNote}${videoNote}
+          ${batchNote}
         </div>
         <div class="actions">
           <button class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
-          ${
-            !o.videoUrl && ['making', 'ready', 'done', 'paid'].includes(o.status)
-              ? `<button class="btn sm primary" onclick="uploadPhoneVideo('${o.id}','${o.makeBatchId || ''}')">上传视频</button>`
-              : ''
-          }
           <button class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>
           <button class="btn sm" onclick="setStatus('${o.id}','making')">制作中</button>
           <button class="btn sm" onclick="setStatus('${o.id}','ready')">待取</button>
@@ -341,7 +331,7 @@ async function loadProducts() {
 }
 
 window.editProduct = function editProduct(p) {
-  $('#productDialogTitle').textContent = p?.id ? '编辑商品' : '新增果切';
+  $('#productDialogTitle').textContent = p?.id ? '编辑商品' : '新增商品';
   $('#p_id').value = p?.id || '';
   $('#p_name').value = p?.name || '';
   $('#p_category').value = p?.category || '果切系列';

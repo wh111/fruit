@@ -45,7 +45,7 @@ function mediaUrl(path) {
   return `${config.baseUrl}${path}`;
 }
 
-function wxLoginWithTimeout(ms = 3000) {
+function wxLoginWithTimeout(ms = 8000) {
   return new Promise((resolve) => {
     let done = false;
     const finish = (code) => {
@@ -67,20 +67,100 @@ function wxLoginWithTimeout(ms = 3000) {
   });
 }
 
-async function ensureLogin() {
+function rememberGrantPending(data) {
+  if (data && data.welcomeGranted) {
+    wx.setStorageSync('welcomeGrantedPending', {
+      count: data.welcomeCouponCount || 21,
+      at: Date.now(),
+    });
+  }
+  if (data && data.monthlyGranted) {
+    wx.setStorageSync('monthlyGrantedPending', {
+      count: data.monthlyCouponCount || 3,
+      at: Date.now(),
+    });
+  }
+}
+
+function clearSession() {
+  wx.removeStorageSync('token');
+  wx.removeStorageSync('user');
+  try {
+    const app = getApp();
+    if (app && app.globalData) {
+      app.globalData.token = '';
+      app.globalData.user = null;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+/**
+ * 登录并确保发券：
+ * - 无 token / force：走 wx.login → wxlogin（服务端发券）
+ * - 有 token：调 /api/coupons/mine 发券；401 则清 token 重登
+ * 解决：扫码进店沿用旧 token 时不发券、只有「重新登录」才有券
+ */
+async function ensureLogin(opts = {}) {
+  const doWxLogin = async () => {
+    const code = await wxLoginWithTimeout(8000);
+    const data = await request('/api/auth/wxlogin', {
+      method: 'POST',
+      data: { code },
+    });
+    wx.setStorageSync('token', data.token);
+    wx.setStorageSync('user', data.user);
+    if (data.couponSummary) wx.setStorageSync('couponSummary', data.couponSummary);
+    try {
+      const app = getApp();
+      app.globalData.token = data.token;
+      app.globalData.user = data.user;
+    } catch (_) {
+      /* ignore */
+    }
+    rememberGrantPending(data);
+    return {
+      token: data.token,
+      welcomeGranted: !!data.welcomeGranted,
+      welcomeCouponCount: data.welcomeCouponCount || 0,
+      monthlyGranted: !!data.monthlyGranted,
+      monthlyCouponCount: data.monthlyCouponCount || 0,
+      couponSummary: data.couponSummary,
+      campaign: data.campaign,
+    };
+  };
+
+  if (opts.force) clearSession();
+
   let token = wx.getStorageSync('token');
-  if (token) return token;
-  const code = await wxLoginWithTimeout(3000);
-  const data = await request('/api/auth/wxlogin', {
-    method: 'POST',
-    data: { code },
-  });
-  wx.setStorageSync('token', data.token);
-  wx.setStorageSync('user', data.user);
-  const app = getApp();
-  app.globalData.token = data.token;
-  app.globalData.user = data.user;
-  return data.token;
+  if (token && !opts.force) {
+    try {
+      const mine = await request('/api/coupons/mine');
+      if (mine.summary) wx.setStorageSync('couponSummary', mine.summary);
+      rememberGrantPending(mine);
+      return {
+        token,
+        welcomeGranted: !!mine.welcomeGranted,
+        welcomeCouponCount: mine.welcomeCouponCount || 0,
+        monthlyGranted: !!mine.monthlyGranted,
+        monthlyCouponCount: mine.monthlyCouponCount || 0,
+        couponSummary: mine.summary,
+        reused: true,
+      };
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      // token 失效或未登录 → 清掉重登
+      if (/请先登录|未登录|401|无权/.test(msg) || !wx.getStorageSync('token')) {
+        clearSession();
+      } else {
+        // 网络错误：保留 token，但告诉调用方这次没发到券
+        return { token, welcomeGranted: false, monthlyGranted: false, offline: true };
+      }
+    }
+  }
+
+  return doWxLogin();
 }
 
 function rememberOrderId(id) {
@@ -91,10 +171,26 @@ function rememberOrderId(id) {
   }
 }
 
+function consumeWelcomeToast() {
+  const pending = wx.getStorageSync('welcomeGrantedPending');
+  if (!pending || !pending.count) return null;
+  wx.removeStorageSync('welcomeGrantedPending');
+  return pending;
+}
+
+function consumeMonthlyToast() {
+  const pending = wx.getStorageSync('monthlyGrantedPending');
+  if (!pending || !pending.count) return null;
+  wx.removeStorageSync('monthlyGrantedPending');
+  return pending;
+}
+
 module.exports = {
   request,
   mediaUrl,
   ensureLogin,
   rememberOrderId,
+  consumeWelcomeToast,
+  consumeMonthlyToast,
   config,
 };

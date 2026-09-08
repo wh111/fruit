@@ -1,12 +1,11 @@
 /**
- * 提前预定优惠（Asia/Shanghai）
+ * 提前预定批次（Asia/Shanghai）
  * 仅两个批次：
- * - 11:00 前预定，12:00 取餐：8 折
- * - 17:00 前预定，18:00 取餐：8 折
- * 现作现取：原价
+ * - 11:00 前预定，12:00 取餐
+ * - 17:00 前预定，18:00 取餐
+ * 现作现取为补充；优惠走优惠券
  */
 const TZ = '+08:00';
-const DISCOUNT_RATE = 0.2;
 const LUNCH_ORDER_BEFORE = 11 * 60;
 const LUNCH_PICKUP = 12 * 60;
 const EVENING_ORDER_BEFORE = 17 * 60;
@@ -82,8 +81,7 @@ function batchDefs(now = Date.now()) {
       pickupMinutes: LUNCH_PICKUP,
       time: '12:00',
       pickupAt: shopStamp(n.y, n.m, n.d, 12, 0),
-      label: '12:00 取餐 · 8折',
-      discountLabel: '11点前预定12点取 · 8折',
+      label: '12:00 取餐',
       reason: '11:00 前预定，12:00 取餐',
     },
     {
@@ -92,8 +90,7 @@ function batchDefs(now = Date.now()) {
       pickupMinutes: EVENING_PICKUP,
       time: '18:00',
       pickupAt: shopStamp(n.y, n.m, n.d, 18, 0),
-      label: '18:00 取餐 · 8折',
-      discountLabel: '5点前预定6点取 · 8折',
+      label: '18:00 取餐',
       reason: '17:00 前预定，18:00 取餐',
     },
   ];
@@ -115,54 +112,26 @@ function buildSlots(now = Date.now()) {
       pickupAt: b.pickupAt,
       time: b.time,
       code: b.code,
-      discount: true,
-      discountLabel: b.discountLabel,
+      discount: false,
       label: b.label,
     }));
 }
 
-function discountInfo({ fulfillmentType, pickupAt, now = Date.now() }) {
-  if (fulfillmentType !== 'reserve' || !pickupAt) {
-    return { rate: 0, code: '', label: '', reason: '现作现取不享受提前预定优惠' };
-  }
-  const n = shopParts(now);
-  const batch = matchBatch(pickupAt, now);
-  if (!batch) {
-    return { rate: 0, code: '', label: '', reason: '仅可预定 12:00 或 18:00 取餐' };
-  }
-  if (n.minutes >= batch.orderBefore) {
-    return { rate: 0, code: '', label: '', reason: `${batch.time} 批次已截止预定` };
-  }
-  return {
-    rate: DISCOUNT_RATE,
-    code: batch.code,
-    label: batch.discountLabel,
-    reason: batch.reason,
-  };
+/** @deprecated 预定不再打折；保留空实现兼容旧调用 */
+function discountInfo() {
+  return { rate: 0, code: '', label: '', reason: '优惠请使用优惠券' };
 }
 
 function applyDiscount(originalAmount, disc) {
   const original = round2(originalAmount);
-  if (!disc || !disc.rate) {
-    return {
-      originalAmount: original,
-      amount: original,
-      discountAmount: 0,
-      discountRate: 0,
-      discountCode: '',
-      discountLabel: '',
-      discountReason: (disc && disc.reason) || '',
-    };
-  }
-  const amount = round2(original * (1 - disc.rate));
   return {
     originalAmount: original,
-    amount,
-    discountAmount: round2(original - amount),
-    discountRate: disc.rate,
-    discountCode: disc.code,
-    discountLabel: disc.label,
-    discountReason: disc.reason,
+    amount: original,
+    discountAmount: 0,
+    discountRate: 0,
+    discountCode: '',
+    discountLabel: '',
+    discountReason: (disc && disc.reason) || '',
   };
 }
 
@@ -172,25 +141,29 @@ function getPromoState(now = Date.now()) {
   const eveningOpen = n.minutes < EVENING_ORDER_BEFORE;
   const slots = buildSlots(now);
   const banners = [];
-  if (lunchOpen) banners.push('11 点前预定，12 点取餐享 8 折');
-  if (eveningOpen) banners.push('5 点前预定，6 点取餐享 8 折');
+  if (lunchOpen) banners.push('11 点前可预定 12 点取餐');
+  if (eveningOpen) banners.push('5 点前可预定 6 点取餐');
   if (!lunchOpen && !eveningOpen) {
-    banners.push('现作现取为原价；今日预定批次已结束');
+    banners.push('今日预定批次已结束，可现作现取');
   }
   let reserveDesc = '今日预定已结束';
-  if (lunchOpen && eveningOpen) reserveDesc = '仅 12 点或 6 点取餐，享 8 折';
-  else if (lunchOpen) reserveDesc = '11 点前预定，12 点取餐 8 折';
-  else if (eveningOpen) reserveDesc = '5 点前预定，6 点取餐 8 折';
+  if (lunchOpen && eveningOpen) reserveDesc = '可选 12:00 / 18:00 取餐';
+  else if (lunchOpen) reserveDesc = '11 点前预定，12 点取餐';
+  else if (eveningOpen) reserveDesc = '5 点前预定，6 点取餐';
   return {
     now,
     lunchOpen,
     eveningOpen,
-    discountRate: DISCOUNT_RATE,
+    discountRate: 0,
     slots,
     banners,
-    hint: banners.filter((b) => !b.includes('原价')).join('；') || banners[0] || '',
+    hint: banners.join('；'),
     reserveDesc,
-    rules: ['11:00 前预定，12:00 取餐 8 折', '17:00 前预定，18:00 取餐 8 折', '现作现取不享受优惠'],
+    rules: [
+      '11:00 前可预定 12:00 取餐',
+      '17:00 前可预定 18:00 取餐',
+      '优惠请使用优惠券；预定可用预定立减券',
+    ],
   };
 }
 
@@ -215,9 +188,10 @@ function normalizeFulfillment({ fulfillmentType, pickupAt, now = Date.now() }) {
 }
 
 module.exports = {
-  DISCOUNT_RATE,
+  DISCOUNT_RATE: 0,
   todayKey,
   shopParts,
+  shopStamp,
   formatHm,
   formatPickupLabel,
   parsePickupAt,

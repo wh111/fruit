@@ -110,10 +110,11 @@ async function loadMysql() {
     products: products.map(rowToProduct),
     orders: orders.map(rowToOrder),
     users: users.map(rowToUser),
+    coupons: Array.isArray(metaMap.coupons) ? metaMap.coupons : [],
     settings: metaMap.settings || {
       shopName: '四季果先',
       shopPhone: '',
-      pickupHint: '做好后请到柜台取餐，出示取餐码即可',
+      pickupHint: '取餐前最多 1 小时现切，做好后请到柜台取餐，出示取餐码即可',
     },
     seq: metaMap.seq || { orderDay: '', pickupNo: 0 },
   };
@@ -213,6 +214,7 @@ async function saveMysql(data) {
 
     await upsertMeta(conn, 'settings', data.settings || {});
     await upsertMeta(conn, 'seq', data.seq || { orderDay: '', pickupNo: 0 });
+    await upsertMeta(conn, 'coupons', data.coupons || []);
 
     await conn.commit();
   } catch (e) {
@@ -240,10 +242,11 @@ async function ensureMysql(seedFn) {
       products: [],
       orders: [],
       users: [],
+      coupons: [],
       settings: {
         shopName: '四季果先',
         shopPhone: '',
-        pickupHint: '做好后请到柜台取餐，出示取餐码即可',
+        pickupHint: '取餐前最多 1 小时现切，做好后请到柜台取餐，出示取餐码即可',
       },
       seq: { orderDay: '', pickupNo: 0 },
     };

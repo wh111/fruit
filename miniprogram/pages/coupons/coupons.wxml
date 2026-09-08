@@ -1,0 +1,53 @@
+<view class="page">
+  <view class="hero card" wx:if="{{campaign}}">
+    <view class="hero-title">{{campaign.title}}</view>
+    <view class="hero-sub">{{campaign.subtitle}}</view>
+    <view class="hero-monthly" wx:if="{{campaign.monthlyGift}}">每月登录再送：{{campaign.monthlyGift.desc}}</view>
+    <view class="stats">
+      <view class="stat">
+        <text class="num">{{summary.unused || 0}}</text>
+        <text class="label">可用</text>
+      </view>
+      <view class="stat">
+        <text class="num">{{summary.flat3 || 0}}</text>
+        <text class="label">无门槛减3</text>
+      </view>
+      <view class="stat">
+        <text class="num">{{summary.off5 || 0}}</text>
+        <text class="label">满15减5</text>
+      </view>
+      <view class="stat">
+        <text class="num">{{summary.off8 || 0}}</text>
+        <text class="label">满25减8</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="tabs">
+    <view class="tab {{tab === 'unused' ? 'on' : ''}}" data-tab="unused" bindtap="onTab">未使用</view>
+    <view class="tab {{tab === 'used' ? 'on' : ''}}" data-tab="used" bindtap="onTab">已使用</view>
+    <view class="tab {{tab === 'expired' ? 'on' : ''}}" data-tab="expired" bindtap="onTab">已过期</view>
+  </view>
+
+  <view class="coupon" wx:for="{{shown}}" wx:key="id">
+    <view class="left">
+      <view class="amount"><text class="yen">¥</text>{{item.amount}}</view>
+      <view class="cond">{{item.usableHint}}</view>
+    </view>
+    <view class="right">
+      <view class="title">{{item.title}}</view>
+      <view class="muted">{{item.fulfillment === 'reserve' ? '仅提前预定可用' : '现取 / 预定均可'}}</view>
+      <view class="muted">有效期至 {{item.expireText}}</view>
+      <view class="badge">{{item.statusText}}</view>
+    </view>
+  </view>
+
+  <view class="empty muted" wx:if="{{!shown.length}}">暂无优惠券</view>
+
+  <view class="card rules" wx:if="{{rules.length}}">
+    <view class="rules-title">使用说明</view>
+    <view class="rule" wx:for="{{rules}}" wx:key="*this">· {{item}}</view>
+  </view>
+
+  <view class="btn-primary use" bindtap="goHome">去下单</view>
+</view>

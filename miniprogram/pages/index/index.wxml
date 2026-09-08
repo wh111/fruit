@@ -3,10 +3,29 @@
     <image class="hero-logo" src="/images/logo.png" mode="aspectFit" />
     <view class="hero-text">
       <text class="brand">四季果先</text>
-      <text class="slogan">当季鲜切 · 提前订更优惠</text>
+      <text class="slogan">现切现做 · 新鲜一小时</text>
+      <text class="slogan-sub">提前订 · 到点取 · 一份也做</text>
     </view>
   </view>
 
+  <view class="fresh-pledge">
+    <text class="fresh-dot">●</text>
+    <text>取餐前最多 1 小时现切，不卖 B 级果、不卖隔夜切</text>
+  </view>
+
+  <view class="banner" wx:if="{{campaign}}" bindtap="onBanner">
+    <view class="banner-left">
+      <view class="banner-tag">新人礼</view>
+      <view class="banner-title">{{campaign.bannerTitle}}</view>
+      <view class="banner-sub">{{campaign.bannerSub}}</view>
+    </view>
+    <view class="banner-right">
+      <view class="banner-btn">{{couponUnused > 0 ? '去使用' : '登录领取'}}</view>
+      <view class="banner-count" wx:if="{{couponUnused > 0}}">剩余 {{couponUnused}} 张</view>
+    </view>
+  </view>
+
+  <view class="promo" wx:if="{{loyaltyHint}}">{{loyaltyHint}}</view>
   <view class="promo" wx:if="{{promoHint}}">{{promoHint}}</view>
   <view class="err" wx:if="{{loadError}}">{{loadError}}</view>
   <view class="debug">接口 {{debugApi}} · {{debugEnv}}</view>
@@ -38,12 +57,11 @@
         <view class="row">
           <text class="price">¥{{item.minPrice}}</text>
           <text class="muted">起</text>
-          <text class="preorder" wx:if="{{item.preorderPrice}}">预订¥{{item.preorderPrice}}</text>
           <view class="buy">选规格</view>
         </view>
       </view>
     </view>
   </view>
 
-  <view wx:if="{{!filtered.length}}" class="empty muted">暂无果切，请稍后再来</view>
+  <view wx:if="{{!filtered.length}}" class="empty muted">暂无商品，请稍后再来</view>
 </view>

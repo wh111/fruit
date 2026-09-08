@@ -56,6 +56,29 @@
 .mode-desc { margin-top: 8rpx; color: #8a8a8a; font-size: 22rpx; line-height: 1.4; }
 .chip.sale { color: #c86100; }
 
+.coupon-card { }
+.coupon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.coupon-value {
+  flex: 1;
+  text-align: right;
+  color: #8a8a8a;
+  font-size: 26rpx;
+}
+.coupon-value.on {
+  color: #e8910f;
+  font-weight: 700;
+}
+.coupon-value::after {
+  content: ' ›';
+  color: #bbb;
+  font-weight: 400;
+}
+
 .footer {
   position: fixed; left: 0; right: 0; bottom: 0;
   background: #fff;

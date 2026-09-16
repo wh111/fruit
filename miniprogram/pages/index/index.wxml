@@ -3,14 +3,14 @@
     <image class="hero-logo" src="/images/logo.png" mode="aspectFit" />
     <view class="hero-text">
       <text class="brand">四季果先</text>
-      <text class="slogan">现切现做 · 新鲜一小时</text>
+      <text class="slogan">现切现做 · 新鲜半小时</text>
       <text class="slogan-sub">提前订 · 到点取 · 一份也做</text>
     </view>
   </view>
 
   <view class="fresh-pledge">
     <text class="fresh-dot">●</text>
-    <text>取餐前最多 1 小时现切，不卖 B 级果、不卖隔夜切</text>
+    <text>取餐前最多半小时现切，不卖 B 级果、不卖隔夜切</text>
   </view>
 
   <view class="banner" wx:if="{{campaign}}" bindtap="onBanner">

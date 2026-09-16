@@ -185,7 +185,9 @@ async function refreshList() {
             <div class="meta">
               <div>${o.productName} · ${o.specName}</div>
               <div class="tag ${o.status}">${STATUS[o.status] || o.status}${o.videoUrl ? ' · 已有视频' : ''}</div>
-              <div class="muted">${o.fulfillmentType === 'reserve' ? `预约 ${o.pickupAtText || ''}` : '现取'} · ¥${o.amount}</div>
+              <div class="muted">${o.fulfillmentType === 'reserve' ? `预约 ${o.pickupAtText || ''}` : '现取'}${
+                o.deliveryPoint && o.deliveryPoint !== 'shop' ? ` · ${o.deliveryPointName}` : ' · 到店'
+              } · ¥${o.amount}</div>
             </div>
           </label>`;
         })

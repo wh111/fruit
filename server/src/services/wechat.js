@@ -2,13 +2,32 @@ const crypto = require('crypto');
 const http = require('http');
 const https = require('https');
 
+/**
+ * 微信支付（APIv2）· 默认按「个体工商户直连」
+ *
+ * 推荐（先办个体户再自己开户）：
+ *   WX_APPID / WX_SECRET / WX_MCH_ID / WX_API_KEY / WX_NOTIFY_URL
+ *   不填 WX_SUB_MCH_ID
+ *
+ * 可选：服务商通道（不推荐作首选）再填 WX_SUB_MCH_ID、WX_SP_APPID
+ */
 function cfg() {
+  const appId = process.env.WX_APPID || '';
+  const subMchId = process.env.WX_SUB_MCH_ID || '';
+  const partner = Boolean(subMchId) || process.env.WX_MCH_MODE === 'partner';
   return {
-    appId: process.env.WX_APPID || '',
+    /** 小程序 AppID（登录 + 调起支付签名） */
+    appId,
     secret: process.env.WX_SECRET || '',
+    /** 直连=小微/普通商户号；服务商模式=服务商商户号 */
     mchId: process.env.WX_MCH_ID || '',
     apiKey: process.env.WX_API_KEY || '',
     notifyUrl: process.env.WX_NOTIFY_URL || '',
+    /** 服务商模式下的小微/特约子商户号 */
+    subMchId,
+    /** 服务商 AppID；不填则与小程序 AppID 相同（少数通道如此） */
+    spAppId: process.env.WX_SP_APPID || appId,
+    partner,
   };
 }
 
@@ -19,6 +38,7 @@ function assertPayConfig() {
   if (!c.mchId) miss.push('WX_MCH_ID');
   if (!c.apiKey) miss.push('WX_API_KEY');
   if (!c.notifyUrl) miss.push('WX_NOTIFY_URL');
+  if (c.partner && !c.subMchId) miss.push('WX_SUB_MCH_ID');
   if (miss.length) {
     throw Object.assign(new Error(`微信支付未配置完整：缺少 ${miss.join(', ')}`), { status: 400 });
   }
@@ -89,7 +109,7 @@ function requestText(url, { method = 'GET', body = null, headers = {} } = {}) {
   });
 }
 
-/** code2session 换 openid */
+/** code2session 换 openid（始终用小程序 AppID/Secret） */
 async function code2Session(code) {
   const { appId, secret } = cfg();
   if (!appId || !secret) {
@@ -121,8 +141,6 @@ async function createJsapiPrepay({ orderNo, amountYuan, openid, description, cli
   }
 
   const params = {
-    appid: c.appId,
-    mch_id: c.mchId,
     nonce_str: nonceStr(16),
     body: String(description || '四季果先果切').slice(0, 120),
     out_trade_no: orderNo,
@@ -130,8 +148,22 @@ async function createJsapiPrepay({ orderNo, amountYuan, openid, description, cli
     spbill_create_ip: clientIp || '127.0.0.1',
     notify_url: c.notifyUrl,
     trade_type: 'JSAPI',
-    openid,
   };
+
+  if (c.partner) {
+    // 服务商 / 小微商户通道
+    params.appid = c.spAppId;
+    params.mch_id = c.mchId;
+    params.sub_mch_id = c.subMchId;
+    params.sub_appid = c.appId;
+    params.sub_openid = openid;
+  } else {
+    // 直连：官方小微商户或普通商户
+    params.appid = c.appId;
+    params.mch_id = c.mchId;
+    params.openid = openid;
+  }
+
   params.sign = signMd5(params, c.apiKey);
 
   const xml = toXml(params);
@@ -153,11 +185,12 @@ async function createJsapiPrepay({ orderNo, amountYuan, openid, description, cli
 
   const prepayId = data.prepay_id;
   const payment = buildJsapiPayment(prepayId);
-  return { prepayId, payment, raw: data };
+  return { prepayId, payment, raw: data, mode: c.partner ? 'partner' : 'direct' };
 }
 
 function buildJsapiPayment(prepayId) {
   const c = assertPayConfig();
+  // 在自家小程序里调起支付，签名 appId 必须是小程序 AppID
   const timeStamp = String(Math.floor(Date.now() / 1000));
   const ns = nonceStr(16);
   const pkg = `prepay_id=${prepayId}`;
@@ -182,11 +215,17 @@ function buildJsapiPayment(prepayId) {
 async function queryOrder(orderNo) {
   const c = assertPayConfig();
   const params = {
-    appid: c.appId,
-    mch_id: c.mchId,
     out_trade_no: orderNo,
     nonce_str: nonceStr(16),
   };
+  if (c.partner) {
+    params.appid = c.spAppId;
+    params.mch_id = c.mchId;
+    params.sub_mch_id = c.subMchId;
+  } else {
+    params.appid = c.appId;
+    params.mch_id = c.mchId;
+  }
   params.sign = signMd5(params, c.apiKey);
   const respXml = await requestText('https://api.mch.weixin.qq.com/pay/orderquery', {
     method: 'POST',
@@ -225,4 +264,5 @@ module.exports = {
   notifySuccessXml,
   notifyFailXml,
   signMd5,
+  requestText,
 };

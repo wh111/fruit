@@ -1,4 +1,28 @@
-const { request, mediaUrl, ensureLogin, rememberOrderId } = require('../../utils/api');
+const {
+  request,
+  mediaUrl,
+  ensureLogin,
+  rememberOrderId,
+  requestReadySubscribe,
+} = require('../../utils/api');
+
+const STORAGE_DELIVERY = 'sg_last_delivery_point';
+
+function readSavedDelivery() {
+  try {
+    return wx.getStorageSync(STORAGE_DELIVERY) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function saveDelivery(id) {
+  try {
+    if (id) wx.setStorageSync(STORAGE_DELIVERY, id);
+  } catch (_) {
+    /* ignore */
+  }
+}
 
 Page({
   data: {
@@ -13,6 +37,13 @@ Page({
     originalTotal: '0.00',
     total: '0.00',
     fulfillmentType: 'now',
+    deliveryPoint: 'shop',
+    deliveryPoints: [
+      { id: 'shop', name: '到店取', fee: 0, tip: '做好后来店取餐' },
+      { id: 'a1', name: 'A座1号外卖柜', fee: 0.5, tip: '做好后放入外卖柜' },
+      { id: 'b2', name: 'B座2号外卖柜', fee: 0.5, tip: '做好后放入外卖柜' },
+    ],
+    deliveryFee: 0,
     slots: [],
     slotIndex: 0,
     hasDiscount: false,
@@ -33,6 +64,8 @@ Page({
   onLoad(query) {
     this.productId = query.id;
     this._couponTouched = false;
+    const saved = readSavedDelivery();
+    if (saved) this.setData({ deliveryPoint: saved });
     this.load();
   },
 
@@ -74,6 +107,11 @@ Page({
         slotIndex = 0;
       }
       if (slotIndex >= slots.length) slotIndex = 0;
+      const points = promo.deliveryPoints || this.data.deliveryPoints;
+      let deliveryPoint = this.data.deliveryPoint || 'shop';
+      if (!points.some((p) => p.id === deliveryPoint)) {
+        deliveryPoint = 'shop';
+      }
       this.setData({
         slots,
         slotIndex,
@@ -81,6 +119,8 @@ Page({
         fulfillmentType,
         promoHint: promo.hint || '',
         reserveDesc: promo.reserveDesc || (canReserve ? '仅 12 点或 6 点取餐，可用预定券' : '今日预定已结束'),
+        deliveryPoints: points,
+        deliveryPoint,
       });
     } catch {
       this.setData({ slots: [], canReserve: false, fulfillmentType: 'now', reserveDesc: '今日预定已结束' });
@@ -88,10 +128,11 @@ Page({
   },
 
   pickupPayload() {
-    const { fulfillmentType, slots, slotIndex } = this.data;
+    const { fulfillmentType, slots, slotIndex, deliveryPoint } = this.data;
     return {
       fulfillmentType,
       pickupAt: fulfillmentType === 'reserve' && slots[slotIndex] ? slots[slotIndex].pickupAt : null,
+      deliveryPoint: deliveryPoint || 'shop',
     };
   },
 
@@ -102,7 +143,7 @@ Page({
     const seq = ++this._quoteSeq;
     try {
       await ensureLogin().catch(() => null);
-      const { fulfillmentType, pickupAt } = this.pickupPayload();
+      const { fulfillmentType, pickupAt, deliveryPoint } = this.pickupPayload();
       const body = {
         productId: product.id,
         specId,
@@ -110,6 +151,7 @@ Page({
         quantity,
         fulfillmentType,
         pickupAt,
+        deliveryPoint,
         autoCoupon: !this._couponTouched,
       };
       if (this._couponTouched) {
@@ -124,10 +166,13 @@ Page({
       const selected = coupons.find((c) => c.id === selectedId);
       const hasDiscount = Number(quote.discountAmount) > 0;
       const loyalty = quote.loyalty || {};
+      const deliveryFee = Number(quote.deliveryFee || 0);
+      const originalFood = Number(quote.originalAmount);
       this.setData({
         unitPrice: Number(quote.unitPrice).toFixed(2),
-        originalTotal: Number(quote.originalAmount).toFixed(2),
+        originalTotal: (originalFood + deliveryFee).toFixed(2),
         total: Number(quote.amount).toFixed(2),
+        deliveryFee,
         hasDiscount,
         discountLabel: hasDiscount ? quote.discountLabel || '优惠' : '',
         coupons,
@@ -141,23 +186,27 @@ Page({
         loyaltyHint: loyalty.nextHint || '',
         loyaltyTier: loyalty.tier || 0,
         monthPaid: loyalty.monthPaid || 0,
+        deliveryPoints: quote.deliveryPoints || this.data.deliveryPoints,
       });
       if (!this._couponTouched && selectedId) {
         this._couponTouched = true;
       }
     } catch (e) {
       // 未登录时本地显示原价
-      const { product: p, specId: sid, extras: ex, quantity: qty } = this.data;
+      const { product: p, specId: sid, extras: ex, quantity: qty, deliveryPoint } = this.data;
       const spec = (p.specs || []).find((s) => s.id === sid);
       let unit = spec ? Number(spec.price) : 0;
       (p.extras || []).forEach((item) => {
         if (ex.includes(item.id)) unit += Number(item.price);
       });
+      const point = (this.data.deliveryPoints || []).find((d) => d.id === deliveryPoint);
+      const fee = point ? Number(point.fee) || 0 : 0;
       const original = unit * qty;
       this.setData({
         unitPrice: unit.toFixed(2),
         originalTotal: original.toFixed(2),
-        total: original.toFixed(2),
+        total: (original + fee).toFixed(2),
+        deliveryFee: fee,
         hasDiscount: false,
         discountLabel: '',
       });
@@ -210,6 +259,12 @@ Page({
     this.refreshQuote();
   },
 
+  onDelivery(e) {
+    const id = e.currentTarget.dataset.id || 'shop';
+    saveDelivery(id);
+    this.setData({ deliveryPoint: id }, () => this.refreshQuote());
+  },
+
   onSlot(e) {
     this.setData({ slotIndex: Number(e.currentTarget.dataset.index) });
     this.refreshQuote();
@@ -250,7 +305,7 @@ Page({
 
   async submit() {
     try {
-      const { fulfillmentType, slots, slotIndex, canReserve, couponId } = this.data;
+      const { fulfillmentType, slots, slotIndex, canReserve, couponId, deliveryPoint } = this.data;
       if (fulfillmentType === 'reserve' && (!canReserve || !slots[slotIndex])) {
         wx.showToast({ title: '请选择取餐时间', icon: 'none' });
         return;
@@ -267,26 +322,55 @@ Page({
           remark: this.data.remark,
           fulfillmentType,
           pickupAt: fulfillmentType === 'reserve' ? slots[slotIndex].pickupAt : null,
+          deliveryPoint: deliveryPoint || 'shop',
           couponId: this._couponTouched ? couponId || '' : undefined,
           autoCoupon: !this._couponTouched,
         },
       });
       rememberOrderId(order.id);
+      saveDelivery(deliveryPoint || 'shop');
 
       const pay = await request('/api/pay/create', {
         method: 'POST',
         data: { orderId: order.id },
       });
 
-      if (pay.mode === 'mock' && pay.paid) {
+      // 一次性订阅：做好/投柜后服务端可推送（用户可拒绝，不挡支付）
+      wx.hideLoading();
+      await requestReadySubscribe();
+      wx.showLoading({ title: '支付中' });
+
+      // mock / wechat 统一：预支付 → 收银台 → confirm（个体户直连真实链路）
+      if (!pay.payment || pay.paid) {
         wx.hideLoading();
-        wx.redirectTo({ url: `/pages/order/order?id=${order.id}` });
+        if (pay.paid) {
+          wx.redirectTo({ url: `/pages/order/order?id=${order.id}` });
+          return;
+        }
+        wx.showToast({ title: '支付未完成', icon: 'none' });
         return;
       }
 
-      if (pay.mode === 'wechat' && pay.payment) {
-        wx.hideLoading();
-        try {
+      wx.hideLoading();
+      try {
+        if (pay.mode === 'mock') {
+          const amount = pay.order?.amount ?? order.amount;
+          const { confirm } = await new Promise((resolve) => {
+            wx.showModal({
+              title: '模拟支付（个体户直连）',
+              content: `应付 ¥${amount}\n正式环境将调起微信支付`,
+              confirmText: '支付',
+              cancelText: '取消',
+              success: resolve,
+              fail: () => resolve({ confirm: false }),
+            });
+          });
+          if (!confirm) {
+            const err = new Error('cancel');
+            err.errMsg = 'requestPayment:fail cancel';
+            throw err;
+          }
+        } else {
           await new Promise((resolve, reject) => {
             wx.requestPayment({
               timeStamp: pay.payment.timeStamp,
@@ -298,26 +382,21 @@ Page({
               fail: reject,
             });
           });
-        } catch (err) {
-          const msg = (err && (err.errMsg || err.message)) || '支付取消';
-          // 未支付取消：退回优惠券
-          try {
-            await request(`/api/orders/${order.id}/cancel`, { method: 'POST' });
-          } catch (_) {
-            /* ignore */
-          }
-          wx.showToast({ title: msg.includes('cancel') ? '已取消支付' : msg, icon: 'none' });
-          return;
         }
-        wx.showLoading({ title: '确认订单' });
-        await request('/api/pay/confirm', { method: 'POST', data: { orderId: order.id } });
-        wx.hideLoading();
-        wx.redirectTo({ url: `/pages/order/order?id=${order.id}` });
+      } catch (err) {
+        const msg = (err && (err.errMsg || err.message)) || '支付取消';
+        try {
+          await request(`/api/orders/${order.id}/cancel`, { method: 'POST' });
+        } catch (_) {
+          /* ignore */
+        }
+        wx.showToast({ title: msg.includes('cancel') ? '已取消支付' : msg, icon: 'none' });
         return;
       }
-
+      wx.showLoading({ title: '确认订单' });
+      await request('/api/pay/confirm', { method: 'POST', data: { orderId: order.id } });
       wx.hideLoading();
-      wx.showToast({ title: '支付未完成', icon: 'none' });
+      wx.redirectTo({ url: `/pages/order/order?id=${order.id}` });
     } catch (e) {
       wx.hideLoading();
       wx.showToast({ title: e.message || '支付失败', icon: 'none' });

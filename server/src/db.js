@@ -14,9 +14,10 @@ const defaultDb = () => ({
   settings: {
     shopName: '四季果先',
     shopPhone: '18813017847',
-    shopContact: '王恒',
-    pickupHint: '取餐前最多 1 小时现切，做好后请到柜台取餐，出示取餐码即可',
-    tagline: '现切现做 · 新鲜一小时',
+    // shopContact 仅内部备注，勿下发给用户端
+    shopContact: '',
+    pickupHint: '取餐前最多半小时现切，做好后请到柜台取餐，出示取餐码即可',
+    tagline: '现切现做 · 新鲜半小时',
     groupBuyHint: '企业团购、部门下午茶、会议用果，电话沟通即可。10 份起订，可按 12:00 / 18:00 取餐。',
   },
   seq: { orderDay: '', pickupNo: 0 },

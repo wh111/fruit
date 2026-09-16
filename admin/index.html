@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#1f2a1f" />
   <title>四季果先 · 门店管理</title>
   <link rel="stylesheet" href="./css/admin.css" />
 </head>
@@ -13,7 +16,7 @@
       <div class="login-card">
         <img class="logo" src="/assets/logo.png" alt="四季果先" />
         <h1>门店管理端</h1>
-        <p class="muted">接单 · 出码 · 打印贴纸</p>
+        <p class="muted">手机接单 · 出码 · 打印贴纸</p>
         <label>账号</label>
         <input id="username" value="admin" autocomplete="username" />
         <label>密码</label>
@@ -33,14 +36,16 @@
             <span>SEASONAL FRUIT</span>
           </div>
         </div>
-        <nav>
-          <button data-tab="dashboard" class="nav active">今日概览</button>
-          <button data-tab="orders" class="nav">订单 / 打印</button>
-          <button data-tab="products" class="nav">商品规格</button>
-          <button data-tab="verify" class="nav">扫码核销</button>
-          <button data-tab="hardware" class="nav">打印硬件</button>
+        <nav class="side-nav">
+          <button type="button" data-tab="dashboard" class="nav active">今日概览</button>
+          <button type="button" data-tab="orders" class="nav">订单 / 打印</button>
+          <button type="button" data-tab="products" class="nav">商品规格</button>
+          <button type="button" data-tab="delivery" class="nav">配送费</button>
+          <button type="button" data-tab="verify" class="nav">扫码核销</button>
+          <button type="button" data-tab="hardware" class="nav">打印硬件</button>
+          <a class="nav link" href="./make.html">制作台（录像）</a>
         </nav>
-        <button id="logoutBtn" class="btn ghost logout">退出</button>
+        <button type="button" id="logoutBtn" class="btn ghost logout">退出</button>
       </aside>
 
       <main class="content">
@@ -55,7 +60,8 @@
               <input type="checkbox" id="soundOn" checked />
               <span>新单提示音</span>
             </label>
-            <button id="refreshBtn" class="btn">刷新</button>
+            <button type="button" id="refreshBtn" class="btn">刷新</button>
+            <button type="button" id="logoutBtnMobile" class="btn ghost mobile-only">退出</button>
           </div>
         </header>
         <div id="toast" class="toast hidden"></div>
@@ -72,6 +78,9 @@
               <span class="muted" id="batchHint">可勾选多个单号，一人同时做多份</span>
             </div>
             <div id="pendingList" class="order-list"></div>
+            <p class="muted hardware-entry">
+              <button type="button" class="btn ghost sm" data-tab="hardware" id="openHardwareBtn">打印硬件说明</button>
+            </p>
           </div>
         </div>
 
@@ -92,17 +101,28 @@
 
         <div id="tab-products" class="tab hidden">
           <div class="toolbar">
-            <button id="addProductBtn" class="btn primary">新增果切</button>
+            <button type="button" id="addProductBtn" class="btn primary">新增果切</button>
           </div>
           <div id="productTable" class="table-wrap"></div>
+        </div>
+
+        <div id="tab-delivery" class="tab hidden">
+          <div class="panel">
+            <h3>送达点 / 配送费</h3>
+            <p class="muted">顾客下单时自行选择；此处只改名称与费用。到店取费用固定为 0。</p>
+            <div id="deliveryList" class="delivery-list"></div>
+            <div class="toolbar" style="margin-top:12px">
+              <button type="button" id="saveDeliveryBtn" class="btn primary">保存配送配置</button>
+            </div>
+          </div>
         </div>
 
         <div id="tab-verify" class="tab hidden">
           <div class="panel verify-panel">
             <h3>核销取餐</h3>
             <p class="muted">输入取餐码（如 A001）或粘贴扫码内容</p>
-            <input id="verifyInput" placeholder="取餐码 / 扫码内容" />
-            <button id="verifyBtn" class="btn primary">核销完成</button>
+            <input id="verifyInput" placeholder="取餐码 / 扫码内容" inputmode="text" autocomplete="off" />
+            <button type="button" id="verifyBtn" class="btn primary">核销完成</button>
             <pre id="verifyResult"></pre>
           </div>
         </div>
@@ -116,10 +136,20 @@
               <li>电脑打开本管理端 → 订单「打印标签」→ 选打印机即可贴杯</li>
             </ol>
             <p>也可买<strong>蓝牙标签机</strong>（精臣/汉印）用手机打；或买<strong>云打印机</strong>实现支付后自动出纸。</p>
+            <p>手机接单日常用本页即可；需要录像时打开「制作台」。</p>
             <p>完整说明见项目 <code>docs/HARDWARE.md</code>。</p>
           </div>
         </div>
       </main>
+
+      <nav class="bottom-nav" aria-label="手机导航">
+        <button type="button" data-tab="dashboard" class="nav active"><span class="ico">概</span><span>概览</span></button>
+        <button type="button" data-tab="orders" class="nav"><span class="ico">单</span><span>订单</span></button>
+        <button type="button" data-tab="verify" class="nav"><span class="ico">核</span><span>核销</span></button>
+        <button type="button" data-tab="products" class="nav"><span class="ico">品</span><span>商品</span></button>
+        <button type="button" data-tab="delivery" class="nav"><span class="ico">配</span><span>配送</span></button>
+        <a class="nav link" href="./make.html"><span class="ico">录</span><span>制作台</span></a>
+      </nav>
     </section>
   </div>
 

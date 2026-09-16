@@ -40,6 +40,7 @@
 .promo-line { color: #3d8b40; font-size: 26rpx; line-height: 1.5; margin-bottom: 8rpx; }
 
 .modes { display: flex; gap: 16rpx; }
+.modes.col { flex-direction: column; }
 .mode {
   flex: 1;
   padding: 20rpx 18rpx;
@@ -54,6 +55,8 @@
 .mode.off { opacity: 0.45; }
 .mode-name { font-weight: 700; font-size: 28rpx; }
 .mode-desc { margin-top: 8rpx; color: #8a8a8a; font-size: 22rpx; line-height: 1.4; }
+.mode .fee { margin-left: 10rpx; font-size: 22rpx; color: #e8910f; font-weight: 600; }
+.mode .fee.free { color: #4caf50; }
 .chip.sale { color: #c86100; }
 
 .coupon-card { }

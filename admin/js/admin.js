@@ -35,17 +35,23 @@ function showMain(show) {
 
 function switchTab(tab) {
   state.tab = tab;
-  $$('.nav').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  $$('.side-nav .nav, .bottom-nav .nav').forEach((b) => {
+    if (!b.dataset.tab) return;
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
   $$('.tab').forEach((el) => el.classList.add('hidden'));
-  $(`#tab-${tab}`).classList.remove('hidden');
+  const pane = $(`#tab-${tab}`);
+  if (pane) pane.classList.remove('hidden');
   const titles = {
     dashboard: '今日概览',
     orders: '订单 / 打印',
     products: '商品规格',
+    delivery: '配送费',
     verify: '扫码核销',
     hardware: '打印硬件',
   };
   $('#pageTitle').textContent = titles[tab] || '';
+  window.scrollTo(0, 0);
   refresh();
 }
 
@@ -136,10 +142,15 @@ function logout() {
 }
 
 function fulfillmentNote(o) {
-  if (o.fulfillmentType === 'reserve') {
-    return `预约 ${o.pickupAtText || ''}`.trim();
-  }
-  return '现取';
+  const time =
+    o.fulfillmentType === 'reserve'
+      ? `预约 ${o.pickupAtText || ''}`.trim()
+      : '现作';
+  const place =
+    o.deliveryPoint && o.deliveryPoint !== 'shop'
+      ? `投柜 ${o.deliveryPointName || o.deliveryPoint}`
+      : '到店取';
+  return `${time} · ${place}`;
 }
 
 function amountNote(o) {
@@ -183,20 +194,22 @@ async function loadStats() {
           return `
       <div class="order-card ${o.id === newest ? 'new' : ''}">
         <label class="pick">${
-          canBatch ? `<input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" />` : ''
+          canBatch ? `<input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" />` : '<span></span>'
         }</label>
         <div class="pickup">${o.pickupCode || '--'}</div>
-        <div style="flex:1">
-          <div><strong>${o.productName}</strong> · ${o.specName} ×${o.quantity}</div>
+        <div class="order-main">
+          <div class="order-title">${o.productName} · ${o.specName} ×${o.quantity}</div>
           <div class="muted">${STATUS_TEXT[o.status]} · ${fulfillmentNote(o)} · ${amountNote(o)}${o.printed ? ' · 已打标' : ''}</div>
           ${batchNote}
         </div>
         <div class="actions">
-          <button class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
-          <button class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>
-          <button class="btn sm" onclick="setStatus('${o.id}','making')">制作中</button>
-          <button class="btn sm" onclick="setStatus('${o.id}','ready')">待取</button>
-          <button class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>
+          <button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
+          <button type="button" class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>
+          <button type="button" class="btn sm" onclick="setStatus('${o.id}','making')">制作中</button>
+          <button type="button" class="btn sm" onclick="setStatus('${o.id}','ready')">${
+            o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已投柜' : '待取'
+          }</button>
+          <button type="button" class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>
         </div>
       </div>`;
         })
@@ -249,35 +262,32 @@ async function loadOrders() {
   const q = status ? `?status=${status}` : '';
   const { list } = await api(`/api/admin/orders${q}`);
   await watchNewOrders(list);
-  $('#orderTable').innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th>取餐码</th><th>商品</th><th>取餐</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${list
-          .map((o) => {
-            const t = new Date(o.paidAt || o.createdAt);
-            const ts = `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-            return `<tr>
-              <td><strong>${o.pickupCode || '-'}</strong></td>
-              <td>${o.productName}<br/><span class="muted">${o.specName} ×${o.quantity}</span></td>
-              <td>${fulfillmentNote(o)}</td>
-              <td>${amountNote(o)}</td>
-              <td><span class="tag ${o.status}">${STATUS_TEXT[o.status] || o.status}</span></td>
-              <td>${ts}</td>
-              <td class="actions">
-                ${o.pickupCode ? `<button class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>` : ''}
-                ${['paid', 'making'].includes(o.status) ? `<button class="btn sm" onclick="setStatus('${o.id}','ready')">待取</button>` : ''}
-                ${['paid', 'making', 'ready'].includes(o.status) ? `<button class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>` : ''}
-              </td>
-            </tr>`;
-          })
-          .join('')}
-      </tbody>
-    </table>`;
+  if (!list.length) {
+    $('#orderTable').innerHTML = '<p class="muted" style="padding:16px">暂无订单</p>';
+    return;
+  }
+  $('#orderTable').innerHTML = list
+    .map((o) => {
+      const t = new Date(o.paidAt || o.createdAt);
+      const ts = `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+      return `<div class="list-card">
+        <div class="row-top">
+          <div class="code">${o.pickupCode || '-'}</div>
+          <span class="tag ${o.status}">${STATUS_TEXT[o.status] || o.status}</span>
+        </div>
+        <div><strong>${o.productName}</strong> · ${o.specName} ×${o.quantity}</div>
+        <div class="meta">${fulfillmentNote(o)} · ${amountNote(o)} · ${ts}${o.printed ? ' · 已打标' : ''}</div>
+        <div class="actions">
+          ${o.pickupCode ? `<button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>` : ''}
+                ${['paid', 'making'].includes(o.status) ? `<button type="button" class="btn sm" onclick="setStatus('${o.id}','ready')">${
+                  o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已投柜' : '待取'
+                }</button>` : ''}
+                ${['paid', 'making', 'ready'].includes(o.status) ? `<button type="button" class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>` : ''}
+          ${o.pickupCode ? `<button type="button" class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>` : ''}
+        </div>
+      </div>`;
+    })
+    .join('');
 }
 
 function mediaSrc(url) {
@@ -304,30 +314,30 @@ function setCoverPreview(url) {
 
 async function loadProducts() {
   const { list } = await api('/api/admin/products');
-  $('#productTable').innerHTML = `
-    <table>
-      <thead><tr><th>商品</th><th>分类</th><th>规格</th><th>状态</th><th>操作</th></tr></thead>
-      <tbody>
-        ${list
-          .map((p) => {
-            const specs = (p.specs || []).map((s) => `${s.name}¥${s.price}`).join(' / ');
-            const thumb = p.cover
-              ? `<img class="product-thumb" src="${mediaSrc(p.cover)}" alt="" />`
-              : '';
-            return `<tr>
-              <td>${thumb}<strong>${p.name}</strong><br/><span class="muted">${p.desc || ''}</span></td>
-              <td>${p.category}</td>
-              <td>${specs}</td>
-              <td>${p.status === 1 ? '上架' : '下架'}</td>
-              <td class="actions">
-                <button class="btn sm" data-edit='${JSON.stringify(p).replace(/'/g, '&#39;')}' onclick="editProduct(JSON.parse(this.dataset.edit))">编辑</button>
-                ${p.status === 1 ? `<button class="btn sm" onclick="offProduct('${p.id}')">下架</button>` : ''}
-              </td>
-            </tr>`;
-          })
-          .join('')}
-      </tbody>
-    </table>`;
+  if (!list.length) {
+    $('#productTable').innerHTML = '<p class="muted" style="padding:16px">暂无商品</p>';
+    return;
+  }
+  $('#productTable').innerHTML = list
+    .map((p) => {
+      const specs = (p.specs || []).map((s) => `${s.name}¥${s.price}`).join(' / ');
+      const thumb = p.cover
+        ? `<img class="product-thumb" src="${mediaSrc(p.cover)}" alt="" />`
+        : '<div class="product-thumb"></div>';
+      return `<div class="product-card">
+        ${thumb}
+        <div class="info">
+          <div><strong>${p.name}</strong> · ${p.status === 1 ? '上架' : '下架'}</div>
+          <div class="muted">${p.category} · ${specs}</div>
+          ${p.desc ? `<div class="muted">${p.desc}</div>` : ''}
+          <div class="actions">
+            <button type="button" class="btn sm" data-edit='${JSON.stringify(p).replace(/'/g, '&#39;')}' onclick="editProduct(JSON.parse(this.dataset.edit))">编辑</button>
+            ${p.status === 1 ? `<button type="button" class="btn sm" onclick="offProduct('${p.id}')">下架</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    })
+    .join('');
 }
 
 window.editProduct = function editProduct(p) {
@@ -522,12 +532,55 @@ async function verify() {
   }
 }
 
+async function loadDelivery() {
+  const { points } = await api('/api/admin/delivery');
+  const box = $('#deliveryList');
+  if (!box) return;
+  box.innerHTML = (points || [])
+    .map((p) => {
+      const feeDisabled = p.id === 'shop' ? 'disabled' : '';
+      return `<div class="delivery-row" data-id="${p.id}">
+        <div class="delivery-main">
+          <label>名称</label>
+          <input class="d-name" value="${String(p.name || '').replace(/"/g, '&quot;')}" />
+        </div>
+        <div class="delivery-fee">
+          <label>配送费（元）</label>
+          <input class="d-fee" type="number" min="0" step="0.1" value="${Number(p.fee) || 0}" ${feeDisabled} />
+        </div>
+        <div class="delivery-tip">
+          <label>说明</label>
+          <input class="d-tip" value="${String(p.tip || '').replace(/"/g, '&quot;')}" />
+        </div>
+      </div>`;
+    })
+    .join('');
+}
+
+async function saveDelivery() {
+  const rows = [...document.querySelectorAll('#deliveryList .delivery-row')];
+  const points = rows.map((row) => ({
+    id: row.dataset.id,
+    name: row.querySelector('.d-name')?.value?.trim() || '',
+    tip: row.querySelector('.d-tip')?.value?.trim() || '',
+    fee: row.querySelector('.d-fee')?.value,
+  }));
+  try {
+    await api('/api/admin/delivery', { method: 'PUT', body: JSON.stringify({ points }) });
+    toast('配送配置已保存');
+    await loadDelivery();
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
 async function refresh() {
   if (!state.token) return;
   try {
     if (state.tab === 'dashboard') await loadStats();
     if (state.tab === 'orders') await loadOrders();
     if (state.tab === 'products') await loadProducts();
+    if (state.tab === 'delivery') await loadDelivery();
   } catch (e) {
     if (String(e.message).includes('登录') || String(e.message).includes('过期') || String(e.message).includes('权限')) logout();
     else console.error(e);
@@ -544,10 +597,12 @@ $('#soundOn').addEventListener('change', () => {
 });
 
 $('#loginBtn').addEventListener('click', login);
-$('#logoutBtn').addEventListener('click', logout);
+$('#logoutBtn')?.addEventListener('click', logout);
+$('#logoutBtnMobile')?.addEventListener('click', logout);
 $('#refreshBtn').addEventListener('click', refresh);
 $('#statusFilter').addEventListener('change', loadOrders);
 $('#verifyBtn').addEventListener('click', verify);
+$('#saveDeliveryBtn')?.addEventListener('click', saveDelivery);
 $('#addProductBtn').addEventListener('click', () => editProduct(null));
 $('#saveProductBtn').addEventListener('click', saveProduct);
 $('#pickCoverBtn')?.addEventListener('click', (e) => {
@@ -560,7 +615,13 @@ $('#uploadCoverBtn')?.addEventListener('click', (e) => {
 });
 $('#p_cover_file')?.addEventListener('change', onCoverFilePicked);
 $('#p_cover')?.addEventListener('input', () => setCoverPreview($('#p_cover').value));
-$$('.nav').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+$$('.side-nav [data-tab], .bottom-nav [data-tab], #openHardwareBtn').forEach((b) => {
+  b.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!b.dataset.tab) return;
+    switchTab(b.dataset.tab);
+  });
+});
 
 $('#batchMakingBtn')?.addEventListener('click', () => batchSetStatus('making'));
 $('#batchReadyBtn')?.addEventListener('click', () => batchSetStatus('ready'));

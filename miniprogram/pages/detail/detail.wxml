@@ -11,7 +11,7 @@
     <view class="promo-line" wx:if="{{loyaltyLabel}}">{{loyaltyLabel}}（可与立减券同享）</view>
     <view class="promo-line" wx:elif="{{loyaltyHint}}">{{loyaltyHint}}</view>
     <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
-    <view class="muted">按单现切，取餐前最多 1 小时制作。预定仅 12 点 / 18 点取餐，一份也做。</view>
+    <view class="muted">按单现切，取餐前最多半小时制作。预定仅 12 点 / 18 点取餐，一份也做。</view>
   </view>
 
   <view class="card">
@@ -75,6 +75,26 @@
     </view>
   </view>
 
+  <view class="card">
+    <view class="section-title">送达方式</view>
+    <view class="modes col">
+      <view
+        class="mode {{deliveryPoint === item.id ? 'on' : ''}}"
+        wx:for="{{deliveryPoints}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onDelivery"
+      >
+        <view class="mode-name">
+          {{item.name}}
+          <text class="fee" wx:if="{{item.fee > 0}}">+¥{{item.fee}}</text>
+          <text class="fee free" wx:else>免费</text>
+        </view>
+        <view class="mode-desc">{{item.tip}}</view>
+      </view>
+    </view>
+  </view>
+
   <view class="card coupon-card" bindtap="onPickCoupon">
     <view class="coupon-row">
       <view class="section-title" style="margin:0">优惠券</view>
@@ -100,6 +120,7 @@
   <view class="footer">
     <view class="total">
       <view wx:if="{{hasDiscount}}" class="save">{{discountLabel}}</view>
+      <view class="muted" wx:if="{{deliveryFee > 0}}" style="font-size:22rpx;margin-bottom:4rpx">含配送费 ¥{{deliveryFee}}</view>
       <view>
         合计 <text class="price">¥{{total}}</text>
         <text class="strike" wx:if="{{hasDiscount}}">¥{{originalTotal}}</text>

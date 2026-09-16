@@ -16,6 +16,10 @@ function buildLabelHtml({ order, qrDataUrl, shopName }) {
     order.fulfillmentType === 'reserve' && order.pickupAt
       ? `预约 ${formatHm(order.pickupAt)}`
       : `现取 ${timeStr}`;
+  const deliveryStr =
+    order.deliveryPoint && order.deliveryPoint !== 'shop'
+      ? escapeHtml(order.deliveryPointName || order.deliveryPoint)
+      : '到店取';
   const priceStr =
     order.discountAmount > 0 && order.originalAmount
       ? `¥${order.amount}（原价¥${order.originalAmount}）`
@@ -53,7 +57,7 @@ function buildLabelHtml({ order, qrDataUrl, shopName }) {
         <div class="name">${escapeHtml(order.productName)} · ${escapeHtml(order.specName)}</div>
         <div class="sub">${escapeHtml(extras)} ×${order.quantity} · ${escapeHtml(priceStr)}</div>
       </div>
-      <div class="time">${escapeHtml(pickupStr)}</div>
+      <div class="time">${escapeHtml(pickupStr)} · ${deliveryStr}</div>
     </div>
   </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},200)}</script>

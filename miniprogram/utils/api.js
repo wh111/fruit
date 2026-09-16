@@ -185,6 +185,25 @@ function consumeMonthlyToast() {
   return pending;
 }
 
+/** 支付前申请「取餐提醒」一次性订阅；拒绝/失败不阻断支付 */
+async function requestReadySubscribe() {
+  try {
+    const cfg = await request('/api/subscribe/config');
+    const tmplIds = (cfg && cfg.tmplIds) || [];
+    if (!cfg || !cfg.enabled || !tmplIds.length) return { skipped: true };
+    if (!wx.requestSubscribeMessage) return { skipped: true };
+    return await new Promise((resolve) => {
+      wx.requestSubscribeMessage({
+        tmplIds,
+        success: (res) => resolve(res || {}),
+        fail: () => resolve({ skipped: true }),
+      });
+    });
+  } catch (_) {
+    return { skipped: true };
+  }
+}
+
 module.exports = {
   request,
   mediaUrl,
@@ -192,5 +211,6 @@ module.exports = {
   rememberOrderId,
   consumeWelcomeToast,
   consumeMonthlyToast,
+  requestReadySubscribe,
   config,
 };

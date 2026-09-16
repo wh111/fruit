@@ -32,6 +32,8 @@ const {
   restoreCouponForOrder,
 } = require('./services/order');
 const { getPromoState } = require('./services/promo');
+const { listDeliveryPoints, applyDeliverySettings } = require('./services/delivery');
+const { notifyOrderReady, subscribeClientConfig } = require('./services/subscribe');
 const {
   grantLoginCoupons,
   listUserCoupons,
@@ -178,7 +180,6 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, {
       shopName: s.shopName || '四季果先',
       shopPhone: s.shopPhone || '18813017847',
-      shopContact: s.shopContact || '',
       tagline: s.tagline || '',
       pickupHint: s.pickupHint || '',
       groupBuyHint:
@@ -271,11 +272,15 @@ async function handleApi(req, res, pathname) {
     });
   }
 
+  if (pathname === '/api/subscribe/config' && method === 'GET') {
+    return send(res, 200, subscribeClientConfig());
+  }
+
   if (pathname === '/api/promo' && method === 'GET') {
     const user = auth(req);
     const state = getPromoState();
+    const db = await load();
     if (user?.userId) {
-      const db = await load();
       state.loyalty = getLoyaltyState(db, {
         userId: user.userId,
         openid: user.openid,
@@ -295,7 +300,7 @@ async function handleApi(req, res, pathname) {
         ],
       };
     }
-    return send(res, 200, state);
+    return send(res, 200, { ...state, deliveryPoints: listDeliveryPoints(db.settings) });
   }
 
   if (pathname === '/api/loyalty/mine' && method === 'GET') {
@@ -336,6 +341,7 @@ async function handleApi(req, res, pathname) {
         quantity: body.quantity || 1,
         fulfillmentType: body.fulfillmentType,
         pickupAt: body.pickupAt,
+        deliveryPoint: body.deliveryPoint,
         couponId: body.couponId,
         userId: user?.userId,
         openid: user?.openid,
@@ -360,6 +366,7 @@ async function handleApi(req, res, pathname) {
         remark: body.remark,
         fulfillmentType: body.fulfillmentType,
         pickupAt: body.pickupAt,
+        deliveryPoint: body.deliveryPoint,
         couponId: body.couponId,
         autoCoupon: body.autoCoupon !== false,
       });
@@ -463,6 +470,11 @@ async function handleApi(req, res, pathname) {
       updated.push(order);
     }
     await save(db);
+    if (status === 'ready') {
+      for (const o of updated) {
+        notifyOrderReady(o).catch(() => {});
+      }
+    }
     return send(res, 200, {
       ok: true,
       count: updated.length,
@@ -491,6 +503,7 @@ async function handleApi(req, res, pathname) {
     if (method === 'PATCH' && action === 'status') {
       if (!requireAdmin(req, res)) return;
       if (!order) return send(res, 404, { error: '订单不存在' });
+      const prev = order.status;
       order.status = body.status;
       order.updatedAt = Date.now();
       if (body.status === 'making') {
@@ -500,7 +513,16 @@ async function handleApi(req, res, pathname) {
           order.makeBatchCodes = [order.pickupCode].filter(Boolean);
         }
       }
+      if (body.status === 'ready') {
+        order.readyAt = Date.now();
+      }
+      if (body.status === 'done') {
+        order.doneAt = Date.now();
+      }
       await save(db);
+      if (body.status === 'ready' && prev !== 'ready') {
+        notifyOrderReady(order).catch(() => {});
+      }
       return send(res, 200, { order });
     }
     if (method === 'POST' && action === 'cancel') {
@@ -542,21 +564,31 @@ async function handleApi(req, res, pathname) {
       '127.0.0.1';
 
     if (PAY_MODE === 'mock') {
-      const paid = await markPaid(order.id, { payMode: 'mock' });
-      const { onOrderPaid } = require('./services/afterPay');
-      const print = await onOrderPaid(paid);
-      const qrDataUrl = await orderQrDataUrl(paid);
+      // 按「个体户直连」真实链路模拟：下单预支付 → 前端收银台 → confirm 才入账
+      // 不在此处 markPaid，与正式 wechat 行为一致
+      const timeStamp = String(Math.floor(Date.now() / 1000));
+      const nonceStr = require('crypto').randomBytes(8).toString('hex');
+      const prepayId = `mock_${order.orderNo}`;
+      order.prepayId = prepayId;
+      order.updatedAt = Date.now();
+      await save(db);
       return send(res, 200, {
         mode: 'mock',
-        paid: true,
-        order: paid,
-        qrDataUrl,
-        print,
-        message: '模拟支付成功',
+        paid: false,
+        merchantType: 'individual', // 目标方案：个体工商户直连
+        order,
+        payment: {
+          timeStamp,
+          nonceStr,
+          package: `prepay_id=${prepayId}`,
+          signType: 'MD5',
+          paySign: 'MOCK_PAY_SIGN',
+        },
+        message: '模拟预支付成功，请走收银台确认（与正式支付同流程）',
       });
     }
 
-    // 真实微信支付 JSAPI
+    // 真实微信支付 JSAPI（个体工商户 / 普通商户直连；填了 WX_SUB_MCH_ID 则走服务商）
     try {
       const wechat = require('./services/wechat');
       const openid = order.openid || user?.openid;
@@ -570,7 +602,7 @@ async function handleApi(req, res, pathname) {
         order.openid = openid;
         await save(db);
       }
-      const { payment, prepayId } = await wechat.createJsapiPrepay({
+      const { payment, prepayId, mode: mchMode } = await wechat.createJsapiPrepay({
         orderNo: order.orderNo,
         amountYuan: order.amount,
         openid,
@@ -583,6 +615,7 @@ async function handleApi(req, res, pathname) {
       return send(res, 200, {
         mode: 'wechat',
         paid: false,
+        merchantType: mchMode === 'partner' ? 'partner' : 'individual',
         order,
         payment,
       });
@@ -657,6 +690,24 @@ async function handleApi(req, res, pathname) {
     order = (await load()).orders.find((o) => o.id === body.orderId) || order;
     const qrDataUrl = order.pickupCode ? await orderQrDataUrl(order) : null;
     return send(res, 200, { order, qrDataUrl });
+  }
+
+  if (pathname === '/api/admin/delivery' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, { points: listDeliveryPoints(db.settings) });
+  }
+
+  if (pathname === '/api/admin/delivery' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      db.settings = applyDeliverySettings(db.settings, body.points);
+      await save(db);
+      return send(res, 200, { ok: true, points: listDeliveryPoints(db.settings) });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
   }
 
   if (pathname === '/api/admin/stats' && method === 'GET') {

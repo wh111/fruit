@@ -62,14 +62,18 @@ Page({
       const data = await request(`/api/orders/${this.id}`);
       const extras = (data.order.extras || []).map((e) => e.name).join('、');
       const queue = data.queue || {};
+      const isLocker = data.order.deliveryPoint && data.order.deliveryPoint !== 'shop';
+      let statusText = STATUS[data.order.status] || data.order.status;
+      if (data.order.fulfillmentType === 'reserve' && data.order.status === 'paid') {
+        statusText = '已预约';
+      } else if (data.order.status === 'ready' && isLocker) {
+        statusText = '已投柜';
+      }
       this.setData({
         order: data.order,
         qrDataUrl: data.qrDataUrl || '',
         extraText: extras,
-        statusText:
-          data.order.fulfillmentType === 'reserve' && data.order.status === 'paid'
-            ? '已预约'
-            : STATUS[data.order.status] || data.order.status,
+        statusText,
         queue,
       });
       if (data.order.status === 'done' || data.order.status === 'cancelled') {

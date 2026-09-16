@@ -1,108 +1,116 @@
 # 真实微信支付 + 云打印机配置
 
-## 一、微信支付（小程序 JSAPI）
+## 一、微信支付（推荐：个体工商户直连）
 
-### 1. 准备材料
+目标方案：**先办个体户执照 → 自己在微信支付开户 → 直连小程序 JSAPI**。  
+开发用 `PAY_MODE=mock` 时，调用链与正式一致：`预支付 → 收银台 → confirm`，不会在 create 时直接入账。
 
-1. 已认证的**微信小程序**（拿到 AppID、AppSecret）
-2. **微信支付商户号**（mch_id），并在商户平台完成小程序绑定
-3. 商户平台 → API 安全 → 设置 **APIv2 密钥**（32 位，即 `WX_API_KEY`）
-4. 一台有公网 HTTPS 的服务器（支付回调必须公网可访问）
+| 模式 | `.env` |
+|------|--------|
+| 开发模拟 | `PAY_MODE=mock` |
+| 正式个体户直连 | `PAY_MODE=wechat` + `WX_MCH_ID`=个体户商户号（**不填** `WX_SUB_MCH_ID`） |
+| 服务商通道（备选） | 再填 `WX_SUB_MCH_ID` |
+
+### 1. 准备材料（个体户直连）
+
+1. **个体工商户营业执照**  
+2. 已认证**微信小程序** → AppID、AppSecret  
+3. [微信支付商户平台](https://pay.weixin.qq.com/) 申请商户号（主体选个体工商户）  
+4. API 安全 → **APIv2 密钥**（32 位）  
+5. 关联小程序 AppID，开通 **JSAPI 支付**  
+6. 回调：`https://sijixiansheng.xin/api/pay/notify`
 
 ### 2. 填写 `server/.env`
 
 ```bash
-PAY_MODE=wechat
+# 开发
+PAY_MODE=mock
 
+# 上线改为：
+# PAY_MODE=wechat
 WX_APPID=wx你的小程序AppID
 WX_SECRET=你的小程序AppSecret
-WX_MCH_ID=你的商户号
-WX_API_KEY=你的APIv2密钥32位
-WX_NOTIFY_URL=https://你的域名/api/pay/notify
+WX_MCH_ID=个体户商户号
+WX_API_KEY=APIv2密钥32位
+WX_NOTIFY_URL=https://sijixiansheng.xin/api/pay/notify
 ```
 
-说明：
+### 3. 支付流程（mock 与 wechat 相同）
 
-- `WX_NOTIFY_URL` 必须是 **HTTPS**，且外网可访问（不要用 localhost）
-- 本地开发可用内网穿透（ngrok / 花生壳 / frp）把 3000 端口映射出去，再填到 `WX_NOTIFY_URL`
-- 开发阶段可继续 `PAY_MODE=mock` 测流程；上线改 `wechat`
-
-### 3. 微信后台配置
-
-1. 小程序后台 → 开发 → 开发管理 → 服务器域名  
-   - request 合法域名：你的 API 域名  
-2. 商户平台 → 产品中心 → 确认已开通 **JSAPI 支付**  
-3. 商户平台 → 产品中心 → AppID 账号管理 → 关联小程序 AppID  
-
-### 4. 小程序端
-
-1. `miniprogram/project.config.json` 里填真实 `appid`  
-2. `miniprogram/utils/config.js` 的 `baseUrl` 填 HTTPS API 地址  
-3. 真机预览：用户先登录（会换真实 openid）再支付  
-
-### 5. 支付流程（已实现）
-
-1. `POST /api/auth/wxlogin` → code2session 拿 openid  
-2. `POST /api/orders` → 创建待支付订单  
-3. `POST /api/pay/create` → 微信统一下单 → 返回 `wx.requestPayment` 参数  
-4. 用户付款成功  
-5. 微信回调 `POST /api/pay/notify` → 验签 → 出取餐码 → **自动云打印**  
-6. 小程序再调 `POST /api/pay/confirm` 查单兜底，展示取餐码页  
+1. `POST /api/auth/wxlogin` → openid  
+2. `POST /api/orders` → 待支付订单  
+3. `POST /api/pay/create` → 预支付参数（`paid: false`）  
+4. 收银台：mock 弹窗确认 / 正式 `wx.requestPayment`  
+5. 取消则 `POST /api/orders/:id/cancel`  
+6. 成功则 `POST /api/pay/confirm` → 入账、取餐码、云打印  
+7. 正式另有微信异步回调 `POST /api/pay/notify`  
 
 ---
 
-## 二、云打印机
+## 二、订阅消息（取餐/投柜提醒）
+
+用户支付前会弹出一次性订阅授权；后台把订单标为 **ready** 时服务端调用微信推送。
+
+### 1. 公众平台配置
+
+1. [微信公众平台](https://mp.weixin.qq.com/) → 功能 → 订阅消息  
+2. 选用餐饮/取餐类模板（含商品名、取餐点、取餐码、温馨提示等字段）  
+3. 记下模板 ID，以及每个字段的 key（如 `thing1`、`character_string3`）
+
+### 2. 填写 `server/.env`
+
+```bash
+WX_SUBSCRIBE_READY_TMPL_ID=你的模板ID
+# 按你选用的模板改字段名；缺省示例如下
+WX_SUBSCRIBE_READY_KEYS={"product":"thing1","place":"thing2","code":"character_string3","tip":"thing4"}
+# 开发版调试可改 developer；上线用 formal
+WX_SUBSCRIBE_STATE=formal
+```
+
+还需已配置 `WX_APPID`、`WX_SECRET`（与支付共用）。未配模板 ID 时接口静默跳过，不影响下单。
+
+### 3. 流程
+
+1. 小程序支付前 `wx.requestSubscribeMessage`（`GET /api/subscribe/config` 取 tmplIds）  
+2. 店员后台将订单改为「可取/已投柜」`ready`  
+3. 服务端 `subscribeMessage.send` → 用户微信服务通知  
+
+---
+
+## 三、云打印机
 
 支付成功后，后端会自动调用云打印（`CLOUD_PRINT_ENABLED=true`）。
 
-### 方案 A：飞鹅云（推荐，对接已写好）
-
-1. 购买飞鹅云小票机（带网线/Wi-Fi，支持云）  
-2. 打开 [飞鹅开放平台](https://admin.feieyun.com/) 注册，添加打印机拿到 **SN**  
-3. 在开放平台拿到 USER、UKEY  
+### 方案 A：飞鹅云（推荐）
 
 ```bash
 CLOUD_PRINT_ENABLED=true
 CLOUD_PRINT_PROVIDER=feie
-CLOUD_PRINT_USER=你的飞鹅账号邮箱或用户名
-CLOUD_PRINT_UKEY=你的UKEY
-CLOUD_PRINT_SN=打印机编号SN
+CLOUD_PRINT_USER=...
+CLOUD_PRINT_UKEY=...
+CLOUD_PRINT_SN=...
 ```
-
-打印内容含：店名、取餐码大字、品名规格、金额、二维码。
 
 ### 方案 B：易联云
 
 ```bash
 CLOUD_PRINT_ENABLED=true
 CLOUD_PRINT_PROVIDER=yilianyun
-YLY_CLIENT_ID=应用ID
-YLY_CLIENT_SECRET=应用密钥
-YLY_MACHINE_CODE=打印机终端号
-# 可选：长期 token，不填则自动用 client_credentials 换
-# YLY_ACCESS_TOKEN=
+YLY_CLIENT_ID=...
+YLY_CLIENT_SECRET=...
+YLY_MACHINE_CODE=...
 ```
-
-### 管理端补打
-
-- 浏览器「打印标签」：USB/本地标签机  
-- `POST /api/print/cloud` + `{ "orderId": "..." }`：再推一单到云打印机  
 
 ---
 
-## 三、推荐上线清单
+## 四、上线清单
 
 | 项目 | 说明 |
 |------|------|
-| HTTPS 域名 + 服务器 | 跑 `node src/index.js` 或前面加 Nginx |
-| `.env` 微信支付五项 | PAY_MODE=wechat + WX_* |
-| `.env` 云打印 | CLOUD_PRINT_ENABLED=true + 厂商参数 |
-| 小程序 AppID | project.config.json + 合法域名 |
-| 标签机（可选） | 管理端精细贴纸；云打印机负责后厨出票 |
+| 个体户执照 + 微信商户号 | 直连，勿优先走服务商 |
+| `PAY_MODE=wechat` + WX_* | 上线必填 |
+| 订阅消息模板 `WX_SUBSCRIBE_READY_*` | 取餐/投柜提醒，建议开启 |
+| 云打印 | 建议开启 |
+| 小程序合法域名 | `https://sijixiansheng.xin` |
 
-改完 `.env` 后重启：
-
-```bash
-cd /home/wujie/work/sijiguoxian
-./start.sh
-```
+改完 `.env` 后重启服务 / 部署。

@@ -16,6 +16,7 @@ const {
   restoreCouponForOrder,
 } = require('./coupon');
 const { getLoyaltyState, applyLoyaltyAndCoupon } = require('./loyalty');
+const { normalizeDelivery, listDeliveryPoints } = require('./delivery');
 
 function nextPickupCode(db) {
   const key = todayKey();
@@ -64,6 +65,9 @@ function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) 
   }
 
   const priced = applyLoyaltyAndCoupon(originalAmount, loyalty, coupon);
+  const delivery = normalizeDelivery(promoOpts.deliveryPoint, promoOpts.settings);
+  const foodAmount = priced.amount;
+  const amount = round2(foodAmount + delivery.deliveryFee);
 
   return {
     spec,
@@ -74,6 +78,9 @@ function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) 
     pickupAt,
     pickupAtText: pickupAt ? formatPickupLabel(pickupAt) : '',
     ...priced,
+    foodAmount,
+    amount,
+    ...delivery,
   };
 }
 
@@ -100,6 +107,7 @@ async function quoteOrder({
   quantity,
   fulfillmentType,
   pickupAt,
+  deliveryPoint,
   couponId,
   userId,
   openid,
@@ -115,8 +123,10 @@ async function quoteOrder({
 
   const bare = calcAmount(product, specId, extras || [], quantity, {
     ...fulfillment,
+    deliveryPoint,
     now,
     loyalty,
+    settings: db.settings,
   });
 
   let coupon = null;
@@ -135,9 +145,11 @@ async function quoteOrder({
 
   const priced = calcAmount(product, specId, extras || [], quantity, {
     ...fulfillment,
+    deliveryPoint,
     now,
     coupon,
     loyalty,
+    settings: db.settings,
   });
   const availableCoupons = userId
     ? listAvailableForOrder(db, userId, {
@@ -150,6 +162,7 @@ async function quoteOrder({
 
   return {
     ...priced,
+    deliveryPoints: listDeliveryPoints(db.settings),
     availableCoupons,
     selectedCouponId: priced.couponId || null,
     loyalty: {
@@ -175,6 +188,7 @@ async function createOrder({
   remark,
   fulfillmentType,
   pickupAt,
+  deliveryPoint,
   couponId,
   autoCoupon = true,
 }) {
@@ -188,8 +202,10 @@ async function createOrder({
   const loyalty = resolveLoyalty(db, { userId, openid, now });
   const bare = calcAmount(product, specId, extras || [], quantity, {
     ...fulfillment,
+    deliveryPoint,
     now,
     loyalty,
+    settings: db.settings,
   });
 
   let coupon = null;
@@ -208,9 +224,11 @@ async function createOrder({
 
   const priced = calcAmount(product, specId, extras || [], quantity, {
     ...fulfillment,
+    deliveryPoint,
     now,
     coupon,
     loyalty,
+    settings: db.settings,
   });
 
   const order = {
@@ -227,7 +245,11 @@ async function createOrder({
     quantity: priced.quantity,
     unitPrice: priced.unitPrice,
     originalAmount: priced.originalAmount,
+    foodAmount: priced.foodAmount,
     amount: priced.amount,
+    deliveryFee: priced.deliveryFee,
+    deliveryPoint: priced.deliveryPoint,
+    deliveryPointName: priced.deliveryPointName,
     discountAmount: priced.discountAmount,
     discountRate: priced.discountRate,
     discountCode: priced.discountCode,
@@ -356,16 +378,23 @@ function getQueueInfo(order, db) {
   }
 
   if (status === 'ready') {
+    const code = order.pickupCode || '';
+    const locker =
+      order.deliveryPoint && order.deliveryPoint !== 'shop'
+        ? order.deliveryPointName || '外卖柜'
+        : null;
     return {
       phase: 'ready',
-      title: '请取餐',
-      tip: `取餐码 ${order.pickupCode}，请到柜台出示`,
+      title: locker ? '已投柜，请取餐' : '请取餐',
+      tip: locker
+        ? `已放入「${locker}」，取餐码 ${code}。取餐时请核对取餐码。`
+        : `取餐码 ${code}，请到柜台出示`,
       ahead: 0,
       position: 0,
       steps: [
         { key: 'pay', label: '下单支付', done: true, current: false },
         { key: 'queue', label: '排队制作', done: true, current: false },
-        { key: 'ready', label: '取餐', done: false, current: true },
+        { key: 'ready', label: locker ? '投柜取餐' : '取餐', done: false, current: true },
       ],
     };
   }
@@ -377,8 +406,8 @@ function getQueueInfo(order, db) {
       phase: 'reserved',
       title: '已预约',
       tip: when
-        ? `已排入 ${when} 批次，取餐前 1 小时内现切（取餐码 ${order.pickupCode || ''}）`
-        : `已预约，取餐前 1 小时内现切（取餐码 ${order.pickupCode || ''}）`,
+        ? `已排入 ${when} 批次，取餐前半小时内现切（取餐码 ${order.pickupCode || ''}）`
+        : `已预约，取餐前半小时内现切（取餐码 ${order.pickupCode || ''}）`,
       ahead: null,
       position: null,
       pickupAt: order.pickupAt || null,

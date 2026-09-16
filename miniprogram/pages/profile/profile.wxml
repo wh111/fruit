@@ -3,7 +3,7 @@
     <image class="logo" src="/images/logo.png" mode="aspectFit" />
     <view>
       <view class="brand">四季果先</view>
-      <view class="muted">SEASONAL FRUIT · 现切现做 · 新鲜一小时</view>
+      <view class="muted">SEASONAL FRUIT · 现切现做 · 新鲜半小时</view>
       <view class="muted" style="margin-top:8rpx">{{user.nickName || '果粉'}}</view>
     </view>
   </view>
@@ -20,6 +20,6 @@
 
   <view class="card tip">
     <view class="title">取餐说明</view>
-    <view class="muted">支付成功后会生成取餐码。我们按取餐时间现切，保证取餐前最多 1 小时制作完成；到店出示取餐码即可。</view>
+    <view class="muted">支付成功后会生成取餐码。我们按取餐时间现切，保证取餐前最多半小时制作完成；到店出示取餐码即可。</view>
   </view>
 </view>

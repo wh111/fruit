@@ -4,7 +4,6 @@ Page({
   data: {
     shopName: '四季果先',
     shopPhone: '18813017847',
-    shopContact: '',
     groupBuyHint: '',
     points: [
       '适合企业团建、部门下午茶、会议茶歇',
@@ -24,7 +23,6 @@ Page({
       this.setData({
         shopName: shop.shopName || '四季果先',
         shopPhone: shop.shopPhone || '18813017847',
-        shopContact: shop.shopContact || '',
         groupBuyHint: shop.groupBuyHint || this.data.groupBuyHint,
       });
     } catch (_) {

@@ -12,7 +12,7 @@
 
   <view class="card contact">
     <view class="section">联系门店</view>
-    <view class="name">{{shopName}}<text wx:if="{{shopContact}}"> · {{shopContact}}</text></view>
+    <view class="name">{{shopName}}</view>
     <view class="phone" bindtap="copyPhone">{{shopPhone}}</view>
     <view class="muted">点击号码可复制；下面按钮直接拨打</view>
   </view>

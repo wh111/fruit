@@ -114,7 +114,7 @@ async function loadMysql() {
     settings: metaMap.settings || {
       shopName: '四季果先',
       shopPhone: '',
-      pickupHint: '取餐前最多 1 小时现切，做好后请到柜台取餐，出示取餐码即可',
+      pickupHint: '取餐前最多半小时现切，做好后请到柜台取餐，出示取餐码即可',
     },
     seq: metaMap.seq || { orderDay: '', pickupNo: 0 },
   };
@@ -246,7 +246,7 @@ async function ensureMysql(seedFn) {
       settings: {
         shopName: '四季果先',
         shopPhone: '',
-        pickupHint: '取餐前最多 1 小时现切，做好后请到柜台取餐，出示取餐码即可',
+        pickupHint: '取餐前最多半小时现切，做好后请到柜台取餐，出示取餐码即可',
       },
       seq: { orderDay: '', pickupNo: 0 },
     };

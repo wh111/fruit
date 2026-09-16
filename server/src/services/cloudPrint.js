@@ -16,17 +16,22 @@ const http = require('http');
 const { URL } = require('url');
 
 function pickupLine(order) {
+  let time = '现作现取';
   if (order.fulfillmentType === 'reserve' && (order.pickupAtText || order.pickupAt)) {
-    return `预约取餐：${order.pickupAtText || order.pickupAt}`;
+    time = `预约取餐：${order.pickupAtText || order.pickupAt}`;
   }
-  return '现作现取';
+  if (order.deliveryPoint && order.deliveryPoint !== 'shop') {
+    return `${time}\n投柜：${order.deliveryPointName || order.deliveryPoint}`;
+  }
+  return `${time}\n送达：到店取`;
 }
 
 function amountLine(order) {
+  const fee = Number(order.deliveryFee) > 0 ? ` 含配送￥${order.deliveryFee}` : '';
   if (order.discountAmount > 0 && order.originalAmount) {
-    return `金额：￥${order.amount}（原价￥${order.originalAmount} ${order.discountLabel || '优惠券'}）`;
+    return `金额：￥${order.amount}（原价￥${order.originalAmount} ${order.discountLabel || '优惠券'}${fee}）`;
   }
-  return `金额：￥${order.amount}`;
+  return `金额：￥${order.amount}${fee}`;
 }
 
 function buildCloudTicket(order, shopName = '四季果先') {

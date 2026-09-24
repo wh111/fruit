@@ -5,6 +5,7 @@
       <view class="brand">四季果先</view>
       <view class="muted">SEASONAL FRUIT · 现切现做 · 新鲜半小时</view>
       <view class="muted" style="margin-top:8rpx">{{user.nickName || '果粉'}}</view>
+      <view class="phone-line" wx:if="{{user.hasPhone}}">手机 {{user.phoneMasked}}</view>
     </view>
   </view>
 
@@ -15,11 +16,22 @@
     </view>
     <view class="row" bindtap="goGroupBuy">企业团购</view>
     <view class="row" bindtap="goOrders">我的订单</view>
+    <button
+      wx:if="{{!user.hasPhone}}"
+      class="row phone-btn"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhone"
+    >授权手机号（同步优惠）</button>
+    <view class="row" wx:else>
+      <text>手机号</text>
+      <text class="muted">{{user.phoneMasked}}</text>
+    </view>
     <view class="row" bindtap="reLogin">重新登录</view>
   </view>
 
   <view class="card tip">
     <view class="title">取餐说明</view>
     <view class="muted">支付成功后会生成取餐码。我们按取餐时间现切，保证取餐前最多半小时制作完成；到店出示取餐码即可。</view>
+    <view class="muted" style="margin-top:12rpx">授权手机号后，同一号码的优惠券会保持一致。</view>
   </view>
 </view>

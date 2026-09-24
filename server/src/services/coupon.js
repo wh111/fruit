@@ -1,8 +1,8 @@
 /**
  * 新人券包 + 每月登录礼 + 下单用券
- * - 满15减5 ×3、满25减8 ×3：现取/预定均可
+ * - 满15减3 ×3：现取/预定均可
  * - 预定立减 ×15（仅预定）；面额由开业阶段决定（对客只展示当前面额，不写阶段策略）
- * - 每月登录：无门槛减3元 ×3（现取/预定均可）
+ * - 每月登录：无门槛减2元 ×2（现取/预定均可）
  * - 每单限 1 张
  */
 const crypto = require('crypto');
@@ -41,20 +41,11 @@ function welcomeTemplates(now = Date.now()) {
   const reserveAmt = reserveOffAmount(now);
   return [
     {
-      templateId: 'welcome_off5',
-      title: '满15减5',
+      templateId: 'welcome_off3',
+      title: '满15减3',
       type: 'threshold',
       threshold: 15,
-      amount: 5,
-      fulfillment: 'any',
-      count: 3,
-    },
-    {
-      templateId: 'welcome_off8',
-      title: '满25减8',
-      type: 'threshold',
-      threshold: 25,
-      amount: 8,
+      amount: 3,
       fulfillment: 'any',
       count: 3,
     },
@@ -70,17 +61,17 @@ function welcomeTemplates(now = Date.now()) {
   ];
 }
 
-/** @deprecated 兼容旧引用：静态快照（开业期减3） */
+/** @deprecated 兼容旧引用：静态快照 */
 const WELCOME_TEMPLATES = welcomeTemplates();
 
 const MONTHLY_TEMPLATE = {
-  templateId: 'monthly_flat3',
-  title: '无门槛减3元',
+  templateId: 'monthly_flat2',
+  title: '无门槛减2元',
   type: 'flat',
   threshold: 0,
-  amount: 3,
+  amount: 2,
   fulfillment: 'any',
-  count: 3,
+  count: 2,
 };
 
 function monthKey(now = Date.now()) {
@@ -105,7 +96,7 @@ function campaignInfo(now = Date.now()) {
     title: '新人见面礼',
     subtitle: '登录送券 · 下单立减',
     bannerTitle: '领券下单更划算',
-    bannerSub: `新人礼包含${reserveLabel}×15 · 每月登录再送无门槛减3×3`,
+    bannerSub: `新人礼包含${reserveLabel}×15 · 每月登录再送无门槛减2×2`,
     faceValue,
     validDays: VALID_DAYS,
     /** 当前预定券面额，供前端展示「现在能领什么」；不含阶段策略说明 */
@@ -114,15 +105,14 @@ function campaignInfo(now = Date.now()) {
       title: '每月登录礼',
       count: MONTHLY_TEMPLATE.count,
       amount: MONTHLY_TEMPLATE.amount,
-      desc: '无门槛减3元 ×3，当月登录即送',
+      desc: '无门槛减2元 ×2，当月登录即送',
     },
     rules: [
       '首次登录自动发放新人券包，每人限领一次',
-      '每月登录再送无门槛减3元券 3 张（当月限领一次）',
+      '每月登录再送无门槛减2元券 2 张（当月限领一次）',
       '每单限用 1 张券，不可叠加多张券',
       '满减券 / 无门槛券：现作现取、预定均可',
       '预定立减券：仅提前预定可用',
-      '可与月累计折扣同享：先 95/9 折，再减券',
       `优惠券有效期 ${VALID_DAYS} 天，过期作废`,
     ],
     packs: [
@@ -190,7 +180,7 @@ function grantWelcomePack(db, user, now = Date.now()) {
   return { granted: true, coupons: created, campaign: campaignInfo(now) };
 }
 
-/** 自然月登录礼：无门槛减3 ×3，当月只发一次 */
+/** 自然月登录礼：无门槛减2 ×2，当月只发一次 */
 function grantMonthlyLoginPack(db, user, now = Date.now()) {
   if (!user || !user.id) return { granted: false, coupons: [] };
   ensureCoupons(db);
@@ -286,12 +276,15 @@ function listUserCoupons(db, userId, { includeUsed = true, now = Date.now() } = 
     list: list.map(couponPublic),
     summary: {
       unused: unused.length,
-      off5: unused.filter((c) => c.templateId === 'welcome_off5').length,
-      off8: unused.filter((c) => c.templateId === 'welcome_off8').length,
+      off3: unused.filter(
+        (c) => c.templateId === 'welcome_off3' || c.templateId === 'welcome_off5'
+      ).length,
       reserve3: unused.filter(
         (c) => c.type === 'reserve_off' || String(c.templateId || '').startsWith('welcome_reserve')
       ).length,
-      flat3: unused.filter((c) => c.templateId === 'monthly_flat3').length,
+      flat2: unused.filter(
+        (c) => c.templateId === 'monthly_flat2' || c.templateId === 'monthly_flat3'
+      ).length,
     },
     campaign: campaignInfo(now),
   };
@@ -417,12 +410,69 @@ function restoreCouponForOrder(db, order) {
   return false;
 }
 
+/**
+ * 管理端定向发券（写入用户券包，不下发微信卡包）
+ * @param {{ title?: string, amount: number, threshold?: number, fulfillment?: string, count?: number, templateId?: string }} tpl
+ */
+function grantManualCoupons(db, users, tpl, now = Date.now()) {
+  ensureCoupons(db);
+  const amount = round2(Number(tpl.amount) || 0);
+  if (!(amount > 0)) throw Object.assign(new Error('面额须大于 0'), { status: 400 });
+  const threshold = round2(Number(tpl.threshold) || 0);
+  const count = Math.min(20, Math.max(1, Number(tpl.count) || 1));
+  const fulfillment = tpl.fulfillment === 'reserve' ? 'reserve' : 'any';
+  const title =
+    tpl.title ||
+    (threshold > 0 ? `满${threshold}减${amount}` : `无门槛减${amount}元`);
+  const templateId = tpl.templateId || `admin_${fulfillment}_${amount}_${threshold || 0}`;
+  const expireAt = now + VALID_DAYS * 24 * 60 * 60 * 1000;
+  const created = [];
+  const targets = Array.isArray(users) ? users.filter(Boolean) : [];
+
+  for (const user of targets) {
+    for (let i = 0; i < count; i += 1) {
+      const coupon = {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        openid: user.openid || null,
+        pack: 'admin',
+        templateId,
+        title,
+        type: threshold > 0 ? 'threshold' : 'flat',
+        threshold,
+        amount,
+        fulfillment,
+        status: 'unused',
+        grantedAt: now,
+        expireAt,
+        orderId: null,
+        usedAt: null,
+      };
+      db.coupons.push(coupon);
+      created.push(coupon);
+    }
+  }
+
+  return {
+    granted: created.length,
+    userCount: targets.length,
+    perUser: count,
+    title,
+    amount,
+    threshold,
+    fulfillment,
+    expireAt,
+    coupons: created,
+  };
+}
+
 module.exports = {
   WELCOME_TEMPLATES,
   MONTHLY_TEMPLATE,
   SHOP_OPENING_AT,
   RESERVE_OFF_OPENING,
   RESERVE_OFF_NORMAL,
+  VALID_DAYS,
   isOpeningPromo,
   reserveOffAmount,
   welcomeTemplates,
@@ -430,6 +480,7 @@ module.exports = {
   grantWelcomePack,
   grantMonthlyLoginPack,
   grantLoginCoupons,
+  grantManualCoupons,
   hasWelcomePack,
   listUserCoupons,
   findCoupon,

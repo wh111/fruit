@@ -41,8 +41,9 @@
           <button type="button" data-tab="orders" class="nav">订单 / 打印</button>
           <button type="button" data-tab="products" class="nav">商品规格</button>
           <button type="button" data-tab="delivery" class="nav">配送费</button>
+          <button type="button" data-tab="users" class="nav">用户 / 发券</button>
           <button type="button" data-tab="verify" class="nav">扫码核销</button>
-          <button type="button" data-tab="hardware" class="nav">打印硬件</button>
+          <button type="button" data-tab="hardware" class="nav">打印 / 标签</button>
           <a class="nav link" href="./make.html">制作台（录像）</a>
         </nav>
         <button type="button" id="logoutBtn" class="btn ghost logout">退出</button>
@@ -117,6 +118,50 @@
           </div>
         </div>
 
+        <div id="tab-users" class="tab hidden">
+          <div class="stats" id="userStats"></div>
+          <div class="panel">
+            <h3>按活跃度发券</h3>
+            <p class="muted">
+              活跃 = 近 <span id="activeDaysLabel">14</span> 天内有支付订单；不活跃 = 更久未下单或从未下单。
+              券发到用户<strong>小程序券包</strong>，不会自动进微信卡包，也不会微信推送（除非另配订阅消息）。
+            </p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+              <label>人群
+                <select id="userSegment">
+                  <option value="inactive">不活跃</option>
+                  <option value="active">活跃</option>
+                  <option value="all">全部</option>
+                </select>
+              </label>
+              <label>活跃天数
+                <input id="activeDaysInput" type="number" min="1" max="365" value="14" style="width:72px" />
+              </label>
+              <label>面额¥
+                <input id="grantAmount" type="number" min="0.1" step="0.1" value="2" style="width:72px" />
+              </label>
+              <label>满减门槛¥
+                <input id="grantThreshold" type="number" min="0" step="1" value="0" style="width:72px" />
+              </label>
+              <label>每人张数
+                <input id="grantCount" type="number" min="1" max="10" value="1" style="width:64px" />
+              </label>
+              <label>标题
+                <input id="grantTitle" placeholder="可空，自动生成" style="width:140px" />
+              </label>
+              <label>用途
+                <select id="grantFulfillment">
+                  <option value="any">现取/预定均可</option>
+                  <option value="reserve">仅预定</option>
+                </select>
+              </label>
+              <button type="button" class="btn" id="reloadUsersBtn">刷新列表</button>
+              <button type="button" class="btn primary" id="grantCouponsBtn">给当前人群发券</button>
+            </div>
+            <div id="userTable" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+        </div>
+
         <div id="tab-verify" class="tab hidden">
           <div class="panel verify-panel">
             <h3>核销取餐</h3>
@@ -129,15 +174,109 @@
 
         <div id="tab-hardware" class="tab hidden">
           <div class="panel prose">
-            <h3>贴纸打印需要什么硬件？</h3>
+            <h3>① 德佟打印机</h3>
+            <p class="muted" id="detongStatus">正在检测打印助手…</p>
+            <label class="switch"><input type="checkbox" id="detongEnabled" checked /> <span>启用德佟本地打印</span></label>
+            <div class="cover-fields" style="margin-top:12px;gap:8px">
+              <label>打印机</label>
+              <select id="detongPrinter"></select>
+              <div class="cover-actions">
+                <label>宽(mm)</label>
+                <input id="detongWidth" type="number" min="20" max="80" value="50" style="width:72px" />
+                <label>高(mm)</label>
+                <input id="detongHeight" type="number" min="15" max="60" value="30" style="width:72px" />
+              </div>
+              <div class="cover-actions">
+                <button type="button" class="btn sm" id="detongRefresh">刷新设备</button>
+                <button type="button" class="btn sm primary" id="detongTest">测试订单标签</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel prose">
+            <h3>② 订单标签自定义</h3>
+            <p class="muted">控制小程序下单后自动打印 / 点「打印标签」时的杯贴内容。</p>
+            <label>品牌名</label>
+            <input id="orderTplBrand" placeholder="四季果先" />
+            <label>码制</label>
+            <select id="orderTplCodeType">
+              <option value="qr">二维码（推荐核销）</option>
+              <option value="barcode">一维条码（取餐码）</option>
+            </select>
+            <div class="tpl-checks">
+              <label class="switch"><input type="checkbox" id="orderTplShowBrand" checked /> <span>品牌</span></label>
+              <label class="switch"><input type="checkbox" id="orderTplShowCode" checked /> <span>取餐码</span></label>
+              <label class="switch"><input type="checkbox" id="orderTplShowName" checked /> <span>品名规格</span></label>
+              <label class="switch"><input type="checkbox" id="orderTplShowPrice" checked /> <span>价格</span></label>
+              <label class="switch"><input type="checkbox" id="orderTplShowTime" checked /> <span>现取/预约</span></label>
+              <label class="switch"><input type="checkbox" id="orderTplShowDelivery" checked /> <span>送达方式</span></label>
+            </div>
+          </div>
+
+          <div class="panel prose">
+            <h3>③ 批量生产 · 条形码标签</h3>
+            <p class="muted">用于杯贴预印、货架码、规格码。改完模板后选一种方式生成并打印。</p>
+            <label>批量标签品牌</label>
+            <input id="batchTplBrand" placeholder="四季果先" />
+            <div class="tpl-checks">
+              <label class="switch"><input type="checkbox" id="batchTplShowBrand" checked /> <span>品牌</span></label>
+              <label class="switch"><input type="checkbox" id="batchTplShowTitle" checked /> <span>标题</span></label>
+              <label class="switch"><input type="checkbox" id="batchTplShowPrice" checked /> <span>价格</span></label>
+              <label class="switch"><input type="checkbox" id="batchTplShowHuman" checked /> <span>条码下方数字</span></label>
+            </div>
+
+            <div class="batch-mode">
+              <label class="switch"><input type="radio" name="batchMode" value="serial" checked /> <span>连号生成</span></label>
+              <label class="switch"><input type="radio" name="batchMode" value="manual" /> <span>手动列表</span></label>
+            </div>
+
+            <div id="batchSerialBox" class="batch-box">
+              <div class="cover-actions">
+                <label>前缀</label>
+                <input id="batchPrefix" value="SG" style="width:80px" />
+                <label>起始</label>
+                <input id="batchStart" type="number" value="1" style="width:80px" />
+                <label>数量</label>
+                <input id="batchCount" type="number" min="1" max="500" value="10" style="width:80px" />
+                <label>补零</label>
+                <input id="batchPad" type="number" min="0" max="8" value="4" style="width:64px" />
+              </div>
+              <div class="cover-actions">
+                <label>标题</label>
+                <input id="batchTitle" placeholder="例：招牌麒麟瓜 500g" style="flex:1" />
+                <label>价格</label>
+                <input id="batchPrice" placeholder="10" style="width:72px" />
+                <label>每码份数</label>
+                <input id="batchCopies" type="number" min="1" max="50" value="1" style="width:64px" />
+              </div>
+              <div class="cover-actions">
+                <button type="button" class="btn sm" id="batchPreview">预览前 30 条</button>
+                <button type="button" class="btn sm primary" id="batchSerialPrint">开始连号打印</button>
+              </div>
+            </div>
+
+            <div id="batchManualBox" class="batch-box">
+              <label>每行：条码,品名,价格,份数（逗号或制表符）</label>
+              <textarea id="batchManualList" rows="6" placeholder="SG0001,招牌麒麟瓜,10,2&#10;SG0002,芒果多多,18,1"></textarea>
+              <div class="cover-actions">
+                <button type="button" class="btn sm" id="batchPreviewManual">预览</button>
+                <button type="button" class="btn sm primary" id="batchManualPrint">按列表打印</button>
+                <button type="button" class="btn sm" id="batchFromProducts">从在售商品生成并打印</button>
+              </div>
+            </div>
+
+            <pre id="batchPreviewBox" class="batch-preview"></pre>
+            <p class="muted" id="batchPrintProgress"></p>
+            <p class="muted">说明：德佟是本地打印。店里电脑需开着管理端 + 打印助手。连号最多 500；单次批量请分批以免卡纸。</p>
+          </div>
+
+          <div class="panel prose">
+            <h3>其它</h3>
             <ol>
-              <li><strong>热敏标签打印机</strong>（推荐）：汉印 / 佳博 / 芯烨，USB 接电脑，约 200–500 元</li>
-              <li><strong>标签纸</strong>：40×30mm 或 50×30mm 热敏不干胶（防水更好）</li>
-              <li>电脑打开本管理端 → 订单「打印标签」→ 选打印机即可贴杯</li>
+              <li>安装德佟 <strong>dtpweb 打印助手</strong>并保持运行</li>
+              <li>右上角勾选「新单自动打印」：顾客支付后自动出订单杯贴</li>
             </ol>
-            <p>也可买<strong>蓝牙标签机</strong>（精臣/汉印）用手机打；或买<strong>云打印机</strong>实现支付后自动出纸。</p>
-            <p>手机接单日常用本页即可；需要录像时打开「制作台」。</p>
-            <p>完整说明见项目 <code>docs/HARDWARE.md</code>。</p>
+            <p>完整说明见 <code>docs/HARDWARE.md</code>。</p>
           </div>
         </div>
       </main>
@@ -188,6 +327,13 @@
     </form>
   </dialog>
 
+  <script src="https://cdn.jsdelivr.net/npm/dtpweb@2.7.260720/lib/dtpweb.umd.js"></script>
+  <script src="./js/detong-print.js"></script>
   <script src="./js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.DetongPrint) DetongPrint.init();
+    });
+  </script>
 </body>
 </html>

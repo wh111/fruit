@@ -1,12 +1,11 @@
 /**
- * 月累计下单折扣（Asia/Shanghai 自然月）
- * - 本月 ≥3 单：95 折
- * - 本月 ≥10 单：9 折
- * 可与立减券叠加：先打折再减券
+ * 月累计下单折扣（已关闭）
+ * 保留计数与接口字段，便于历史订单展示；计价不再打折。
  */
 const { shopParts, shopStamp, round2 } = require('./promo');
 
 const PAID_STATUSES = new Set(['paid', 'making', 'ready', 'done']);
+const LOYALTY_ENABLED = false;
 
 function monthRange(now = Date.now()) {
   const p = shopParts(now);
@@ -43,6 +42,17 @@ function countMonthPaidOrders(db, { userId, openid, now = Date.now() } = {}) {
  */
 function loyaltyFromCount(monthPaidCount, { includeCurrent = true } = {}) {
   const n = Math.max(0, Number(monthPaidCount) || 0) + (includeCurrent ? 1 : 0);
+  if (!LOYALTY_ENABLED) {
+    return {
+      monthCount: n,
+      tier: 0,
+      rate: 0,
+      factor: 1,
+      label: '',
+      shortLabel: '',
+      nextHint: '',
+    };
+  }
   if (n >= 10) {
     return {
       monthCount: n,
@@ -85,16 +95,19 @@ function getLoyaltyState(db, { userId, openid, now = Date.now(), includeCurrent 
     monthKey: range.key,
     monthPaid: paid,
     ...loyalty,
-    rules: [
-      '自然月累计：满 3 单享 95 折，满 10 单享 9 折',
-      '以支付成功订单为准，取消/未支付不计',
-      '可与立减券叠加：先打折，再减券',
-    ],
+    enabled: LOYALTY_ENABLED,
+    rules: LOYALTY_ENABLED
+      ? [
+          '自然月累计：满 3 单享 95 折，满 10 单享 9 折',
+          '以支付成功订单为准，取消/未支付不计',
+          '可与立减券叠加：先打折，再减券',
+        ]
+      : [],
   };
 }
 
 /**
- * 先月折，再减券
+ * 先月折（若开启），再减券
  * coupon 门槛仍按原价判断（由 canUseCoupon 负责）
  */
 function applyLoyaltyAndCoupon(originalAmount, loyalty, coupon) {
@@ -146,4 +159,5 @@ module.exports = {
   getLoyaltyState,
   applyLoyaltyAndCoupon,
   PAID_STATUSES,
+  LOYALTY_ENABLED,
 };

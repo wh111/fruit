@@ -47,8 +47,9 @@ function switchTab(tab) {
     orders: '订单 / 打印',
     products: '商品规格',
     delivery: '配送费',
+    users: '用户 / 发券',
     verify: '扫码核销',
-    hardware: '打印硬件',
+    hardware: '打印 / 标签',
   };
   $('#pageTitle').textContent = titles[tab] || '';
   window.scrollTo(0, 0);
@@ -178,6 +179,8 @@ async function loadStats() {
     <div class="stat"><div class="label">今日营收</div><div class="value">¥${s.todayRevenue}</div></div>
     <div class="stat"><div class="label">待制作</div><div class="value">${s.pendingMake}</div></div>
     <div class="stat"><div class="label">在售商品</div><div class="value">${s.productCount}</div></div>
+    <div class="stat"><div class="label">活跃用户</div><div class="value">${s.userActive ?? '-'}</div></div>
+    <div class="stat"><div class="label">不活跃</div><div class="value">${s.userInactive ?? '-'}</div></div>
   `;
   const { list } = await api('/api/admin/orders');
   await watchNewOrders(list);
@@ -447,9 +450,30 @@ window.setStatus = async function setStatus(id, status) {
 
 window.printLabel = async function printLabel(orderId) {
   const data = await api(`/api/print/label/${orderId}`);
+
+  // 优先走德佟本地标签机（需本机安装 dtpweb 打印助手）
+  if (window.DetongPrint && DetongPrint.isAvailable()) {
+    try {
+      await DetongPrint.printOrderLabel({
+        order: data.order,
+        shopName: data.shopName || '四季果先',
+      });
+      toast(`德佟已打印 ${data.order?.pickupCode || ''}`);
+      try {
+        await api(`/api/orders/${orderId}/printed`, { method: 'POST', body: '{}' });
+      } catch {
+        /* ignore */
+      }
+      return;
+    } catch (e) {
+      console.warn('[detong]', e);
+      toast((e && e.message) || '德佟打印失败，改用浏览器打印');
+    }
+  }
+
   const w = window.open('', '_blank', 'width=420,height=320');
   if (!w) {
-    toast('浏览器拦截了弹窗，请允许后重试');
+    toast('浏览器拦截了弹窗，请允许后重试（或检查德佟打印助手）');
     return;
   }
   w.document.write(data.html);
@@ -574,6 +598,64 @@ async function saveDelivery() {
   }
 }
 
+async function loadUsers() {
+  const segment = $('#userSegment')?.value || 'all';
+  const activeDays = Number($('#activeDaysInput')?.value || 14);
+  const data = await api(`/api/admin/users?segment=${encodeURIComponent(segment)}&activeDays=${activeDays}`);
+  const s = data.summary || {};
+  if ($('#activeDaysLabel')) $('#activeDaysLabel').textContent = String(s.activeDays || activeDays);
+  $('#userStats').innerHTML = `
+    <div class="stat"><div class="label">用户总数</div><div class="value">${s.total || 0}</div></div>
+    <div class="stat"><div class="label">活跃（${s.activeDays || activeDays}天）</div><div class="value">${s.active || 0}</div></div>
+    <div class="stat"><div class="label">不活跃</div><div class="value">${s.inactive || 0}</div></div>
+    <div class="stat"><div class="label">当前列表</div><div class="value">${(data.list || []).length}</div></div>
+  `;
+  const fmt = (t) => (t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '-');
+  const rows = (data.list || [])
+    .map(
+      (u) => `<tr>
+      <td>${u.nickName || '果粉'}</td>
+      <td>${u.phone || '-'}</td>
+      <td>${u.segment === 'active' ? '活跃' : '不活跃'}</td>
+      <td>${u.paidCount || 0}</td>
+      <td>${fmt(u.lastOrderAt)}</td>
+      <td>${fmt(u.lastLoginAt)}</td>
+    </tr>`
+    )
+    .join('');
+  $('#userTable').innerHTML = `
+    <table class="table">
+      <thead><tr><th>昵称</th><th>手机</th><th>状态</th><th>支付单</th><th>最近下单</th><th>最近登录</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6" class="muted">暂无用户</td></tr>'}</tbody>
+    </table>`;
+}
+
+async function grantCouponsToSegment() {
+  const segment = $('#userSegment').value;
+  const activeDays = Number($('#activeDaysInput').value || 14);
+  const amount = Number($('#grantAmount').value);
+  const threshold = Number($('#grantThreshold').value || 0);
+  const count = Number($('#grantCount').value || 1);
+  const title = ($('#grantTitle').value || '').trim();
+  const fulfillment = $('#grantFulfillment').value;
+  if (!(amount > 0)) return toast('请填写面额');
+  const label =
+    segment === 'active' ? '活跃用户' : segment === 'inactive' ? '不活跃用户' : '全部用户';
+  if (!confirm(`确认给「${label}」每人发 ${count} 张券（¥${amount}${threshold > 0 ? ` / 满${threshold}` : ' 无门槛'}）？`)) {
+    return;
+  }
+  try {
+    const res = await api('/api/admin/coupons/grant', {
+      method: 'POST',
+      body: JSON.stringify({ segment, activeDays, amount, threshold, count, title, fulfillment }),
+    });
+    toast(`已发 ${res.granted} 张券 → ${res.userCount} 人（小程序券包）`);
+    await loadUsers();
+  } catch (e) {
+    toast(e.message || '发券失败');
+  }
+}
+
 async function refresh() {
   if (!state.token) return;
   try {
@@ -581,6 +663,7 @@ async function refresh() {
     if (state.tab === 'orders') await loadOrders();
     if (state.tab === 'products') await loadProducts();
     if (state.tab === 'delivery') await loadDelivery();
+    if (state.tab === 'users') await loadUsers();
   } catch (e) {
     if (String(e.message).includes('登录') || String(e.message).includes('过期') || String(e.message).includes('权限')) logout();
     else console.error(e);
@@ -603,6 +686,10 @@ $('#refreshBtn').addEventListener('click', refresh);
 $('#statusFilter').addEventListener('change', loadOrders);
 $('#verifyBtn').addEventListener('click', verify);
 $('#saveDeliveryBtn')?.addEventListener('click', saveDelivery);
+$('#reloadUsersBtn')?.addEventListener('click', () => loadUsers().catch((e) => toast(e.message)));
+$('#grantCouponsBtn')?.addEventListener('click', grantCouponsToSegment);
+$('#userSegment')?.addEventListener('change', () => loadUsers().catch((e) => toast(e.message)));
+$('#activeDaysInput')?.addEventListener('change', () => loadUsers().catch((e) => toast(e.message)));
 $('#addProductBtn').addEventListener('click', () => editProduct(null));
 $('#saveProductBtn').addEventListener('click', saveProduct);
 $('#pickCoverBtn')?.addEventListener('click', (e) => {

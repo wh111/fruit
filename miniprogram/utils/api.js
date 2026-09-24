@@ -96,6 +96,82 @@ function clearSession() {
   }
 }
 
+function applyAuthSession(data) {
+  if (!data) return;
+  if (data.token) wx.setStorageSync('token', data.token);
+  if (data.user) wx.setStorageSync('user', data.user);
+  if (data.couponSummary) wx.setStorageSync('couponSummary', data.couponSummary);
+  try {
+    const app = getApp();
+    if (app && app.globalData) {
+      if (data.token) app.globalData.token = data.token;
+      if (data.user) app.globalData.user = data.user;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+/** 绑定微信手机号（button open-type=getPhoneNumber 回调） */
+async function bindPhoneNumber(detail) {
+  await ensureLogin();
+  const d = detail || {};
+  const errMsg = String(d.errMsg || '');
+  const errno = d.errno;
+
+  // 用户拒绝 / 额度不足等
+  if (/deny|cancel|拒绝/i.test(errMsg) || errno === 103 || errno === 104) {
+    throw new Error('需要授权手机号才能保持优惠一致');
+  }
+  if (errno === 1400001) {
+    throw new Error('手机号授权次数已达上限，请稍后再试');
+  }
+
+  const payload = {};
+  if (d.code) payload.code = d.code;
+  if (d.encryptedData && d.iv) {
+    payload.encryptedData = d.encryptedData;
+    payload.iv = d.iv;
+  }
+
+  // 开发者工具常不给 code：开发版允许 mock，便于联调
+  let env = '';
+  try {
+    env = wx.getAccountInfoSync().miniProgram.envVersion || '';
+  } catch (_) {
+    /* ignore */
+  }
+  if (!payload.code && !payload.encryptedData) {
+    const denied = /deny|cancel|拒绝/i.test(errMsg);
+    if (denied) {
+      throw new Error('需要授权手机号才能保持优惠一致');
+    }
+    // 仅当显式开启开发模拟时才用测试号（避免误以为已拿到真号）
+    const allowDevMock = !!wx.getStorageSync('sg_allow_dev_phone_mock');
+    if ((env === 'develop' || env === 'trial') && allowDevMock) {
+      payload.mockPhone = wx.getStorageSync('sg_dev_mock_phone') || '13800138000';
+      payload._devMock = true;
+    } else {
+      throw new Error(
+        '未拿到微信手机号凭证。请用真机预览；小程序须企业/个体户主体认证，并在公众平台开通「手机号快速验证」（含免费额度或资源包）'
+      );
+    }
+  }
+
+  const data = await request('/api/auth/bindPhone', {
+    method: 'POST',
+    data: {
+      code: payload.code,
+      encryptedData: payload.encryptedData,
+      iv: payload.iv,
+      mockPhone: payload.mockPhone,
+    },
+  });
+  applyAuthSession(data);
+  if (payload._devMock) data.devMock = true;
+  return data;
+}
+
 /**
  * 登录并确保发券：
  * - 无 token / force：走 wx.login → wxlogin（服务端发券）
@@ -109,16 +185,7 @@ async function ensureLogin(opts = {}) {
       method: 'POST',
       data: { code },
     });
-    wx.setStorageSync('token', data.token);
-    wx.setStorageSync('user', data.user);
-    if (data.couponSummary) wx.setStorageSync('couponSummary', data.couponSummary);
-    try {
-      const app = getApp();
-      app.globalData.token = data.token;
-      app.globalData.user = data.user;
-    } catch (_) {
-      /* ignore */
-    }
+    applyAuthSession(data);
     rememberGrantPending(data);
     return {
       token: data.token,
@@ -208,6 +275,7 @@ module.exports = {
   request,
   mediaUrl,
   ensureLogin,
+  bindPhoneNumber,
   rememberOrderId,
   consumeWelcomeToast,
   consumeMonthlyToast,

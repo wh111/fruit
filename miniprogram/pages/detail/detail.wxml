@@ -101,8 +101,7 @@
       <view class="coupon-value {{hasDiscount ? 'on' : ''}}">{{couponLabel}}</view>
     </view>
     <view class="muted" style="margin-top:8rpx">
-      每单限用 1 张 · 可与月累计折扣叠加
-      <text wx:if="{{monthPaid}}"> · 本月已付 {{monthPaid}} 单</text>
+      每单限用 1 张优惠券
     </view>
   </view>
 
@@ -126,6 +125,16 @@
         <text class="strike" wx:if="{{hasDiscount}}">¥{{originalTotal}}</text>
       </view>
     </view>
-    <view class="btn-primary pay" bindtap="submit">去支付</view>
+    <view
+      wx:if="{{hasPhone}}"
+      class="btn-primary pay"
+      bindtap="submit"
+    >去支付</view>
+    <button
+      wx:else
+      class="btn-primary pay phone-pay"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onPhoneThenPay"
+    >授权手机号并支付</button>
   </view>
 </view>

@@ -4,6 +4,7 @@ const {
   ensureLogin,
   rememberOrderId,
   requestReadySubscribe,
+  bindPhoneNumber,
 } = require('../../utils/api');
 
 const STORAGE_DELIVERY = 'sg_last_delivery_point';
@@ -59,6 +60,7 @@ Page({
     loyaltyHint: '',
     loyaltyTier: 0,
     monthPaid: 0,
+    hasPhone: false,
   },
 
   onLoad(query) {
@@ -66,13 +68,27 @@ Page({
     this._couponTouched = false;
     const saved = readSavedDelivery();
     if (saved) this.setData({ deliveryPoint: saved });
+    const user = wx.getStorageSync('user') || {};
+    this.setData({ hasPhone: !!(user.hasPhone || user.phone) });
     this.load();
   },
 
   onShow() {
+    const user = wx.getStorageSync('user') || {};
+    this.setData({ hasPhone: !!(user.hasPhone || user.phone) });
     if (this.data.product) {
       this.loadPromo().then(() => this.refreshQuote());
     }
+    // 以服务端为准刷新是否已绑手机
+    ensureLogin()
+      .then(() => request('/api/auth/me'))
+      .then((me) => {
+        if (me && me.user) {
+          wx.setStorageSync('user', me.user);
+          this.setData({ hasPhone: !!(me.user.hasPhone || me.user.phone) });
+        }
+      })
+      .catch(() => {});
   },
 
   async load() {
@@ -303,6 +319,24 @@ Page({
     });
   },
 
+  async onPhoneThenPay(e) {
+    try {
+      wx.showLoading({ title: '授权中' });
+      await ensureLogin();
+      const data = await bindPhoneNumber(e.detail || {});
+      wx.hideLoading();
+      this.setData({ hasPhone: true });
+      if (data.merged) {
+        wx.showToast({ title: '已同步优惠到本号', icon: 'none' });
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      await this.submit();
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: (err && err.message) || '请先授权手机号', icon: 'none' });
+    }
+  },
+
   async submit() {
     try {
       const { fulfillmentType, slots, slotIndex, canReserve, couponId, deliveryPoint } = this.data;
@@ -312,6 +346,14 @@ Page({
       }
       wx.showLoading({ title: '下单中' });
       await ensureLogin();
+      const user = wx.getStorageSync('user') || {};
+      if (!(user.hasPhone || user.phone)) {
+        wx.hideLoading();
+        this.setData({ hasPhone: false });
+        wx.showToast({ title: '请先授权手机号', icon: 'none' });
+        return;
+      }
+      this.setData({ hasPhone: true });
       const { order } = await request('/api/orders', {
         method: 'POST',
         data: {

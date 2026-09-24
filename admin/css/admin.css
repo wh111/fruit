@@ -25,6 +25,49 @@ body {
 
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
+.ok-line { color: #2e7d32 !important; }
+.warn-line { color: #c62828 !important; }
+.tpl-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 10px 0 14px;
+}
+.batch-mode {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0;
+}
+.batch-box {
+  margin: 8px 0 12px;
+  padding: 12px;
+  background: #f7f8f5;
+  border-radius: 8px;
+}
+.batch-box .cover-actions {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.batch-preview {
+  background: #1f2a1f;
+  color: #d7e8d0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+#tab-hardware .panel + .panel { margin-top: 14px; }
+#tab-hardware input[type="text"],
+#tab-hardware input:not([type]),
+#tab-hardware input[type="number"],
+#tab-hardware select,
+#tab-hardware textarea {
+  width: 100%;
+  max-width: 520px;
+  margin: 4px 0 10px;
+}
 .error { color: #d32f2f; min-height: 1.2em; }
 
 .btn {

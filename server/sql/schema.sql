@@ -55,8 +55,10 @@ CREATE TABLE IF NOT EXISTS users (
   openid VARCHAR(128) NOT NULL UNIQUE,
   nick_name VARCHAR(128) DEFAULT '',
   avatar_url VARCHAR(512) DEFAULT '',
+  phone VARCHAR(32) DEFAULT '',
   created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
+  updated_at BIGINT NOT NULL,
+  INDEX idx_users_phone (phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS app_meta (

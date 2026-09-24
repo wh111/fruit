@@ -302,6 +302,12 @@ async function markPaid(orderId, { transactionId, payMode } = {}) {
   order.paidAt = Date.now();
   order.printed = false;
   order.updatedAt = Date.now();
+  try {
+    const { touchOrderPaid } = require('./users');
+    touchOrderPaid(db, order, order.paidAt);
+  } catch {
+    /* ignore */
+  }
   await save(db);
   return order;
 }

@@ -9,16 +9,16 @@
         <text class="label">可用</text>
       </view>
       <view class="stat">
-        <text class="num">{{summary.flat3 || 0}}</text>
-        <text class="label">无门槛减3</text>
+        <text class="num">{{summary.flat2 || 0}}</text>
+        <text class="label">无门槛减2</text>
       </view>
       <view class="stat">
-        <text class="num">{{summary.off5 || 0}}</text>
-        <text class="label">满15减5</text>
+        <text class="num">{{summary.off3 || 0}}</text>
+        <text class="label">满15减3</text>
       </view>
       <view class="stat">
-        <text class="num">{{summary.off8 || 0}}</text>
-        <text class="label">满25减8</text>
+        <text class="num">{{summary.reserve3 || 0}}</text>
+        <text class="label">预定立减</text>
       </view>
     </view>
   </view>

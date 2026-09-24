@@ -93,6 +93,7 @@ function rowToUser(r) {
     openid: r.openid,
     nickName: r.nick_name || '',
     avatarUrl: r.avatar_url || '',
+    phone: r.phone || '',
     createdAt: Number(r.created_at),
   };
 }
@@ -206,9 +207,17 @@ async function saveMysql(data) {
     await conn.query('DELETE FROM users');
     for (const u of data.users || []) {
       await conn.query(
-        `INSERT INTO users (id, openid, nick_name, avatar_url, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [u.id, u.openid, u.nickName || '', u.avatarUrl || '', u.createdAt || Date.now(), Date.now()]
+        `INSERT INTO users (id, openid, nick_name, avatar_url, phone, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          u.id,
+          u.openid,
+          u.nickName || '',
+          u.avatarUrl || '',
+          u.phone || '',
+          u.createdAt || Date.now(),
+          Date.now(),
+        ]
       );
     }
 

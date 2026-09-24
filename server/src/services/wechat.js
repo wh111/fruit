@@ -109,6 +109,135 @@ function requestText(url, { method = 'GET', body = null, headers = {} } = {}) {
   });
 }
 
+function requestJson(url, { method = 'GET', bodyObj = null } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const lib = u.protocol === 'https:' ? https : http;
+    const body = bodyObj ? JSON.stringify(bodyObj) : null;
+    const req = lib.request(
+      {
+        protocol: u.protocol,
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: u.pathname + u.search,
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+        },
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const text = Buffer.concat(chunks).toString('utf8');
+          try {
+            resolve(JSON.parse(text));
+          } catch {
+            resolve({ raw: text });
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+let tokenCache = { token: '', expireAt: 0 };
+
+async function getAccessToken(force = false) {
+  const { appId, secret } = cfg();
+  if (!appId || !secret) {
+    throw Object.assign(new Error('未配置 WX_APPID / WX_SECRET'), { status: 400 });
+  }
+  if (!force && tokenCache.token && Date.now() < tokenCache.expireAt - 60_000) {
+    return tokenCache.token;
+  }
+  const url =
+    `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential` +
+    `&appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(secret)}`;
+  const data = await requestJson(url);
+  if (!data.access_token) {
+    throw Object.assign(new Error(data.errmsg || '获取 access_token 失败'), { status: 400, raw: data });
+  }
+  tokenCache = {
+    token: data.access_token,
+    expireAt: Date.now() + (Number(data.expires_in) || 7200) * 1000,
+  };
+  return tokenCache.token;
+}
+
+/**
+ * 手机号快速验证组件返回的 code → 真实手机号
+ * @see https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/user-info/phone-number/getPhoneNumber.html
+ */
+async function getUserPhoneNumber(code) {
+  if (!code) throw Object.assign(new Error('缺少手机号 code'), { status: 400 });
+  // 开发/无密钥：允许 mock_13800138000 形式
+  if (String(code).startsWith('mock_')) {
+    const phone = String(code).slice(5).replace(/\D/g, '');
+    if (phone.length < 11) throw Object.assign(new Error('模拟手机号无效'), { status: 400 });
+    return { phoneNumber: phone, purePhoneNumber: phone, countryCode: '86' };
+  }
+  let token = await getAccessToken();
+  let data = await requestJson(
+    `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${token}`,
+    { method: 'POST', bodyObj: { code } }
+  );
+  if (data.errcode === 40001 || data.errcode === 42001) {
+    token = await getAccessToken(true);
+    data = await requestJson(
+      `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${token}`,
+      { method: 'POST', bodyObj: { code } }
+    );
+  }
+  if (data.errcode && data.errcode !== 0) {
+    throw Object.assign(new Error(data.errmsg || '获取手机号失败'), { status: 400, raw: data });
+  }
+  const info = data.phone_info || {};
+  const phone = String(info.purePhoneNumber || info.phoneNumber || '').replace(/\D/g, '');
+  if (!phone) throw Object.assign(new Error('未返回手机号'), { status: 400, raw: data });
+  return {
+    phoneNumber: info.phoneNumber || phone,
+    purePhoneNumber: phone,
+    countryCode: info.countryCode || '86',
+  };
+}
+
+function maskPhone(phone) {
+  const s = String(phone || '').replace(/\D/g, '');
+  if (s.length < 7) return s ? `${s.slice(0, 2)}****` : '';
+  return `${s.slice(0, 3)}****${s.slice(-4)}`;
+}
+
+/** 旧版 getPhoneNumber：用 session_key 解密 encryptedData */
+function decryptPhoneData(sessionKey, encryptedData, iv) {
+  if (!sessionKey || !encryptedData || !iv) {
+    throw Object.assign(new Error('缺少 session_key / encryptedData / iv'), { status: 400 });
+  }
+  try {
+    const key = Buffer.from(sessionKey, 'base64');
+    const ivBuf = Buffer.from(iv, 'base64');
+    const data = Buffer.from(encryptedData, 'base64');
+    const decipher = crypto.createDecipheriv('aes-128-cbc', key, ivBuf);
+    decipher.setAutoPadding(true);
+    let decoded = decipher.update(data, undefined, 'utf8');
+    decoded += decipher.final('utf8');
+    const parsed = JSON.parse(decoded);
+    const phone = String(parsed.purePhoneNumber || parsed.phoneNumber || '').replace(/\D/g, '');
+    if (!phone) throw new Error('解密结果无手机号');
+    return {
+      phoneNumber: parsed.phoneNumber || phone,
+      purePhoneNumber: phone,
+      countryCode: parsed.countryCode || '86',
+    };
+  } catch (e) {
+    throw Object.assign(new Error(`手机号解密失败：${e.message}`), { status: 400 });
+  }
+}
+
 /** code2session 换 openid（始终用小程序 AppID/Secret） */
 async function code2Session(code) {
   const { appId, secret } = cfg();
@@ -265,4 +394,9 @@ module.exports = {
   notifyFailXml,
   signMd5,
   requestText,
+  requestJson,
+  getAccessToken,
+  getUserPhoneNumber,
+  decryptPhoneData,
+  maskPhone,
 };

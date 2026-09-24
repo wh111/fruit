@@ -1,54 +1,9 @@
 /**
  * 微信小程序订阅消息（一次性）
  *
- * 1. 公众平台 → 功能 → 订阅消息 → 选用餐饮/取餐类模板
- * 2. .env 填写模板 ID，并按模板字段改 KEYS（字段名必须一致）
- *
- * WX_SUBSCRIBE_READY_TMPL_ID=xxxxxxxx
- * WX_SUBSCRIBE_READY_KEYS={"product":"thing1","place":"thing2","code":"character_string3","tip":"thing4"}
- * WX_SUBSCRIBE_STATE=formal
+ * WX_SUBSCRIBE_READY_TMPL_ID / WX_SUBSCRIBE_READY_KEYS / WX_SUBSCRIBE_STATE
  */
-const http = require('http');
-const https = require('https');
-const { cfg } = require('./wechat');
-
-function requestJson(url, { method = 'GET', bodyObj = null } = {}) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const lib = u.protocol === 'https:' ? https : http;
-    const body = bodyObj ? JSON.stringify(bodyObj) : null;
-    const req = lib.request(
-      {
-        protocol: u.protocol,
-        hostname: u.hostname,
-        port: u.port || (u.protocol === 'https:' ? 443 : 80),
-        path: u.pathname + u.search,
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
-        },
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          const text = Buffer.concat(chunks).toString('utf8');
-          try {
-            resolve(JSON.parse(text));
-          } catch {
-            resolve({ raw: text });
-          }
-        });
-      }
-    );
-    req.on('error', reject);
-    if (body) req.write(body);
-    req.end();
-  });
-}
-
-let tokenCache = { token: '', expireAt: 0 };
+const { getAccessToken, requestJson } = require('./wechat');
 
 function readyTmplId() {
   return String(process.env.WX_SUBSCRIBE_READY_TMPL_ID || '').trim();
@@ -81,28 +36,6 @@ function formatNow() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}年${p(d.getMonth() + 1)}月${p(d.getDate())}日 ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-async function getAccessToken(force = false) {
-  const { appId, secret } = cfg();
-  if (!appId || !secret) {
-    throw new Error('未配置 WX_APPID / WX_SECRET，无法发订阅消息');
-  }
-  if (!force && tokenCache.token && Date.now() < tokenCache.expireAt - 60_000) {
-    return tokenCache.token;
-  }
-  const url =
-    `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential` +
-    `&appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(secret)}`;
-  const data = await requestJson(url);
-  if (!data.access_token) {
-    throw new Error(data.errmsg || '获取 access_token 失败');
-  }
-  tokenCache = {
-    token: data.access_token,
-    expireAt: Date.now() + (Number(data.expires_in) || 7200) * 1000,
-  };
-  return tokenCache.token;
 }
 
 function buildReadyPayload(order) {

@@ -99,4 +99,11 @@
   font-weight: 400;
 }
 .pay { flex: 1.2; }
+.phone-pay {
+  margin: 0;
+  border: none;
+  line-height: 1.2;
+  font-size: 30rpx;
+}
+.phone-pay::after { border: none; }
 .page { padding-bottom: 180rpx; }

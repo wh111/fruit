@@ -1,4 +1,11 @@
-const { request, mediaUrl, ensureLogin, consumeWelcomeToast, consumeMonthlyToast } = require('../../utils/api');
+const {
+  request,
+  mediaUrl,
+  ensureLogin,
+  consumeWelcomeToast,
+  consumeMonthlyToast,
+  bindPhoneNumber,
+} = require('../../utils/api');
 
 Page({
   data: {
@@ -13,6 +20,8 @@ Page({
     loadError: '',
     debugApi: '',
     debugEnv: '',
+    showPhoneAuth: false,
+    hasPhone: false,
   },
 
   onShow() {
@@ -21,6 +30,25 @@ Page({
 
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh());
+  },
+
+  async refreshPhoneState() {
+    try {
+      const me = await request('/api/auth/me');
+      if (me && me.user) {
+        wx.setStorageSync('user', me.user);
+        const hasPhone = !!(me.user.hasPhone || me.user.phone);
+        this.setData({ hasPhone, showPhoneAuth: !hasPhone });
+        return hasPhone;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    const user = wx.getStorageSync('user') || {};
+    const hasPhone = !!(user.hasPhone || user.phone);
+    const skipped = !!wx.getStorageSync('sg_phone_skip_session');
+    this.setData({ hasPhone, showPhoneAuth: !hasPhone && !skipped });
+    return hasPhone;
   },
 
   async load() {
@@ -34,10 +62,10 @@ Page({
     this.setData({ debugApi: config.baseUrl, debugEnv });
     try {
       const loginRes = await ensureLogin().catch(() => null);
-      // 若仍无 token（偶发失败），再强制登一次
       if (!wx.getStorageSync('token')) {
         await ensureLogin({ force: true }).catch(() => null);
       }
+      await this.refreshPhoneState();
       const [productRes, promo, campaign] = await Promise.all([
         request('/api/products'),
         request('/api/promo').catch(() => ({})),
@@ -68,7 +96,6 @@ Page({
           }
         }
       }
-      // ensureLogin 已发券时，用其返回补齐 toast 计数
       if (!justGranted && loginRes && loginRes.welcomeGranted) {
         justGranted = loginRes.welcomeCouponCount || 21;
       }
@@ -100,12 +127,10 @@ Page({
       const cats = ['全部', ...ordered];
       const loyalty = promo.loyalty || {};
       let loyaltyHint = '';
-      if (loyalty.label) {
+      if (loyalty.enabled && loyalty.label) {
         loyaltyHint = `${loyalty.label} · 可与立减券同享`;
-      } else if (loyalty.nextHint) {
-        loyaltyHint = `${loyalty.nextHint}；满10单升9折`;
-      } else {
-        loyaltyHint = '本月满3单95折、满10单9折，可与立减券同享';
+      } else if (loyalty.enabled && loyalty.nextHint) {
+        loyaltyHint = loyalty.nextHint;
       }
       this.setData({
         products,
@@ -131,6 +156,12 @@ Page({
         (loginRes && loginRes.monthlyGranted && loginRes.monthlyCouponCount) ||
         0;
 
+      const afterGrantModals = () => {
+        if (!this.data.hasPhone && !wx.getStorageSync('sg_phone_skip_session')) {
+          this.setData({ showPhoneAuth: true });
+        }
+      };
+
       if (grantedCount) {
         const reserveAmt =
           (campaign && campaign.reserveOffAmount) ||
@@ -138,35 +169,40 @@ Page({
           3;
         wx.showModal({
           title: '新人券包已到账',
-          content: `已放入 ${grantedCount} 张优惠券：满15减5×3、满25减8×3、预定立减${reserveAmt}×15，30天内有效。`,
+          content: `已放入 ${grantedCount} 张优惠券：满15减3×3、预定立减${reserveAmt}×15，30天内有效。`,
           confirmText: monthlyCount ? '下一条' : '去看看',
           cancelText: '知道了',
           success: (r) => {
             if (monthlyCount) {
               wx.showModal({
                 title: '本月登录礼已到账',
-                content: `无门槛减3元 ×${monthlyCount}，现取预定都能用，30天内有效。`,
+                content: `无门槛减2元 ×${monthlyCount}，现取预定都能用，30天内有效。`,
                 confirmText: '去看看',
                 cancelText: '知道了',
                 success: (r2) => {
                   if (r2.confirm) wx.navigateTo({ url: '/pages/coupons/coupons' });
+                  afterGrantModals();
                 },
               });
-            } else if (r.confirm) {
-              wx.navigateTo({ url: '/pages/coupons/coupons' });
+            } else {
+              if (r.confirm) wx.navigateTo({ url: '/pages/coupons/coupons' });
+              afterGrantModals();
             }
           },
         });
       } else if (monthlyCount) {
         wx.showModal({
           title: '本月登录礼已到账',
-          content: `无门槛减3元 ×${monthlyCount}，现取预定都能用，30天内有效。`,
+          content: `无门槛减2元 ×${monthlyCount}，现取预定都能用，30天内有效。`,
           confirmText: '去看看',
           cancelText: '知道了',
           success: (r) => {
             if (r.confirm) wx.navigateTo({ url: '/pages/coupons/coupons' });
+            afterGrantModals();
           },
         });
+      } else {
+        afterGrantModals();
       }
     } catch (e) {
       const loadError = e.message || '加载失败';
@@ -195,6 +231,36 @@ Page({
       wx.navigateTo({ url: '/pages/coupons/coupons' });
     } catch (e) {
       wx.showToast({ title: e.message || '请先登录', icon: 'none' });
+    }
+  },
+
+  skipPhoneAuth() {
+    wx.setStorageSync('sg_phone_skip_session', 1);
+    this.setData({ showPhoneAuth: false });
+  },
+
+  async onGetPhone(e) {
+    try {
+      wx.showLoading({ title: '绑定中' });
+      await ensureLogin();
+      const data = await bindPhoneNumber(e.detail || {});
+      wx.hideLoading();
+      wx.removeStorageSync('sg_phone_skip_session');
+      this.setData({
+        hasPhone: true,
+        showPhoneAuth: false,
+      });
+      wx.showToast({
+        title: data.devMock
+          ? '开发环境已绑测试号'
+          : data.merged
+            ? '已同步到原账号'
+            : '绑定成功',
+        icon: data.devMock ? 'none' : 'success',
+      });
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: (err && err.message) || '授权失败', icon: 'none' });
     }
   },
 });

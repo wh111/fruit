@@ -64,4 +64,18 @@
   </view>
 
   <view wx:if="{{!filtered.length}}" class="empty muted">暂无商品，请稍后再来</view>
+
+  <!-- 进店引导：微信要求必须点按钮才能授权手机号，无法自动弹出系统框 -->
+  <view class="phone-mask" wx:if="{{showPhoneAuth}}" catchtouchmove="true">
+    <view class="phone-sheet">
+      <view class="phone-title">绑定手机号</view>
+      <view class="phone-desc">用于同步优惠券，换机登录也能拿到同一份福利。</view>
+      <button
+        class="btn-primary phone-auth-btn"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhone"
+      >授权微信手机号</button>
+      <view class="phone-skip" bindtap="skipPhoneAuth">稍后再说</view>
+    </view>
+  </view>
 </view>

@@ -34,13 +34,16 @@ const {
 const { getPromoState } = require('./services/promo');
 const { listDeliveryPoints, applyDeliverySettings } = require('./services/delivery');
 const { notifyOrderReady, subscribeClientConfig } = require('./services/subscribe');
+const { bindPhoneForUser, publicUser } = require('./services/phone');
 const {
   grantLoginCoupons,
+  grantManualCoupons,
   listUserCoupons,
   campaignInfo,
   ensureCoupons,
 } = require('./services/coupon');
 const { getLoyaltyState } = require('./services/loyalty');
+const { touchLogin, listUsersWithActivity } = require('./services/users');
 const { buildLabelHtml } = require('./services/label');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -199,11 +202,13 @@ async function handleApi(req, res, pathname) {
     const db = await load();
     ensureCoupons(db);
     let openid = '';
+    let sessionKey = '';
     const wechat = require('./services/wechat');
     if (process.env.WX_APPID && process.env.WX_SECRET && body.code && !String(body.code).startsWith('dev')) {
       try {
         const session = await wechat.code2Session(body.code);
         openid = session.openid;
+        sessionKey = session.session_key || '';
       } catch (e) {
         console.warn('code2session fail, fallback mock:', e.message);
       }
@@ -226,6 +231,8 @@ async function handleApi(req, res, pathname) {
       user.nickName = body.nickName;
       user.avatarUrl = body.avatarUrl || user.avatarUrl;
     }
+    if (sessionKey) user.sessionKey = sessionKey;
+    touchLogin(user);
 
     const grants = grantLoginCoupons(db, user);
     await save(db);
@@ -235,9 +242,7 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, {
       token,
       user: {
-        id: user.id,
-        nickName: user.nickName,
-        avatarUrl: user.avatarUrl,
+        ...publicUser(user),
         openid: openid.startsWith('dev_') ? undefined : openid,
       },
       isNew,
@@ -250,6 +255,47 @@ async function handleApi(req, res, pathname) {
     });
   }
 
+  /** 微信手机号快速验证 → 绑定；同号合并用户，保证券/月累计一致 */
+  if (pathname === '/api/auth/bindPhone' && method === 'POST') {
+    const u = auth(req);
+    if (!u?.userId) return send(res, 401, { error: '请先登录' });
+    try {
+      const db = await load();
+      const current = db.users.find((x) => x.id === u.userId);
+      if (!current) return send(res, 401, { error: '用户不存在，请重新登录' });
+      const { user, merged } = await bindPhoneForUser(db, current, {
+        code: body.code,
+        encryptedData: body.encryptedData,
+        iv: body.iv,
+        mockPhone: body.mockPhone,
+      });
+      await save(db);
+      const token = signToken({ role: 'user', userId: user.id, openid: user.openid }, 30);
+      const mine = listUserCoupons(db, user.id);
+      return send(res, 200, {
+        ok: true,
+        merged,
+        token,
+        user: {
+          ...publicUser(user),
+          openid: String(user.openid || '').startsWith('dev_') ? undefined : user.openid,
+        },
+        couponSummary: mine.summary,
+      });
+    } catch (e) {
+      return send(res, e.status || 500, { error: e.message || '绑定失败' });
+    }
+  }
+
+  if (pathname === '/api/auth/me' && method === 'GET') {
+    const u = auth(req);
+    if (!u?.userId) return send(res, 401, { error: '请先登录' });
+    const db = await load();
+    const user = db.users.find((x) => x.id === u.userId);
+    if (!user) return send(res, 401, { error: '用户不存在' });
+    return send(res, 200, { user: publicUser(user) });
+  }
+
   if (pathname === '/api/coupons/campaign' && method === 'GET') {
     return send(res, 200, campaignInfo());
   }
@@ -260,8 +306,9 @@ async function handleApi(req, res, pathname) {
     const db = await load();
     ensureCoupons(db);
     const u = db.users.find((x) => x.id === user.userId);
+    if (u) touchLogin(u);
     const grants = u ? grantLoginCoupons(db, u) : { welcome: { granted: false }, monthly: { granted: false }, changed: false };
-    if (grants.changed) await save(db);
+    if (grants.changed || u) await save(db);
     const mine = listUserCoupons(db, user.userId);
     return send(res, 200, {
       ...mine,
@@ -293,11 +340,9 @@ async function handleApi(req, res, pathname) {
         tier: 0,
         rate: 0,
         label: '',
-        nextHint: '本月满3单95折，满10单9折；可与立减券同享',
-        rules: [
-          '自然月累计：满 3 单享 95 折，满 10 单享 9 折',
-          '可与立减券叠加：先打折，再减券',
-        ],
+        nextHint: '',
+        enabled: false,
+        rules: [],
       };
     }
     return send(res, 200, { ...state, deliveryPoints: listDeliveryPoints(db.settings) });
@@ -719,12 +764,62 @@ async function handleApi(req, res, pathname) {
     const todays = db.orders.filter((o) => (o.paidAt || o.createdAt) >= start && o.status !== 'cancelled');
     const paid = todays.filter((o) => !['pending_pay', 'cancelled'].includes(o.status));
     const revenue = paid.reduce((s, o) => s + Number(o.amount || 0), 0);
+    const users = listUsersWithActivity(db);
     return send(res, 200, {
       todayOrders: paid.length,
       todayRevenue: Math.round(revenue * 100) / 100,
       pendingMake: db.orders.filter((o) => ['paid', 'making'].includes(o.status)).length,
       productCount: db.products.filter((p) => p.status === 1).length,
+      userTotal: users.summary.total,
+      userActive: users.summary.active,
+      userInactive: users.summary.inactive,
+      userActiveDays: users.summary.activeDays,
     });
+  }
+
+  if (pathname === '/api/admin/users' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const segment = url.searchParams.get('segment') || 'all';
+    const activeDays = Number(url.searchParams.get('activeDays') || 0) || undefined;
+    return send(res, 200, listUsersWithActivity(db, { segment, activeDays }));
+  }
+
+  if (pathname === '/api/admin/coupons/grant' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      ensureCoupons(db);
+      const segment = body.segment || 'inactive';
+      const activeDays = Number(body.activeDays || 0) || undefined;
+      const { list } = listUsersWithActivity(db, { segment, activeDays });
+      let targets = list;
+      if (Array.isArray(body.userIds) && body.userIds.length) {
+        const set = new Set(body.userIds);
+        targets = list.filter((u) => set.has(u.id));
+      }
+      if (!targets.length) return send(res, 400, { error: '没有符合条件的用户' });
+      const fullUsers = targets
+        .map((t) => db.users.find((u) => u.id === t.id))
+        .filter(Boolean);
+      const result = grantManualCoupons(db, fullUsers, {
+        title: body.title,
+        amount: body.amount,
+        threshold: body.threshold,
+        fulfillment: body.fulfillment,
+        count: body.count,
+      });
+      await save(db);
+      return send(res, 200, {
+        ok: true,
+        ...result,
+        segment,
+        note: '券已写入用户小程序券包；不会自动推到微信卡包。用户打开小程序「我的优惠券」可见。',
+      });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '发券失败' });
+    }
   }
 
   if (pathname === '/api/admin/orders' && method === 'GET') {

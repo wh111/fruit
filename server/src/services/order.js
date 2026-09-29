@@ -284,6 +284,71 @@ async function createOrder({
   return order;
 }
 
+/** 散装称重：顾客按包装标价自行输入金额支付（无优惠券/会员折） */
+async function createBulkOrder({ userId, openid, amount, remark }) {
+  const yuan = round2(Number(amount));
+  if (!Number.isFinite(yuan) || yuan < 0.01) {
+    throw Object.assign(new Error('请输入有效金额（最少 0.01 元）'), { status: 400 });
+  }
+  if (yuan > 999.99) {
+    throw Object.assign(new Error('单笔金额不能超过 999.99 元'), { status: 400 });
+  }
+
+  const db = await load();
+  const now = Date.now();
+  const delivery = normalizeDelivery('shop', db.settings);
+  const note = String(remark || '').trim().slice(0, 80);
+
+  const order = {
+    id: crypto.randomUUID(),
+    orderNo: `SG${Date.now()}${Math.floor(Math.random() * 900 + 100)}`,
+    userId: userId || null,
+    openid: openid || null,
+    orderKind: 'bulk',
+    productId: 'bulk',
+    productName: '散装水果',
+    cover: '',
+    specId: 'bulk',
+    specName: '称重计价',
+    extras: [],
+    quantity: 1,
+    unitPrice: yuan,
+    originalAmount: yuan,
+    foodAmount: yuan,
+    amount: yuan,
+    deliveryFee: 0,
+    deliveryPoint: delivery.deliveryPoint,
+    deliveryPointName: delivery.deliveryPointName,
+    discountAmount: 0,
+    discountRate: 1,
+    discountCode: null,
+    discountLabel: '',
+    couponId: null,
+    couponSave: 0,
+    loyaltyRate: 0,
+    loyaltySave: 0,
+    loyaltyLabel: '',
+    loyaltyTier: 0,
+    monthOrderCount: 0,
+    fulfillmentType: 'now',
+    pickupAt: null,
+    pickupAtText: '',
+    remark: note,
+    status: 'pending_pay',
+    pickupCode: null,
+    qrPayload: null,
+    payMode: null,
+    transactionId: null,
+    paidAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  db.orders.unshift(order);
+  await save(db);
+  return order;
+}
+
 async function markPaid(orderId, { transactionId, payMode } = {}) {
   const db = await load();
   const order = db.orders.find((o) => o.id === orderId);
@@ -294,7 +359,8 @@ async function markPaid(orderId, { transactionId, payMode } = {}) {
   }
 
   const pickupCode = nextPickupCode(db);
-  order.status = 'paid';
+  // 散装已称重包装，支付后直接可取，不进果切排队
+  order.status = order.orderKind === 'bulk' ? 'ready' : 'paid';
   order.pickupCode = pickupCode;
   order.qrPayload = JSON.stringify({ t: 'sijiguoxian', orderNo: order.orderNo, pickupCode });
   order.transactionId = transactionId || `MOCK${Date.now()}`;
@@ -385,6 +451,20 @@ function getQueueInfo(order, db) {
 
   if (status === 'ready') {
     const code = order.pickupCode || '';
+    if (order.orderKind === 'bulk') {
+      return {
+        phase: 'ready',
+        title: '已支付',
+        tip: `取货码 ${code}，请带好包装离店（必要时出示）`,
+        ahead: 0,
+        position: 0,
+        steps: [
+          { key: 'pay', label: '下单支付', done: true, current: false },
+          { key: 'queue', label: '称重计价', done: true, current: false },
+          { key: 'ready', label: '取货', done: false, current: true },
+        ],
+      };
+    }
     const locker =
       order.deliveryPoint && order.deliveryPoint !== 'shop'
         ? order.deliveryPointName || '外卖柜'
@@ -469,6 +549,7 @@ function getQueueInfo(order, db) {
 
 module.exports = {
   createOrder,
+  createBulkOrder,
   quoteOrder,
   markPaid,
   cancelPendingOrder,

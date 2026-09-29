@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index",
     "pages/detail/detail",
+    "pages/bulk/bulk",
     "pages/order/order",
     "pages/orders/orders",
     "pages/coupons/coupons",

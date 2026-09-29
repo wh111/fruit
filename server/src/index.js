@@ -25,6 +25,7 @@ const { URL } = require('url');
 const { load, save, ensure } = require('./db');
 const {
   createOrder,
+  createBulkOrder,
   quoteOrder,
   markPaid,
   orderQrDataUrl,
@@ -414,6 +415,21 @@ async function handleApi(req, res, pathname) {
         deliveryPoint: body.deliveryPoint,
         couponId: body.couponId,
         autoCoupon: body.autoCoupon !== false,
+      });
+      return send(res, 200, { order });
+    } catch (e) {
+      return send(res, e.status || 500, { error: e.message });
+    }
+  }
+
+  if (pathname === '/api/orders/bulk' && method === 'POST') {
+    const user = auth(req);
+    try {
+      const order = await createBulkOrder({
+        userId: user?.userId,
+        openid: user?.openid,
+        amount: body.amount,
+        remark: body.remark,
       });
       return send(res, 200, { order });
     } catch (e) {

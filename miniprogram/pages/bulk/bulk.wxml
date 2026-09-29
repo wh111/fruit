@@ -1,0 +1,56 @@
+<view class="page">
+  <view class="card tip-card">
+    <view class="tip-title">按包装标价付款</view>
+    <view class="tip-desc">店内散装称重后包装上有价格，请按标价输入金额完成微信支付。</view>
+  </view>
+
+  <view class="card">
+    <view class="label">应付金额（元）</view>
+    <view class="amount-row">
+      <text class="yen">¥</text>
+      <input
+        class="amount-input"
+        type="digit"
+        maxlength="7"
+        placeholder="0.00"
+        value="{{amountText}}"
+        focus="{{true}}"
+        bindinput="onAmount"
+      />
+    </view>
+    <view class="hint">请与包装上的价格一致，最少 0.01 元</view>
+  </view>
+
+  <view class="card">
+    <view class="label">备注（选填）</view>
+    <input
+      class="remark"
+      placeholder="如：葡萄、火龙果"
+      maxlength="40"
+      value="{{remark}}"
+      bindinput="onRemark"
+    />
+  </view>
+
+  <view class="pay-bar">
+    <view class="pay-sum">
+      <text class="muted">合计</text>
+      <text class="sum">¥{{displayAmount}}</text>
+    </view>
+    <button
+      wx:if="{{hasPhone}}"
+      class="btn-primary pay"
+      loading="{{paying}}"
+      disabled="{{paying || !canPay}}"
+      bindtap="submit"
+    >确认支付</button>
+    <button
+      wx:else
+      class="btn-primary pay phone-pay"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onPhoneThenPay"
+      loading="{{paying}}"
+      disabled="{{paying || !canPay}}"
+    >授权手机号并支付</button>
+  </view>
+</view>

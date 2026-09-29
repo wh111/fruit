@@ -13,6 +13,14 @@
     <text>取餐前最多半小时现切，不卖 B 级果、不卖隔夜切</text>
   </view>
 
+  <view class="bulk-entry" bindtap="goBulk">
+    <view class="bulk-left">
+      <view class="bulk-title">散装水果</view>
+      <view class="bulk-sub">按包装标价自行输入金额支付</view>
+    </view>
+    <view class="bulk-go">去付款</view>
+  </view>
+
   <view class="banner" wx:if="{{campaign}}" bindtap="onBanner">
     <view class="banner-left">
       <view class="banner-tag">新人礼</view>

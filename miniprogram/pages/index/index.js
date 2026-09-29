@@ -225,6 +225,10 @@ Page({
     wx.navigateTo({ url: `/pages/detail/detail?id=${e.currentTarget.dataset.id}` });
   },
 
+  goBulk() {
+    wx.navigateTo({ url: '/pages/bulk/bulk' });
+  },
+
   async onBanner() {
     try {
       await ensureLogin();

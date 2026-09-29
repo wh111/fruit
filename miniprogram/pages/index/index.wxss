@@ -29,6 +29,37 @@
 }
 .fresh-dot { color: #4caf50; font-size: 16rpx; line-height: 1.8; flex-shrink: 0; }
 
+.bulk-entry {
+  margin: 0 24rpx 16rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 2rpx solid #ffe0b2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+.bulk-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #2a2a2a;
+}
+.bulk-sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #8a8a8a;
+}
+.bulk-go {
+  flex-shrink: 0;
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #f5a623, #e8910f);
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
 .promo {
   margin: 0 24rpx 16rpx;
   padding: 18rpx 22rpx;

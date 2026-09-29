@@ -625,7 +625,7 @@ async function handleApi(req, res, pathname) {
       '127.0.0.1';
 
     if (PAY_MODE === 'mock') {
-      // 按「个体户直连」真实链路模拟：下单预支付 → 前端收银台 → confirm 才入账
+      // 按「企业商户直连」真实链路模拟：下单预支付 → 前端收银台 → confirm 才入账
       // 不在此处 markPaid，与正式 wechat 行为一致
       const timeStamp = String(Math.floor(Date.now() / 1000));
       const nonceStr = require('crypto').randomBytes(8).toString('hex');
@@ -636,7 +636,7 @@ async function handleApi(req, res, pathname) {
       return send(res, 200, {
         mode: 'mock',
         paid: false,
-        merchantType: 'individual', // 目标方案：个体工商户直连
+        merchantType: 'enterprise', // 目标方案：企业商户直连
         order,
         payment: {
           timeStamp,
@@ -649,7 +649,7 @@ async function handleApi(req, res, pathname) {
       });
     }
 
-    // 真实微信支付 JSAPI（个体工商户 / 普通商户直连；填了 WX_SUB_MCH_ID 则走服务商）
+    // 真实微信支付 JSAPI（企业商户直连；填了 WX_SUB_MCH_ID 则走服务商）
     try {
       const wechat = require('./services/wechat');
       const openid = order.openid || user?.openid;
@@ -676,7 +676,7 @@ async function handleApi(req, res, pathname) {
       return send(res, 200, {
         mode: 'wechat',
         paid: false,
-        merchantType: mchMode === 'partner' ? 'partner' : 'individual',
+        merchantType: mchMode === 'partner' ? 'partner' : 'enterprise',
         order,
         payment,
       });

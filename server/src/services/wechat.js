@@ -3,9 +3,9 @@ const http = require('http');
 const https = require('https');
 
 /**
- * 微信支付（APIv2）· 默认按「个体工商户直连」
+ * 微信支付（APIv2）· 默认按「企业商户直连」
  *
- * 推荐（先办个体户再自己开户）：
+ * 推荐（有限公司执照 → 自己开微信支付企业商户）：
  *   WX_APPID / WX_SECRET / WX_MCH_ID / WX_API_KEY / WX_NOTIFY_URL
  *   不填 WX_SUB_MCH_ID
  *

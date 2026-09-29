@@ -1,24 +1,26 @@
 # 真实微信支付 + 云打印机配置
 
-## 一、微信支付（推荐：个体工商户直连）
+## 一、微信支付（推荐：企业商户直连）
 
-目标方案：**先办个体户执照 → 自己在微信支付开户 → 直连小程序 JSAPI**。  
+目标方案：**有限公司营业执照 → 微信支付企业商户 → 直连小程序 JSAPI**。  
+当前主体：四季果先（北京）水果零售有限公司（企业，非个体户）。  
 开发用 `PAY_MODE=mock` 时，调用链与正式一致：`预支付 → 收银台 → confirm`，不会在 create 时直接入账。
 
 | 模式 | `.env` |
 |------|--------|
 | 开发模拟 | `PAY_MODE=mock` |
-| 正式个体户直连 | `PAY_MODE=wechat` + `WX_MCH_ID`=个体户商户号（**不填** `WX_SUB_MCH_ID`） |
+| 正式企业直连 | `PAY_MODE=wechat` + `WX_MCH_ID`=企业商户号（**不填** `WX_SUB_MCH_ID`） |
 | 服务商通道（备选） | 再填 `WX_SUB_MCH_ID` |
 
-### 1. 准备材料（个体户直连）
+### 1. 准备材料（企业商户直连）
 
-1. **个体工商户营业执照**  
-2. 已认证**微信小程序** → AppID、AppSecret  
-3. [微信支付商户平台](https://pay.weixin.qq.com/) 申请商户号（主体选个体工商户）  
-4. API 安全 → **APIv2 密钥**（32 位）  
-5. 关联小程序 AppID，开通 **JSAPI 支付**  
-6. 回调：`https://sijixiansheng.xin/api/pay/notify`
+1. **企业营业执照**（有限责任公司）  
+2. **对公银行账户**（企业商户结算通常必需）  
+3. 已认证**微信小程序** → AppID `wx7f915cfcf3f86b92`、AppSecret  
+4. [微信支付商户平台](https://pay.weixin.qq.com/) 申请商户号（**主体类型选企业**）  
+5. API 安全 → **APIv2 密钥**（32 位）  
+6. 关联小程序 AppID，开通 **JSAPI 支付**  
+7. 回调：`https://sijixiansheng.xin/api/pay/notify`
 
 ### 2. 填写 `server/.env`
 
@@ -28,9 +30,9 @@ PAY_MODE=mock
 
 # 上线改为：
 # PAY_MODE=wechat
-WX_APPID=wx你的小程序AppID
+WX_APPID=wx7f915cfcf3f86b92
 WX_SECRET=你的小程序AppSecret
-WX_MCH_ID=个体户商户号
+WX_MCH_ID=企业商户号
 WX_API_KEY=APIv2密钥32位
 WX_NOTIFY_URL=https://sijixiansheng.xin/api/pay/notify
 ```
@@ -79,27 +81,7 @@ WX_SUBSCRIBE_STATE=formal
 
 ## 三、云打印机
 
-支付成功后，后端会自动调用云打印（`CLOUD_PRINT_ENABLED=true`）。
-
-### 方案 A：飞鹅云（推荐）
-
-```bash
-CLOUD_PRINT_ENABLED=true
-CLOUD_PRINT_PROVIDER=feie
-CLOUD_PRINT_USER=...
-CLOUD_PRINT_UKEY=...
-CLOUD_PRINT_SN=...
-```
-
-### 方案 B：易联云
-
-```bash
-CLOUD_PRINT_ENABLED=true
-CLOUD_PRINT_PROVIDER=yilianyun
-YLY_CLIENT_ID=...
-YLY_CLIENT_SECRET=...
-YLY_MACHINE_CODE=...
-```
+详见 `docs/HARDWARE.md`。德佟本机标签可先用；飞鹅/易联云云打印为可选增强。
 
 ---
 
@@ -107,10 +89,10 @@ YLY_MACHINE_CODE=...
 
 | 项目 | 说明 |
 |------|------|
-| 个体户执照 + 微信商户号 | 直连，勿优先走服务商 |
+| 企业执照 + 对公户 + 微信企业商户号 | 直连，勿优先走服务商 |
 | `PAY_MODE=wechat` + WX_* | 上线必填 |
 | 订阅消息模板 `WX_SUBSCRIBE_READY_*` | 取餐/投柜提醒，建议开启 |
-| 云打印 | 建议开启 |
+| 云打印 | 建议开启（德佟本机可顶上） |
 | 小程序合法域名 | `https://sijixiansheng.xin` |
 
 改完 `.env` 后重启服务 / 部署。

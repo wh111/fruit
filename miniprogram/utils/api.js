@@ -153,7 +153,7 @@ async function bindPhoneNumber(detail) {
       payload._devMock = true;
     } else {
       throw new Error(
-        '未拿到微信手机号凭证。请用真机预览；小程序须企业/个体户主体认证，并在公众平台开通「手机号快速验证」（含免费额度或资源包）'
+        '未拿到微信手机号凭证。请用真机预览；小程序须企业主体认证，并在公众平台开通「手机号快速验证」（含免费额度或资源包）'
       );
     }
   }

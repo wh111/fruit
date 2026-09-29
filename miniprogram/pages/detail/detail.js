@@ -382,7 +382,7 @@ Page({
       await requestReadySubscribe();
       wx.showLoading({ title: '支付中' });
 
-      // mock / wechat 统一：预支付 → 收银台 → confirm（个体户直连真实链路）
+      // mock / wechat 统一：预支付 → 收银台 → confirm（企业商户直连真实链路）
       if (!pay.payment || pay.paid) {
         wx.hideLoading();
         if (pay.paid) {
@@ -399,7 +399,7 @@ Page({
           const amount = pay.order?.amount ?? order.amount;
           const { confirm } = await new Promise((resolve) => {
             wx.showModal({
-              title: '模拟支付（个体户直连）',
+              title: '模拟支付（企业商户直连）',
               content: `应付 ¥${amount}\n正式环境将调起微信支付`,
               confirmText: '支付',
               cancelText: '取消',

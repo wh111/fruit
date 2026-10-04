@@ -23,6 +23,7 @@ const { URL } = require('url');
 })();
 
 const { load, save, ensure } = require('./db');
+const { writeHexPages } = require('./usbPrint');
 const {
   createOrder,
   createBulkOrder,
@@ -30,6 +31,7 @@ const {
   markPaid,
   orderQrDataUrl,
   getQueueInfo,
+  settlePickedOrders,
   restoreCouponForOrder,
 } = require('./services/order');
 const { getPromoState } = require('./services/promo');
@@ -440,6 +442,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/orders/mine' && method === 'GET') {
     const user = auth(req);
     const db = await load();
+    if (settlePickedOrders(db)) await save(db);
     const url = new URL(req.url, `http://${req.headers.host}`);
     let list = db.orders;
     if (user?.userId) {
@@ -557,6 +560,7 @@ async function handleApi(req, res, pathname) {
 
     if (method === 'GET' && !action) {
       if (!order) return send(res, 404, { error: '订单不存在' });
+      if (settlePickedOrders(db)) await save(db);
       const qrDataUrl = order.pickupCode ? await orderQrDataUrl(order) : null;
       const queue = getQueueInfo(order, db);
       return send(res, 200, { order, qrDataUrl, queue });
@@ -841,6 +845,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/admin/orders' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
     const db = await load();
+    if (settlePickedOrders(db)) await save(db);
     const url = new URL(req.url, `http://${req.headers.host}`);
     const status = url.searchParams.get('status');
     let list = db.orders;
@@ -928,6 +933,16 @@ async function handleApi(req, res, pathname) {
     const qrDataUrl = await orderQrDataUrl(order);
     const html = buildLabelHtml({ order, qrDataUrl, shopName: db.settings.shopName });
     return send(res, 200, { order, qrDataUrl, html, shopName: db.settings.shopName });
+  }
+
+  if (pathname === '/api/admin/print/usb' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const result = await writeHexPages(body.pages);
+      return send(res, 200, result);
+    } catch (e) {
+      return send(res, e.status || 500, { error: e.message || 'USB 打印失败' });
+    }
   }
 
   if (pathname === '/api/print/cloud' && method === 'POST') {
@@ -1053,7 +1068,12 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname.startsWith('/api/')) return handleApi(req, res, pathname);
 
-    if (pathname === '/' || pathname === '/admin' || pathname === '/admin/') {
+    if (pathname === '/admin') {
+      res.writeHead(302, { Location: '/admin/' });
+      res.end();
+      return;
+    }
+    if (pathname === '/' || pathname === '/admin/') {
       return sendFile(res, path.join(ROOT, 'admin', 'index.html'));
     }
     if (pathname.startsWith('/admin/')) {

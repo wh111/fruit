@@ -48,7 +48,7 @@ function switchTab(tab) {
     products: '商品规格',
     delivery: '配送费',
     users: '用户 / 发券',
-    verify: '扫码核销',
+    verify: '查取餐码',
     hardware: '打印 / 标签',
   };
   $('#pageTitle').textContent = titles[tab] || '';
@@ -110,7 +110,7 @@ async function watchNewOrders(list) {
 
   if ($('#autoPrint').checked) {
     for (const o of fresh) {
-      await printLabel(o.id);
+      await printLabel(o.id, { skipPrinted: true });
       await new Promise((r) => setTimeout(r, 600));
     }
   }
@@ -184,21 +184,24 @@ async function loadStats() {
   `;
   const { list } = await api('/api/admin/orders');
   await watchNewOrders(list);
-  const pending = sortDeskOrders(list.filter((o) => ['paid', 'making', 'ready'].includes(o.status)));
+  const pending = sortDeskOrders(list.filter((o) => ['paid', 'making'].includes(o.status)));
+  const waiting = list
+    .filter((o) => o.status === 'ready')
+    .sort((a, b) => (b.readyAt || b.updatedAt || 0) - (a.readyAt || a.updatedAt || 0));
   const newest = pending[0]?.id;
-  $('#pendingList').innerHTML = pending.length
+  const kept = new Set($$('#pendingList .order-check:checked').map((el) => el.value));
+  const workHtml = pending.length
     ? pending
         .map((o) => {
-          const canBatch = ['paid', 'making'].includes(o.status);
           const batchNote =
             o.makeBatchCodes && o.makeBatchCodes.length > 1
               ? `<div class="batch-codes">同批：${o.makeBatchCodes.join('、')}</div>`
               : '';
+          const handoff =
+            o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐';
           return `
       <div class="order-card ${o.id === newest ? 'new' : ''}">
-        <label class="pick">${
-          canBatch ? `<input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" />` : '<span></span>'
-        }</label>
+        <label class="pick"><input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" ${kept.has(o.id) ? 'checked' : ''} /></label>
         <div class="pickup">${o.pickupCode || '--'}</div>
         <div class="order-main">
           <div class="order-title">${o.productName} · ${o.specName} ×${o.quantity}</div>
@@ -207,17 +210,34 @@ async function loadStats() {
         </div>
         <div class="actions">
           <button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
-          <button type="button" class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>
           <button type="button" class="btn sm" onclick="setStatus('${o.id}','making')">制作中</button>
-          <button type="button" class="btn sm" onclick="setStatus('${o.id}','ready')">${
-            o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已投柜' : '待取'
-          }</button>
-          <button type="button" class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>
+          <button type="button" class="btn sm primary" onclick="setStatus('${o.id}','ready')">${handoff}</button>
         </div>
       </div>`;
         })
         .join('')
     : '<p class="muted">暂无待制作订单</p>';
+  const waitHtml = waiting.length
+    ? `<h3 class="pickup-head">取餐中</h3><p class="muted">报码对上就递出，不用再点完成。两小时后自动记为已取餐。</p>${waiting
+        .map(
+          (o) => `
+      <div class="order-card waiting">
+        <div class="pickup">${o.pickupCode || '--'}</div>
+        <div class="order-main">
+          <div class="order-title">${o.productName} · ${o.specName} ×${o.quantity}</div>
+          <div class="muted">${o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐'} · ${fulfillmentNote(o)}</div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
+        </div>
+      </div>`
+        )
+        .join('')}`
+    : '';
+  $('#pendingList').innerHTML = workHtml + waitHtml;
+  const boxes = $$('#pendingList .order-check');
+  const allOn = boxes.length > 0 && boxes.every((el) => el.checked);
+  if ($('#selectAllPending')) $('#selectAllPending').checked = allOn;
   updateBatchHint();
 }
 
@@ -245,7 +265,7 @@ async function batchSetStatus(status) {
     toast('请先勾选订单');
     return;
   }
-  const labels = { making: '开始制作', ready: '待取餐', done: '完成' };
+  const labels = { making: '开始制作', ready: '请取餐' };
   try {
     const data = await api('/api/orders/batch-status', {
       method: 'POST',
@@ -254,6 +274,9 @@ async function batchSetStatus(status) {
     toast(data.tip || `已${labels[status] || '更新'} ${data.count} 单`);
     const sel = $('#selectAllPending');
     if (sel) sel.checked = false;
+    if (status === 'making') {
+      for (const id of ids) await printLabel(id, { skipPrinted: true });
+    }
     refresh();
   } catch (e) {
     toast(e.message);
@@ -282,11 +305,9 @@ async function loadOrders() {
         <div class="meta">${fulfillmentNote(o)} · ${amountNote(o)} · ${ts}${o.printed ? ' · 已打标' : ''}</div>
         <div class="actions">
           ${o.pickupCode ? `<button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>` : ''}
-                ${['paid', 'making'].includes(o.status) ? `<button type="button" class="btn sm" onclick="setStatus('${o.id}','ready')">${
-                  o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已投柜' : '待取'
-                }</button>` : ''}
-                ${['paid', 'making', 'ready'].includes(o.status) ? `<button type="button" class="btn sm primary" onclick="setStatus('${o.id}','done')">完成</button>` : ''}
-          ${o.pickupCode ? `<button type="button" class="btn sm" onclick="cloudPrint('${o.id}')">云打印</button>` : ''}
+          ${['paid', 'making'].includes(o.status) ? `<button type="button" class="btn sm primary" onclick="setStatus('${o.id}','ready')">${
+            o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐'
+          }</button>` : ''}
         </div>
       </div>`;
     })
@@ -445,11 +466,13 @@ window.offProduct = async function offProduct(id) {
 
 window.setStatus = async function setStatus(id, status) {
   await api(`/api/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  if (status === 'making') await printLabel(id, { skipPrinted: true });
   refresh();
 };
 
-window.printLabel = async function printLabel(orderId) {
+window.printLabel = async function printLabel(orderId, opts = {}) {
   const data = await api(`/api/print/label/${orderId}`);
+  if (opts.skipPrinted && data.order?.printed) return false;
 
   // 优先走德佟本地标签机（需本机安装 dtpweb 打印助手）
   if (window.DetongPrint && DetongPrint.isAvailable()) {
@@ -467,7 +490,8 @@ window.printLabel = async function printLabel(orderId) {
       return;
     } catch (e) {
       console.warn('[detong]', e);
-      toast((e && e.message) || '德佟打印失败，改用浏览器打印');
+      toast((e && e.message) || '德佟打印失败');
+      return;
     }
   }
 
@@ -482,16 +506,6 @@ window.printLabel = async function printLabel(orderId) {
     await api(`/api/orders/${orderId}/printed`, { method: 'POST', body: '{}' });
   } catch {
     /* ignore */
-  }
-};
-
-window.cloudPrint = async function cloudPrint(orderId) {
-  try {
-    await api('/api/print/cloud', { method: 'POST', body: JSON.stringify({ orderId }) });
-    toast('已发送到云打印机');
-    refresh();
-  } catch (e) {
-    toast(e.message || '云打印失败');
   }
 };
 
@@ -712,7 +726,6 @@ $$('.side-nav [data-tab], .bottom-nav [data-tab], #openHardwareBtn').forEach((b)
 
 $('#batchMakingBtn')?.addEventListener('click', () => batchSetStatus('making'));
 $('#batchReadyBtn')?.addEventListener('click', () => batchSetStatus('ready'));
-$('#batchDoneBtn')?.addEventListener('click', () => batchSetStatus('done'));
 $('#phoneVideoInput')?.addEventListener('change', onPhoneVideoPicked);
 $('#selectAllPending')?.addEventListener('change', (e) => {
   $$('.order-check').forEach((c) => {

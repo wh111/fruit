@@ -3,7 +3,7 @@
  * trial / release → 已备案域名
  */
 const PROD = 'https://sijixiansheng.xin';
-const DEV = 'http://10.17.0.44:3000';
+const DEV = 'http://192.168.1.50:3000';
 
 function resolveBaseUrl() {
   try {

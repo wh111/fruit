@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#1f2a1f" />
   <title>四季果先 · 门店管理</title>
-  <link rel="stylesheet" href="./css/admin.css" />
+  <link rel="stylesheet" href="/admin/css/admin.css" />
 </head>
 <body>
   <div id="app">
@@ -42,9 +42,8 @@
           <button type="button" data-tab="products" class="nav">商品规格</button>
           <button type="button" data-tab="delivery" class="nav">配送费</button>
           <button type="button" data-tab="users" class="nav">用户 / 发券</button>
-          <button type="button" data-tab="verify" class="nav">扫码核销</button>
+          <button type="button" data-tab="verify" class="nav">查单</button>
           <button type="button" data-tab="hardware" class="nav">打印 / 标签</button>
-          <a class="nav link" href="./make.html">制作台（录像）</a>
         </nav>
         <button type="button" id="logoutBtn" class="btn ghost logout">退出</button>
       </aside>
@@ -74,8 +73,7 @@
             <div class="batch-bar">
               <label class="switch"><input type="checkbox" id="selectAllPending" /> <span>全选可制作</span></label>
               <button type="button" class="btn primary" id="batchMakingBtn">批量开始制作</button>
-              <button type="button" class="btn green" id="batchReadyBtn">批量待取</button>
-              <button type="button" class="btn" id="batchDoneBtn">批量完成</button>
+              <button type="button" class="btn green" id="batchReadyBtn">批量请取餐</button>
               <span class="muted" id="batchHint">可勾选多个单号，一人同时做多份</span>
             </div>
             <div id="pendingList" class="order-list"></div>
@@ -164,10 +162,10 @@
 
         <div id="tab-verify" class="tab hidden">
           <div class="panel verify-panel">
-            <h3>核销取餐</h3>
-            <p class="muted">输入取餐码（如 A001）或粘贴扫码内容</p>
+            <h3>查取餐码</h3>
+            <p class="muted">正常不用核销。果切递出柜台，或放进外卖柜时，点一次「请取餐」或「已放入柜」即可。这里只在对不上号时查询；放了两小时还没取，会自动记为已取餐。</p>
             <input id="verifyInput" placeholder="取餐码 / 扫码内容" inputmode="text" autocomplete="off" />
-            <button type="button" id="verifyBtn" class="btn primary">核销完成</button>
+            <button type="button" id="verifyBtn" class="btn primary">顾客已取走</button>
             <pre id="verifyResult"></pre>
           </div>
         </div>
@@ -182,7 +180,7 @@
               <select id="detongPrinter"></select>
               <div class="cover-actions">
                 <label>宽(mm)</label>
-                <input id="detongWidth" type="number" min="20" max="80" value="50" style="width:72px" />
+                <input id="detongWidth" type="number" min="20" max="80" value="40" style="width:72px" />
                 <label>高(mm)</label>
                 <input id="detongHeight" type="number" min="15" max="60" value="30" style="width:72px" />
               </div>
@@ -195,13 +193,13 @@
 
           <div class="panel prose">
             <h3>② 订单标签自定义</h3>
-            <p class="muted">控制小程序下单后自动打印 / 点「打印标签」时的杯贴内容。</p>
+            <p class="muted">贴在杯子上给顾客看。默认是大号取餐码和品名，不印店员扫码用的二维码。</p>
             <label>品牌名</label>
             <input id="orderTplBrand" placeholder="四季果先" />
-            <label>码制</label>
+            <label>样式</label>
             <select id="orderTplCodeType">
-              <option value="qr">二维码（推荐核销）</option>
-              <option value="barcode">一维条码（取餐码）</option>
+              <option value="text">大号取餐码（贴杯子）</option>
+              <option value="barcode">条形码</option>
             </select>
             <div class="tpl-checks">
               <label class="switch"><input type="checkbox" id="orderTplShowBrand" checked /> <span>品牌</span></label>
@@ -284,10 +282,9 @@
       <nav class="bottom-nav" aria-label="手机导航">
         <button type="button" data-tab="dashboard" class="nav active"><span class="ico">概</span><span>概览</span></button>
         <button type="button" data-tab="orders" class="nav"><span class="ico">单</span><span>订单</span></button>
-        <button type="button" data-tab="verify" class="nav"><span class="ico">核</span><span>核销</span></button>
+        <button type="button" data-tab="verify" class="nav"><span class="ico">查</span><span>查单</span></button>
         <button type="button" data-tab="products" class="nav"><span class="ico">品</span><span>商品</span></button>
         <button type="button" data-tab="delivery" class="nav"><span class="ico">配</span><span>配送</span></button>
-        <a class="nav link" href="./make.html"><span class="ico">录</span><span>制作台</span></a>
       </nav>
     </section>
   </div>
@@ -327,9 +324,9 @@
     </form>
   </dialog>
 
-  <script src="https://cdn.jsdelivr.net/npm/dtpweb@2.7.260720/lib/dtpweb.umd.js"></script>
-  <script src="./js/detong-print.js"></script>
-  <script src="./js/admin.js"></script>
+  <script src="/admin/js/dtpweb.umd.js"></script>
+  <script src="/admin/js/detong-print.js"></script>
+  <script src="/admin/js/admin.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       if (window.DetongPrint) DetongPrint.init();

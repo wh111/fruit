@@ -1,6 +1,6 @@
 {
   "description": "本地私有配置",
-  "projectname": "四季果先",
+  "projectname": "%E5%9B%9B%E5%AD%A3%E6%9E%9C%E5%85%88",
   "appid": "wx7f915cfcf3f86b92",
   "setting": {
     "urlCheck": false,
@@ -8,7 +8,22 @@
     "es6": true,
     "postcss": true,
     "minified": true,
-    "compileHotReLoad": false,
-    "checkSiteMap": false
-  }
+    "compileHotReLoad": true,
+    "checkSiteMap": false,
+    "lazyloadPlaceholderEnable": false,
+    "skylineRenderEnable": false,
+    "preloadBackgroundData": false,
+    "autoAudits": false,
+    "useApiHook": true,
+    "showShadowRootInWxmlPanel": true,
+    "useStaticServer": false,
+    "useLanDebug": false,
+    "showES6CompileOption": false,
+    "useGlassEaselForWxml": false,
+    "checkInvalidKey": true,
+    "ignoreDevUnusedFiles": true,
+    "bigPackageSizeSupport": false
+  },
+  "libVersion": "3.17.3",
+  "condition": {}
 }

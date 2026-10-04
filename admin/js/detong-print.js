@@ -21,9 +21,9 @@
     showPrice: true,
     showTime: true,
     showDelivery: true,
-    codeType: 'qr', // qr | barcode
+    codeType: 'text', // text 杯贴给顾客 | barcode 条形码
     brandFont: 2.6,
-    codeFont: 7.5,
+    codeFont: 9,
     nameFont: 2.8,
     subFont: 2.4,
     footFont: 2.2,
@@ -67,7 +67,7 @@
   function loadSettings() {
     return {
       printer: localStorage.getItem(KEY.printer) || '',
-      width: Number(localStorage.getItem(KEY.width) || 50),
+      width: Number(localStorage.getItem(KEY.width) || 40),
       height: Number(localStorage.getItem(KEY.height) || 30),
       enabled: localStorage.getItem(KEY.enabled) !== '0',
       orderTpl: loadJson(KEY.orderTpl, DEFAULT_ORDER_TPL),
@@ -84,7 +84,7 @@
       batchTpl: { ...cur.batchTpl, ...(partial.batchTpl || {}) },
     };
     localStorage.setItem(KEY.printer, next.printer || '');
-    localStorage.setItem(KEY.width, String(next.width || 50));
+    localStorage.setItem(KEY.width, String(next.width || 40));
     localStorage.setItem(KEY.height, String(next.height || 30));
     localStorage.setItem(KEY.enabled, next.enabled ? '1' : '0');
     localStorage.setItem(KEY.orderTpl, JSON.stringify(next.orderTpl));
@@ -96,29 +96,88 @@
     return !!(state.ready && state.api && loadSettings().enabled);
   }
 
+  function allowUsbPrinter(api) {
+    if (!api || api._sgUsbOpen) return;
+    // 未安装 Windows 驱动时，DP30S 以 HID 出现，dtpweb 会直接丢弃打印任务。
+    // 本机打印助手可以打开这台机器，因此不再按 HID 拒绝。
+    api.isHidPrinter = function () {
+      return false;
+    };
+    api._sgUsbOpen = true;
+  }
+
   function openPrinter(api, printerName) {
     return new Promise((resolve) => {
-      if (!printerName) {
-        const list = api.getPrinters({ onlyLocal: false }) || [];
-        const first = list[0];
-        if (!first) return resolve(false);
-        const name = typeof first === 'string' ? first : first.name;
-        api.openPrinter(name, (ok) => resolve(!!ok));
-        return;
-      }
-      if (printerName.includes('@')) {
+      const list = api.getPrinters({ onlyLocal: false }) || [];
+      let device = null;
+      if (printerName && printerName.includes('@')) {
         const [name, ip] = printerName.split('@');
-        api.openPrinter({ name, ip }, (ok) => resolve(!!ok));
+        device = { name, ip };
+      } else if (printerName) {
+        device =
+          list.find(
+            (p) => p && (p.name === printerName || p.deviceName === printerName || p.printerName === printerName)
+          ) || printerName;
       } else {
-        api.openPrinter(printerName, (ok) => resolve(!!ok));
+        device = list[0];
       }
+      if (!device) return resolve(false);
+      api.openPrinter(device, (ok) => resolve(!!ok));
     });
   }
 
-  function commitJob(api) {
-    return new Promise((resolve) => {
-      api.commitJob(() => resolve());
+  function printPages(res) {
+    const pages = res && (res.printData || (res.resultInfo && res.resultInfo.printData));
+    if (!Array.isArray(pages) || !pages.length) return [];
+    return pages;
+  }
+
+  async function sendToUsb(pages) {
+    const token = localStorage.getItem('sg_admin_token') || '';
+    const resp = await fetch('/api/admin/print/usb', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({ pages }),
     });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'USB 打印失败');
+    return data;
+  }
+
+  function commitJob(api) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('打印机没有响应，请确认已开机并装好标签纸'));
+      }, 20000);
+      api.commitJob((res) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        const pages = printPages(res);
+        if (!pages.length) {
+          reject(new Error('打印助手没有返回打印数据'));
+          return;
+        }
+        sendToUsb(pages).then(() => resolve(res)).catch(reject);
+      });
+    });
+  }
+
+  function beginJob(api, width, height) {
+    const started = api.startJob({
+      width,
+      height,
+      jobName: 'Print',
+      // 当前 dtpweb 2.6 只接受 action=1 才会真正出纸，4096 会返回参数错误。
+      action: 1,
+    });
+    if (!started) throw new Error('无法开始打印，请确认打印机已开机并装好标签纸');
   }
 
   function formatPickup(order) {
@@ -165,7 +224,7 @@
       if (!order || !order.pickupCode) throw new Error('订单无取餐码');
       const tpl = { ...DEFAULT_ORDER_TPL, ...settings.orderTpl };
       if (payload.shopName) tpl.brand = payload.shopName;
-      const W = settings.width || 50;
+      const W = settings.width || 40;
       const H = settings.height || 30;
       const qrText = String(order.qrPayload || order.orderNo || order.id);
       const title = `${order.productName || ''} · ${order.specName || ''}`.trim();
@@ -175,7 +234,7 @@
       if (tpl.showDelivery) footParts.push(deliveryText(order));
       const foot = footParts.join(' · ');
 
-      api.startJob({ width: W, height: H });
+      beginJob(api, W, H);
 
       let tx = 2;
       let tw = W - 4;
@@ -237,67 +296,57 @@
           });
         }
       } else {
-        const qrSize = Math.min(H - 4, 18);
-        api.draw2DQRCode({
-          text: qrText,
-          x: 2,
-          y: (H - qrSize) / 2,
-          width: qrSize,
-        });
-        tx = qrSize + 4;
-        tw = W - tx - 1.5;
         let y = 1.2;
-        if (tpl.showBrand) {
-          api.drawText({
-            text: tpl.brand,
-            x: tx,
-            y,
-            width: tw,
-            height: 3.2,
-            fontHeight: tpl.brandFont,
-            fontStyle: 1,
-          });
-          y += 3.3;
-        }
+        const x = 2;
+        const w = W - 4;
+        const brandH = 3.2;
+        // 店名单独靠下。40×30 贴纸只有 30mm 高，从上边再加 30mm 会印出纸外，所以贴在底边。
+        const brandY = tpl.showBrand ? Math.max(1.2, H - brandH - 0.4) : H;
+        const contentBottom = tpl.showBrand ? brandY - 0.6 : H;
         if (tpl.showCode) {
+          const codeH = Math.max(6, Math.min(12, contentBottom - y - 7));
           api.drawText({
             text: String(order.pickupCode),
-            x: tx,
+            x,
             y,
-            width: tw,
-            height: 8,
-            fontHeight: tpl.codeFont,
+            width: w,
+            height: codeH,
+            fontHeight: Math.min(tpl.codeFont || 9, codeH - 0.6),
             fontStyle: 1,
           });
-          y += 8.5;
+          y += codeH + 0.4;
         }
         if (tpl.showName) {
           api.drawText({
-            text: title.slice(0, 28),
-            x: tx,
+            text: title.slice(0, 22),
+            x,
             y,
-            width: tw,
-            height: 4,
+            width: w,
+            height: 3.8,
             fontHeight: tpl.nameFont,
           });
           y += 4;
         }
-        api.drawText({
-          text: sub,
-          x: tx,
-          y,
-          width: tw,
-          height: 3.5,
-          fontHeight: tpl.subFont,
-        });
-        if (foot) {
+        const detail = [tpl.showPrice || order.quantity ? sub : '', foot].filter(Boolean).join('  ');
+        if (detail && y < contentBottom - 1) {
           api.drawText({
-            text: foot.slice(0, 36),
-            x: tx,
-            y: H - 5,
-            width: tw,
-            height: 3.5,
-            fontHeight: tpl.footFont,
+            text: detail.slice(0, 36),
+            x,
+            y: Math.min(y, contentBottom - 3.4),
+            width: w,
+            height: 3.4,
+            fontHeight: tpl.subFont,
+          });
+        }
+        if (tpl.showBrand) {
+          api.drawText({
+            text: tpl.brand,
+            x,
+            y: brandY,
+            width: w,
+            height: brandH,
+            fontHeight: tpl.brandFont,
+            fontStyle: 1,
           });
         }
       }
@@ -314,12 +363,12 @@
   function printBarcodeLabel(item, overrides) {
     return withPrinter(async (api, settings) => {
       const tpl = { ...DEFAULT_BATCH_TPL, ...settings.batchTpl, ...(overrides || {}) };
-      const W = settings.width || 50;
+      const W = settings.width || 40;
       const H = settings.height || 30;
       const code = String(item.code || '').trim();
       if (!code) throw new Error('条码内容为空');
 
-      api.startJob({ width: W, height: H });
+      beginJob(api, W, H);
       let y = 1.2;
       if (tpl.showBrand) {
         api.drawText({
@@ -507,7 +556,7 @@
     set('orderTplShowPrice', ot.showPrice, true);
     set('orderTplShowTime', ot.showTime, true);
     set('orderTplShowDelivery', ot.showDelivery, true);
-    set('orderTplCodeType', ot.codeType || 'qr');
+    set('orderTplCodeType', ot.codeType === 'barcode' ? 'barcode' : 'text');
     set('batchTplBrand', bt.brand);
     set('batchTplShowBrand', bt.showBrand, true);
     set('batchTplShowTitle', bt.showTitle, true);
@@ -578,6 +627,7 @@
     }
 
     const api = dtpweb.getInstance();
+    allowUsbPrinter(api);
     state.api = api;
     api.checkPlugin((resp) => {
       if (resp && resp.statusCode === 0) {
@@ -612,7 +662,7 @@
     $('detongPrinter')?.addEventListener('change', (e) => {
       saveSettings({ printer: e.target.value });
     });
-    w?.addEventListener('change', () => saveSettings({ width: Number(w.value) || 50 }));
+    w?.addEventListener('change', () => saveSettings({ width: Number(w.value) || 40 }));
     h?.addEventListener('change', () => saveSettings({ height: Number(h.value) || 30 }));
 
     $('detongRefresh')?.addEventListener('click', () => {
@@ -629,6 +679,9 @@
     });
 
     $('detongTest')?.addEventListener('click', async () => {
+      const btn = $('detongTest');
+      if (btn) btn.disabled = true;
+      if (typeof toast === 'function') toast('正在打印测试标签…');
       try {
         await printOrderLabel({
           shopName: loadSettings().orderTpl.brand || '四季果先',
@@ -644,9 +697,11 @@
             createdAt: Date.now(),
           },
         });
-        if (typeof toast === 'function') toast('订单测试标签已发送');
+        if (typeof toast === 'function') toast('测试标签已送到打印机');
       } catch (e) {
         if (typeof toast === 'function') toast(e.message || '测试打印失败');
+      } finally {
+        if (btn) btn.disabled = false;
       }
     });
 

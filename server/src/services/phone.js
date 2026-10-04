@@ -59,21 +59,33 @@ function mergeUserInto(db, fromUser, toUser) {
  * 绑定手机号；若该号已有账号则合并
  * 支持：新版 code / 旧版 encryptedData+iv / 开发 mockPhone
  */
+function allowMockPhone() {
+  const payMode = process.env.PAY_MODE || 'mock';
+  return payMode === 'mock' || process.env.ALLOW_MOCK_PHONE === '1';
+}
+
 async function bindPhoneForUser(db, currentUser, { code, encryptedData, iv, mockPhone } = {}) {
   if (!currentUser) throw Object.assign(new Error('请先登录'), { status: 401 });
 
   let phone = '';
-  if (code) {
-    const info = await getUserPhoneNumber(code);
-    phone = normalizePhone(info.purePhoneNumber || info.phoneNumber);
+  if (allowMockPhone() && mockPhone) {
+    phone = normalizePhone(mockPhone);
+  } else if (code) {
+    try {
+      const info = await getUserPhoneNumber(code);
+      phone = normalizePhone(info.purePhoneNumber || info.phoneNumber);
+    } catch (e) {
+      if (!allowMockPhone()) throw e;
+      phone = normalizePhone(mockPhone || '13800138000');
+    }
   } else if (encryptedData && iv) {
     if (!currentUser.sessionKey) {
       throw Object.assign(new Error('登录态已过期，请先重新登录再授权手机号'), { status: 401 });
     }
     const info = decryptPhoneData(currentUser.sessionKey, encryptedData, iv);
     phone = normalizePhone(info.purePhoneNumber || info.phoneNumber);
-  } else if (mockPhone && (process.env.PAY_MODE === 'mock' || process.env.ALLOW_MOCK_PHONE === '1')) {
-    phone = normalizePhone(mockPhone);
+  } else if (allowMockPhone()) {
+    phone = '13800138000';
   } else {
     throw Object.assign(new Error('未获得手机号凭证，请用真机重试或检查小程序手机号权限'), { status: 400 });
   }

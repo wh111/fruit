@@ -146,9 +146,8 @@ async function bindPhoneNumber(detail) {
     if (denied) {
       throw new Error('需要授权手机号才能保持优惠一致');
     }
-    // 仅当显式开启开发模拟时才用测试号（避免误以为已拿到真号）
-    const allowDevMock = !!wx.getStorageSync('sg_allow_dev_phone_mock');
-    if ((env === 'develop' || env === 'trial') && allowDevMock) {
+    // 未完成认证时，微信不返回手机号凭证。开发版和体验版直接绑测试号。
+    if (env !== 'release') {
       payload.mockPhone = wx.getStorageSync('sg_dev_mock_phone') || '13800138000';
       payload._devMock = true;
     } else {

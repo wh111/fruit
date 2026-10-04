@@ -18,6 +18,23 @@ const {
 const { getLoyaltyState, applyLoyaltyAndCoupon } = require('./loyalty');
 const { normalizeDelivery, listDeliveryPoints } = require('./delivery');
 
+const PICKUP_AUTO_DONE_MS = 2 * 60 * 60 * 1000;
+
+function settlePickedOrders(db, now = Date.now()) {
+  let changed = 0;
+  for (const order of db.orders || []) {
+    if (order.status !== 'ready') continue;
+    const since = order.readyAt || order.paidAt || order.updatedAt || 0;
+    if (!since || now - since < PICKUP_AUTO_DONE_MS) continue;
+    order.status = 'done';
+    order.doneAt = now;
+    order.updatedAt = now;
+    order.doneBy = 'auto';
+    changed += 1;
+  }
+  return changed;
+}
+
 function nextPickupCode(db) {
   const key = todayKey();
   if (db.seq.orderDay !== key) {
@@ -556,6 +573,7 @@ module.exports = {
   orderQrDataUrl,
   calcAmount,
   nextPickupCode,
+  settlePickedOrders,
   getQueueInfo,
   restoreCouponForOrder,
 };

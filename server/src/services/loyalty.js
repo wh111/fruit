@@ -110,7 +110,8 @@ function getLoyaltyState(db, { userId, openid, now = Date.now(), includeCurrent 
  * 先月折（若开启），再减券
  * coupon 门槛仍按原价判断（由 canUseCoupon 负责）
  */
-function applyLoyaltyAndCoupon(originalAmount, loyalty, coupon) {
+function applyLoyaltyAndCoupon(originalAmount, loyalty, coupon, ctx = {}) {
+  const { computeCouponSave } = require('./coupon');
   const original = round2(originalAmount);
   const rate = loyalty && loyalty.rate ? Number(loyalty.rate) : 0;
   const loyaltySave = rate > 0 ? round2(original * rate) : 0;
@@ -121,7 +122,11 @@ function applyLoyaltyAndCoupon(originalAmount, loyalty, coupon) {
   let couponLabel = '';
   let discountCode = '';
   if (coupon) {
-    couponSave = round2(Math.min(Number(coupon.amount) || 0, afterLoyalty - 0.01));
+    couponSave = computeCouponSave(coupon, {
+      originalAmount: afterLoyalty,
+      unitPrice: ctx.unitPrice,
+      product: ctx.product,
+    });
     if (couponSave < 0) couponSave = 0;
     couponId = coupon.id;
     couponLabel = coupon.title || '优惠券';

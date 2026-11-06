@@ -34,17 +34,38 @@ function amountLine(order) {
   return `金额：￥${order.amount}${fee}`;
 }
 
+function itemLines(order) {
+  const items = Array.isArray(order.items) && order.items.length ? order.items : null;
+  if (items) {
+    return items.map((it) => {
+      const tops = (it.toppings || []).map((t) => t.name).filter(Boolean);
+      const ex = (it.extras || [])
+        .filter((e) => e && e.kind !== 'sideMeal' && e.kind !== 'topping')
+        .map((e) => e.name);
+      const add = [...tops, ...ex].join('+');
+      return `${it.productName} ${it.specName} x${it.quantity}${add ? `（${add}）` : ''}`;
+    });
+  }
+  return [`${order.productName} ${order.specName} x${order.quantity}`];
+}
+
+function extrasSummary(order) {
+  const sides = (order.extras || []).filter((e) => e && e.kind === 'sideMeal').map((e) => e.name);
+  if (sides.length) return sides.join('+');
+  if (Array.isArray(order.items) && order.items.length) return '见上';
+  return (order.extras || []).map((e) => e.name).join('+') || '无';
+}
+
 function buildCloudTicket(order, shopName = '四季果先') {
-  const extras = (order.extras || []).map((e) => e.name).join('+') || '无';
   const time = new Date(order.paidAt || order.createdAt);
   const ts = `${time.getMonth() + 1}-${time.getDate()} ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+  const goods = itemLines(order);
   return [
     `<CB>${shopName}</CB>`,
     `<CB>取餐码 ${order.pickupCode}</CB>`,
     `--------------------------------`,
-    `商品：${order.productName}`,
-    `规格：${order.specName} x${order.quantity}`,
-    `加料：${extras}`,
+    ...goods.map((g) => `商品：${g}`),
+    `加料：${extrasSummary(order)}`,
     amountLine(order),
     pickupLine(order),
     `下单：${ts}`,
@@ -57,16 +78,15 @@ function buildCloudTicket(order, shopName = '四季果先') {
 
 /** 易联云纯文本（无飞鹅标签） */
 function buildYlyContent(order, shopName = '四季果先') {
-  const extras = (order.extras || []).map((e) => e.name).join('+') || '无';
   const time = new Date(order.paidAt || order.createdAt);
   const ts = `${time.getMonth() + 1}-${time.getDate()} ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+  const goods = itemLines(order);
   return [
     `@@2 ${shopName}`,
     `@@2 取餐码 ${order.pickupCode}`,
     `----------------`,
-    `商品：${order.productName}`,
-    `规格：${order.specName} x${order.quantity}`,
-    `加料：${extras}`,
+    ...goods.map((g) => `商品：${g}`),
+    `加料：${extrasSummary(order)}`,
     amountLine(order),
     pickupLine(order),
     `下单：${ts}`,

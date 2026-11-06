@@ -26,14 +26,21 @@ Page({
       const ids = (wx.getStorageSync('localOrderIds') || []).join(',');
       const { list } = await request(`/api/orders/mine?ids=${ids}`);
       this.setData({
-        list: list.map((o) => ({
-          ...o,
-          statusText:
-            o.fulfillmentType === 'reserve' && o.status === 'paid'
-              ? '已预约'
-              : STATUS[o.status] || o.status,
-          queueTip: o.queueTip || '',
-        })),
+        list: list.map((o) => {
+          const items = Array.isArray(o.items) ? o.items : [];
+          const lineSummary = items.length
+            ? items.map((it) => `${it.productName}×${it.quantity}`).join('、')
+            : `${o.specName || ''} ×${o.quantity}`;
+          return {
+            ...o,
+            lineSummary,
+            statusText:
+              o.fulfillmentType === 'reserve' && o.status === 'paid'
+                ? '已预约'
+                : STATUS[o.status] || o.status,
+            queueTip: o.queueTip || '',
+          };
+        }),
       });
     } catch (e) {
       wx.showToast({ title: e.message, icon: 'none' });

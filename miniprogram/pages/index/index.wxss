@@ -1,4 +1,43 @@
-.page { padding-bottom: 40rpx; }
+.page { padding-bottom: 160rpx; }
+
+.cart-bar {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 16rpx 16rpx 24rpx;
+  border-radius: 999rpx;
+  background: #2a2a2a;
+  color: #fff;
+  box-shadow: 0 12rpx 32rpx rgba(0,0,0,.18);
+}
+.cart-bar-main { flex: 1; display: flex; align-items: center; gap: 16rpx; }
+.cart-badge {
+  min-width: 44rpx;
+  height: 44rpx;
+  padding: 0 10rpx;
+  border-radius: 999rpx;
+  background: #f5a623;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 44rpx;
+  text-align: center;
+}
+.cart-title { font-size: 28rpx; font-weight: 700; }
+.cart-sub { font-size: 22rpx; color: rgba(255,255,255,.72); margin-top: 2rpx; }
+.cart-go {
+  padding: 18rpx 28rpx;
+  border-radius: 999rpx;
+  background: #f5a623;
+  color: #fff;
+  font-weight: 800;
+  font-size: 28rpx;
+}
 
 .hero {
   margin: 24rpx;
@@ -128,12 +167,6 @@
   font-size: 24rpx;
   line-height: 1.5;
 }
-.debug {
-  margin: 0 24rpx 12rpx;
-  color: #b0b0b0;
-  font-size: 20rpx;
-}
-
 .cats {
   white-space: nowrap;
   padding: 8rpx 24rpx 16rpx;
@@ -196,6 +229,159 @@
   border-radius: 999rpx;
 }
 .empty { text-align: center; padding: 80rpx; }
+
+.lottery-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(20, 16, 10, 0.62);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx 32rpx;
+  box-sizing: border-box;
+}
+.lottery-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 640rpx;
+  background: linear-gradient(165deg, #fff8e7 0%, #ffffff 42%, #e8f5e9 100%);
+  border-radius: 32rpx;
+  padding: 48rpx 28rpx 36rpx;
+  box-sizing: border-box;
+  text-align: center;
+  box-shadow: 0 24rpx 64rpx rgba(0, 0, 0, 0.22);
+}
+.lottery-close {
+  position: absolute;
+  right: 18rpx;
+  top: 12rpx;
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 52rpx;
+  text-align: center;
+  font-size: 40rpx;
+  color: #9a9a9a;
+}
+.lottery-title {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #2e7d32;
+}
+.lottery-sub {
+  margin-top: 8rpx;
+  margin-bottom: 28rpx;
+  font-size: 24rpx;
+  color: #7a7a7a;
+}
+.wheel-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wheel-pointer {
+  width: 0;
+  height: 0;
+  border-left: 18rpx solid transparent;
+  border-right: 18rpx solid transparent;
+  border-top: 36rpx solid #e65100;
+  margin-bottom: -8rpx;
+  z-index: 3;
+  position: relative;
+  filter: drop-shadow(0 2rpx 2rpx rgba(0, 0, 0, 0.15));
+}
+.wheel {
+  width: 480rpx;
+  height: 480rpx;
+  border-radius: 50%;
+  position: relative;
+  border: 10rpx solid #fff;
+  box-shadow: 0 8rpx 28rpx rgba(46, 125, 50, 0.28);
+  box-sizing: border-box;
+}
+.wheel-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform-origin: center center;
+}
+.wheel-label-text {
+  position: absolute;
+  left: -70rpx;
+  top: -200rpx;
+  width: 140rpx;
+  text-align: center;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
+  line-height: 1.25;
+}
+.wheel-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 112rpx;
+  height: 112rpx;
+  margin: -56rpx 0 0 -56rpx;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #ffb74d, #e65100);
+  border: 8rpx solid #fff;
+  box-shadow: 0 4rpx 16rpx rgba(230, 81, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.hub-go {
+  color: #fff;
+  font-size: 40rpx;
+  font-weight: 800;
+}
+.wheel-hint {
+  margin-top: 22rpx;
+  font-size: 24rpx;
+  color: #8a8a8a;
+}
+.lottery-result {
+  padding: 24rpx 12rpx 8rpx;
+}
+.result-badge {
+  display: inline-block;
+  padding: 8rpx 22rpx;
+  border-radius: 999rpx;
+  background: rgba(230, 81, 0, 0.12);
+  color: #e65100;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.result-name {
+  margin: 24rpx 0 12rpx;
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #2e7d32;
+}
+.result-desc {
+  font-size: 26rpx;
+  color: #7a7a7a;
+  margin-bottom: 28rpx;
+}
+.result-btn {
+  width: 100%;
+  margin: 0;
+}
+.result-btn::after { border: none; }
+.lottery-skip {
+  margin-top: 22rpx;
+  color: #9a9a9a;
+  font-size: 26rpx;
+  padding: 12rpx;
+}
 
 .phone-mask {
   position: fixed;

@@ -84,6 +84,40 @@ header {
 .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .status { min-height: 1.4em; margin: 10px 0 0; font-size: 14px; color: #ffe0b2; }
 
+.topping-panel {
+  margin: 10px 0 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #1a241a;
+  border: 1px solid #2e3d2e;
+}
+.topping-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #c8e6c9;
+}
+.topping-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.topping-chip {
+  border: 1px solid #3d4f3d;
+  background: #222;
+  color: #ddd;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.topping-chip.on {
+  background: #2e7d32;
+  border-color: #4caf50;
+  color: #fff;
+  font-weight: 700;
+}
+
 .list { display: flex; flex-direction: column; gap: 8px; }
 .card {
   display: flex;

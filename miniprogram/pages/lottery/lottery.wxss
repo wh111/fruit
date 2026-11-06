@@ -1,0 +1,71 @@
+.page { padding-bottom: 64rpx; }
+
+.hero {
+  background: linear-gradient(145deg, #fff3e0, #e8f5e9 60%, #fff);
+}
+.tag {
+  display: inline-block;
+  font-size: 22rpx;
+  color: #e65100;
+  background: rgba(255, 152, 0, 0.15);
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  margin-bottom: 12rpx;
+}
+.title { font-size: 40rpx; font-weight: 800; color: #2e7d32; }
+.sub { margin-top: 10rpx; color: #666; font-size: 26rpx; }
+.date { margin-top: 12rpx; font-size: 22rpx; }
+.status {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #e65100;
+  font-weight: 600;
+}
+
+.section { font-weight: 700; margin-bottom: 16rpx; font-size: 28rpx; }
+
+.prize {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0ebe3;
+}
+.prize:last-child { border-bottom: none; }
+.prize-title { font-size: 28rpx; font-weight: 700; width: 100%; }
+.prize-desc { flex: 1; font-size: 22rpx; margin-top: 6rpx; }
+.prize-rate {
+  font-size: 22rpx;
+  color: #e8910f;
+  font-weight: 700;
+  margin-top: 6rpx;
+}
+
+.result {
+  background: #fff8e7;
+  text-align: center;
+}
+.result-title {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #e65100;
+  margin: 8rpx 0 12rpx;
+}
+.btn-line {
+  margin-top: 20rpx;
+  color: #2e7d32;
+  font-weight: 700;
+  font-size: 26rpx;
+}
+
+.actions { padding: 8rpx 24rpx 0; }
+.draw { margin-bottom: 16rpx; }
+.draw[disabled] { opacity: 0.55; }
+.btn-ghost {
+  text-align: center;
+  padding: 22rpx;
+  color: #666;
+  font-size: 26rpx;
+}
+
+.rule { color: #666; font-size: 24rpx; line-height: 1.7; }

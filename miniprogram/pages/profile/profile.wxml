@@ -3,13 +3,23 @@
     <image class="logo" src="/images/logo.png" mode="aspectFit" />
     <view>
       <view class="brand">四季果先</view>
-      <view class="muted">SEASONAL FRUIT · 现切现做 · 新鲜半小时</view>
+      <view class="muted">SEASONAL FRUIT · 现切现做 · 新鲜40分钟</view>
       <view class="muted" style="margin-top:8rpx">{{user.nickName || '果粉'}}</view>
       <view class="phone-line" wx:if="{{user.hasPhone}}">手机 {{user.phoneMasked}}</view>
     </view>
   </view>
 
   <view class="card menu">
+    <view class="row" bindtap="goWallet">
+      <text>储值余额</text>
+      <text class="badge" wx:if="{{balance > 0}}">¥{{balance}}</text>
+      <text class="muted" wx:else>充值优惠</text>
+    </view>
+    <view class="row" bindtap="goLottery">
+      <text>开业抽奖</text>
+      <text class="badge" wx:if="{{lotteryActive}}">进行中</text>
+      <text class="muted" wx:elif="{{lotteryHint}}">{{lotteryHint}}</text>
+    </view>
     <view class="row" bindtap="goCoupons">
       <text>我的优惠券</text>
       <text class="badge" wx:if="{{couponUnused}}">{{couponUnused}} 张可用</text>
@@ -31,7 +41,7 @@
 
   <view class="card tip">
     <view class="title">取餐说明</view>
-    <view class="muted">支付成功后会生成取餐码。我们按取餐时间现切，保证取餐前最多半小时制作完成；到店出示取餐码即可。</view>
+    <view class="muted">支付成功后会生成取餐号。我们按取餐时间现切，保证取餐前最多40分钟制作完成；到柜台报号，店员对一下即可。</view>
     <view class="muted" style="margin-top:12rpx">授权手机号后，同一号码的优惠券会保持一致。</view>
   </view>
 </view>

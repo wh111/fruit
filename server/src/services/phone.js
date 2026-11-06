@@ -17,6 +17,7 @@ function publicUser(user) {
     phone: phone || '',
     phoneMasked: phone ? maskPhone(phone) : '',
     hasPhone: Boolean(phone),
+    balance: Math.round((Number(user.balance) || 0) * 100) / 100,
   };
 }
 
@@ -34,6 +35,12 @@ function mergeUserInto(db, fromUser, toUser) {
       c.voidAt = Date.now();
     }
     c.userId = toUser.id;
+  }
+  try {
+    const { transferWalletOnMerge } = require('./wallet');
+    transferWalletOnMerge(db, fromUser.id, toUser.id);
+  } catch {
+    /* ignore */
   }
   for (const o of db.orders || []) {
     if (o.userId === fromUser.id) {

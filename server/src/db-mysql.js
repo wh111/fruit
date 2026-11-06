@@ -112,10 +112,20 @@ async function loadMysql() {
     orders: orders.map(rowToOrder),
     users: users.map(rowToUser),
     coupons: Array.isArray(metaMap.coupons) ? metaMap.coupons : [],
+    lottery: metaMap.lottery || null,
+    lotteryDraws: Array.isArray(metaMap.lotteryDraws) ? metaMap.lotteryDraws : [],
+    toppings: Array.isArray(metaMap.toppings) ? metaMap.toppings : [],
+    recharges: Array.isArray(metaMap.recharges) ? metaMap.recharges : [],
+    walletLedger: Array.isArray(metaMap.walletLedger) ? metaMap.walletLedger : [],
+    purchases: Array.isArray(metaMap.purchases) ? metaMap.purchases : [],
+    walletBalances:
+      metaMap.walletBalances && typeof metaMap.walletBalances === 'object'
+        ? metaMap.walletBalances
+        : {},
     settings: metaMap.settings || {
       shopName: '四季果先',
       shopPhone: '',
-      pickupHint: '取餐前最多半小时现切，做好后请到柜台取餐，出示取餐码即可',
+      pickupHint: '取餐前最多40分钟现切，做好后请到柜台报取餐号，店员对一下即可',
     },
     seq: metaMap.seq || { orderDay: '', pickupNo: 0 },
   };
@@ -224,6 +234,17 @@ async function saveMysql(data) {
     await upsertMeta(conn, 'settings', data.settings || {});
     await upsertMeta(conn, 'seq', data.seq || { orderDay: '', pickupNo: 0 });
     await upsertMeta(conn, 'coupons', data.coupons || []);
+    await upsertMeta(conn, 'lottery', data.lottery || null);
+    await upsertMeta(conn, 'lotteryDraws', data.lotteryDraws || []);
+    await upsertMeta(conn, 'toppings', data.toppings || []);
+    await upsertMeta(conn, 'recharges', data.recharges || []);
+    await upsertMeta(conn, 'walletLedger', data.walletLedger || []);
+    await upsertMeta(conn, 'purchases', data.purchases || []);
+    const balances = {};
+    for (const u of data.users || []) {
+      if (u && u.id && u.balance != null) balances[u.id] = Number(u.balance) || 0;
+    }
+    await upsertMeta(conn, 'walletBalances', Object.keys(balances).length ? balances : data.walletBalances || {});
 
     await conn.commit();
   } catch (e) {
@@ -255,7 +276,7 @@ async function ensureMysql(seedFn) {
       settings: {
         shopName: '四季果先',
         shopPhone: '',
-        pickupHint: '取餐前最多半小时现切，做好后请到柜台取餐，出示取餐码即可',
+        pickupHint: '取餐前最多40分钟现切，做好后请到柜台报取餐号，店员对一下即可',
       },
       seq: { orderDay: '', pickupNo: 0 },
     };

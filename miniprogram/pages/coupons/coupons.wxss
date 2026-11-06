@@ -54,7 +54,7 @@
   justify-content: center;
   padding: 24rpx 12rpx;
 }
-.amount { font-size: 48rpx; font-weight: 800; line-height: 1; }
+.amount { font-size: 40rpx; font-weight: 800; line-height: 1.1; text-align: center; }
 .yen { font-size: 24rpx; margin-right: 2rpx; }
 .cond { margin-top: 10rpx; font-size: 20rpx; opacity: 0.92; text-align: center; }
 .right {

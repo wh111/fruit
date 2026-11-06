@@ -52,22 +52,21 @@
 .queue-num .unit { font-size: 28rpx; color: #e8910f; font-weight: 700; }
 .queue-meta { margin-top: 12rpx; }
 
+.code-label {
+  margin-top: 20rpx;
+  font-size: 24rpx;
+  color: #8a8a8a;
+  font-weight: 600;
+}
 .code {
   font-size: 96rpx;
   font-weight: 800;
   color: #2a2a2a;
   letter-spacing: 4rpx;
   line-height: 1.1;
-  margin: 16rpx 0;
+  margin: 8rpx 0 12rpx;
 }
 .watch { margin: 28rpx 24rpx 8rpx; }
-.qr {
-  width: 360rpx;
-  height: 360rpx;
-  margin: 12rpx auto;
-  background: #fff;
-  display: block;
-}
 .row {
   display: flex;
   justify-content: space-between;

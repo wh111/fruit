@@ -9,7 +9,16 @@ function escapeHtml(s) {
 }
 
 function buildLabelHtml({ order, qrDataUrl, shopName }) {
-  const extras = (order.extras || []).map((e) => e.name).join('+') || '无加料';
+  const items = Array.isArray(order.items) && order.items.length ? order.items : null;
+  const nameLine = items
+    ? items.map((it) => `${it.productName}×${it.quantity}`).join('、')
+    : `${order.productName} · ${order.specName}`;
+  const side = (order.extras || []).find((e) => e && e.kind === 'sideMeal');
+  const extras = side
+    ? side.name
+    : items
+      ? `共${order.quantity}件`
+      : (order.extras || []).map((e) => e.name).join('+') || '无加料';
   const time = new Date(order.paidAt || order.createdAt);
   const timeStr = `${String(time.getMonth() + 1).padStart(2, '0')}-${String(time.getDate()).padStart(2, '0')} ${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
   const pickupStr =
@@ -54,8 +63,8 @@ function buildLabelHtml({ order, qrDataUrl, shopName }) {
       <div>
         <div class="brand">${escapeHtml(shopName || '四季果先')}</div>
         <div class="code">${escapeHtml(order.pickupCode)}</div>
-        <div class="name">${escapeHtml(order.productName)} · ${escapeHtml(order.specName)}</div>
-        <div class="sub">${escapeHtml(extras)} ×${order.quantity} · ${escapeHtml(priceStr)}</div>
+        <div class="name">${escapeHtml(nameLine)}</div>
+        <div class="sub">${escapeHtml(extras)} · ${escapeHtml(priceStr)}</div>
       </div>
       <div class="time">${escapeHtml(pickupStr)} · ${deliveryStr}</div>
     </div>

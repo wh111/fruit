@@ -3,20 +3,20 @@
     <image class="hero-logo" src="/images/logo.png" mode="aspectFit" />
     <view class="hero-text">
       <text class="brand">四季果先</text>
-      <text class="slogan">现切现做 · 新鲜半小时</text>
+      <text class="slogan">现切现做 · 新鲜40分钟</text>
       <text class="slogan-sub">提前订 · 到点取 · 一份也做</text>
     </view>
   </view>
 
   <view class="fresh-pledge">
     <text class="fresh-dot">●</text>
-    <text>取餐前最多半小时现切，不卖 B 级果、不卖隔夜切</text>
+    <text>取餐前最多40分钟现切，不卖 B 级果、不卖隔夜切</text>
   </view>
 
   <view class="bulk-entry" bindtap="goBulk">
     <view class="bulk-left">
-      <view class="bulk-title">散装水果</view>
-      <view class="bulk-sub">按包装标价自行输入金额支付</view>
+      <view class="bulk-title">自定义金额</view>
+      <view class="bulk-sub">自行输入金额完成支付</view>
     </view>
     <view class="bulk-go">去付款</view>
   </view>
@@ -36,7 +36,6 @@
   <view class="promo" wx:if="{{loyaltyHint}}">{{loyaltyHint}}</view>
   <view class="promo" wx:if="{{promoHint}}">{{promoHint}}</view>
   <view class="err" wx:if="{{loadError}}">{{loadError}}</view>
-  <view class="debug">接口 {{debugApi}} · {{debugEnv}}</view>
 
   <scroll-view scroll-x class="cats" enhanced show-scrollbar="{{false}}">
     <view
@@ -58,7 +57,7 @@
       data-id="{{item.id}}"
       bindtap="goDetail"
     >
-      <image class="cover" src="{{item.coverUrl}}" mode="aspectFill" />
+      <image class="cover" src="{{item.coverUrl}}" mode="aspectFill" lazy-load="{{true}}" />
       <view class="info">
         <view class="name">{{item.name}}</view>
         <view class="muted">{{item.desc}}</view>
@@ -73,8 +72,62 @@
 
   <view wx:if="{{!filtered.length}}" class="empty muted">暂无商品，请稍后再来</view>
 
+  <view class="cart-bar" wx:if="{{cartCount > 0}}">
+    <view class="cart-bar-main" bindtap="goCart">
+      <view class="cart-badge">{{cartCount}}</view>
+      <view>
+        <view class="cart-title">购物车</view>
+        <view class="cart-sub">预估 ¥{{cartEstimate}}</view>
+      </view>
+    </view>
+    <view class="cart-go" bindtap="goCheckout">去结算</view>
+  </view>
+
+  <!-- 开业抽奖：进店弹窗转盘 -->
+  <view class="lottery-mask" wx:if="{{showLottery}}" catchtouchmove="true">
+    <view class="lottery-sheet">
+      <view class="lottery-close" bindtap="skipLottery">×</view>
+      <view class="lottery-title">{{lotteryTitle}}</view>
+      <view class="lottery-sub">{{lotterySub}}</view>
+
+      <view class="wheel-box" wx:if="{{!lotteryResult}}">
+        <view class="wheel-pointer"></view>
+        <view
+          class="wheel"
+          style="background: {{wheelBg}}; transform: rotate({{wheelDeg}}deg); transition: {{wheelTransition}};"
+          bindtap="onLotterySpin"
+        >
+          <view
+            class="wheel-label"
+            wx:for="{{wheelLabels}}"
+            wx:key="id"
+            style="transform: rotate({{item.mid}}deg);"
+          >
+            <text class="wheel-label-text">{{item.short}}</text>
+          </view>
+          <view class="wheel-hub" catchtap="onLotterySpin">
+            <text class="hub-go">{{lotterySpinning ? '…' : '抽'}}</text>
+          </view>
+        </view>
+        <view class="wheel-hint">点击转盘抽奖</view>
+      </view>
+
+      <view class="lottery-result" wx:else>
+        <view class="result-badge">{{lotteryResult.type === 'none' ? '谢谢参与' : '恭喜中奖'}}</view>
+        <view class="result-name">{{lotteryResult.title}}</view>
+        <view class="result-desc" wx:if="{{lotteryResult.type !== 'none'}}">
+          已发放 {{lotteryResult.qty || 1}} 张，放入「我的优惠券」
+        </view>
+        <view class="result-desc" wx:else>欢迎到店尝鲜</view>
+        <button class="btn-primary result-btn" wx:if="{{lotteryResult.type !== 'none'}}" bindtap="goLotteryCoupons">去看优惠券</button>
+        <button class="btn-primary result-btn" wx:elif="{{lotteryCanAgain}}" bindtap="lotteryAgain">再抽一次</button>
+        <view class="lottery-skip" bindtap="closeLottery">先去点单</view>
+      </view>
+    </view>
+  </view>
+
   <!-- 进店引导：微信要求必须点按钮才能授权手机号，无法自动弹出系统框 -->
-  <view class="phone-mask" wx:if="{{showPhoneAuth}}" catchtouchmove="true">
+  <view class="phone-mask" wx:if="{{showPhoneAuth && !showLottery}}" catchtouchmove="true">
     <view class="phone-sheet">
       <view class="phone-title">绑定手机号</view>
       <view class="phone-desc">用于同步优惠券，换机登录也能拿到同一份福利。</view>

@@ -8,14 +8,14 @@ const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
 
-// 加载 .env
+// 加载 .env（文件优先，避免 pm2 旧环境变量盖住支付密钥）
 (() => {
   try {
     const envPath = path.join(__dirname, '..', '.env');
     if (!fs.existsSync(envPath)) return;
     fs.readFileSync(envPath, 'utf8').split('\n').forEach((line) => {
       const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+      if (m) process.env[m[1]] = m[2];
     });
   } catch {
     /* ignore */
@@ -34,8 +34,17 @@ const {
   settlePickedOrders,
   restoreCouponForOrder,
 } = require('./services/order');
-const { getPromoState } = require('./services/promo');
-const { listDeliveryPoints, applyDeliverySettings } = require('./services/delivery');
+const {
+  getPromoState,
+  getReserveCategories,
+  setReserveCategories,
+  ALL_PRODUCT_CATEGORIES,
+} = require('./services/promo');
+const {
+  listDeliveryPoints,
+  applyDeliverySettings,
+  getDeliveryScopeNote,
+} = require('./services/delivery');
 const { notifyOrderReady, subscribeClientConfig } = require('./services/subscribe');
 const { bindPhoneForUser, publicUser } = require('./services/phone');
 const {
@@ -44,9 +53,31 @@ const {
   listUserCoupons,
   campaignInfo,
   ensureCoupons,
+  getOff15_3ScopePublic,
+  updateOff15_3Scope,
 } = require('./services/coupon');
+const {
+  ensureLottery,
+  campaignPublic: lotteryCampaign,
+  drawLottery,
+  updateLottery,
+  adminStats: lotteryAdminStats,
+} = require('./services/lottery');
+const {
+  normalizeToppings,
+  listActiveToppings,
+  listPublicToppings,
+  resolveToppingItems,
+  isFruitBowlOrder,
+} = require('./services/toppings');
 const { getLoyaltyState } = require('./services/loyalty');
-const { touchLogin, listUsersWithActivity } = require('./services/users');
+const {
+  touchLogin,
+  listUsersWithActivity,
+  getUserAdminDetail,
+  updateUserAdmin,
+  adjustUserBalance,
+} = require('./services/users');
 const { buildLabelHtml } = require('./services/label');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -55,6 +86,63 @@ const JWT_SECRET = process.env.JWT_SECRET || 'sijiguoxian_dev_secret_change_me';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const PAY_MODE = process.env.PAY_MODE || 'mock';
+/** 管理端 token 有效期（天），默认 1 天 */
+const ADMIN_TOKEN_DAYS = Math.max(0.04, Number(process.env.ADMIN_TOKEN_DAYS || 1));
+/** 登录失败：窗口内最多 N 次，超限锁定 LOCK_MS */
+const ADMIN_LOGIN_MAX_FAILS = Math.max(3, Number(process.env.ADMIN_LOGIN_MAX_FAILS || 5));
+const ADMIN_LOGIN_WINDOW_MS = Math.max(60_000, Number(process.env.ADMIN_LOGIN_WINDOW_MS || 10 * 60 * 1000));
+const ADMIN_LOGIN_LOCK_MS = Math.max(60_000, Number(process.env.ADMIN_LOGIN_LOCK_MS || 10 * 60 * 1000));
+
+/** ip -> { fails: number[], lockedUntil: number } */
+const adminLoginAttempts = new Map();
+
+function clientIp(req) {
+  const xff = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim();
+  if (xff) return xff;
+  const real = String(req.headers['x-real-ip'] || '').trim();
+  if (real) return real;
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function checkAdminLoginRate(ip) {
+  const now = Date.now();
+  let row = adminLoginAttempts.get(ip);
+  if (!row) {
+    row = { fails: [], lockedUntil: 0 };
+    adminLoginAttempts.set(ip, row);
+  }
+  if (row.lockedUntil > now) {
+    const waitSec = Math.ceil((row.lockedUntil - now) / 1000);
+    return { ok: false, waitSec, error: `登录尝试过多，请 ${waitSec} 秒后再试` };
+  }
+  if (row.lockedUntil && row.lockedUntil <= now) {
+    row.lockedUntil = 0;
+    row.fails = [];
+  }
+  row.fails = (row.fails || []).filter((t) => now - t < ADMIN_LOGIN_WINDOW_MS);
+  return { ok: true, row };
+}
+
+function recordAdminLoginFail(ip) {
+  const now = Date.now();
+  let row = adminLoginAttempts.get(ip);
+  if (!row) {
+    row = { fails: [], lockedUntil: 0 };
+    adminLoginAttempts.set(ip, row);
+  }
+  row.fails = (row.fails || []).filter((t) => now - t < ADMIN_LOGIN_WINDOW_MS);
+  row.fails.push(now);
+  if (row.fails.length >= ADMIN_LOGIN_MAX_FAILS) {
+    row.lockedUntil = now + ADMIN_LOGIN_LOCK_MS;
+    row.fails = [];
+  }
+}
+
+function clearAdminLoginFails(ip) {
+  adminLoginAttempts.delete(ip);
+}
 
 function b64url(buf) {
   return Buffer.from(buf)
@@ -185,19 +273,32 @@ async function handleApi(req, res, pathname) {
     const s = db.settings || {};
     return send(res, 200, {
       shopName: s.shopName || '四季果先',
-      shopPhone: s.shopPhone || '18813017847',
+      shopPhone: s.shopPhone || '15701511086',
       tagline: s.tagline || '',
       pickupHint: s.pickupHint || '',
       groupBuyHint:
         s.groupBuyHint ||
-        '企业团购、部门下午茶、会议用果，电话沟通即可。10 份起订，可按 12:00 / 18:00 取餐。',
+        '企业团购、部门下午茶、会议用果，电话沟通即可。10 份起订。',
     });
   }
 
   if (pathname === '/api/auth/admin/login' && method === 'POST') {
-    if (body.username === ADMIN_USER && body.password === ADMIN_PASS) {
-      return send(res, 200, { token: signToken({ role: 'admin', username: body.username }), username: body.username });
+    const ip = clientIp(req);
+    const rate = checkAdminLoginRate(ip);
+    if (!rate.ok) {
+      return send(res, 429, { error: rate.error, waitSec: rate.waitSec });
     }
+    const userOk = String(body.username || '') === ADMIN_USER;
+    const passOk = String(body.password || '') === ADMIN_PASS;
+    if (userOk && passOk) {
+      clearAdminLoginFails(ip);
+      return send(res, 200, {
+        token: signToken({ role: 'admin', username: ADMIN_USER }, ADMIN_TOKEN_DAYS),
+        username: ADMIN_USER,
+        expiresInDays: ADMIN_TOKEN_DAYS,
+      });
+    }
+    recordAdminLoginFail(ip);
     return send(res, 401, { error: '账号或密码错误' });
   }
 
@@ -303,6 +404,29 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, campaignInfo());
   }
 
+  if (pathname === '/api/lottery' && method === 'GET') {
+    const db = await load();
+    ensureLottery(db);
+    const user = auth(req);
+    return send(res, 200, lotteryCampaign(db, user && user.userId));
+  }
+
+  if (pathname === '/api/lottery/draw' && method === 'POST') {
+    const user = auth(req);
+    if (!user?.userId) return send(res, 401, { error: '请先登录' });
+    try {
+      const db = await load();
+      ensureLottery(db);
+      const full = (db.users || []).find((u) => u.id === user.userId);
+      if (!full) return send(res, 401, { error: '用户不存在' });
+      const result = drawLottery(db, full);
+      await save(db);
+      return send(res, 200, result);
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '抽奖失败' });
+    }
+  }
+
   if (pathname === '/api/coupons/mine' && method === 'GET') {
     const user = auth(req);
     if (!user?.userId) return send(res, 401, { error: '请先登录' });
@@ -328,8 +452,8 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/promo' && method === 'GET') {
     const user = auth(req);
-    const state = getPromoState();
     const db = await load();
+    const state = getPromoState(Date.now(), db);
     if (user?.userId) {
       state.loyalty = getLoyaltyState(db, {
         userId: user.userId,
@@ -348,7 +472,55 @@ async function handleApi(req, res, pathname) {
         rules: [],
       };
     }
-    return send(res, 200, { ...state, deliveryPoints: listDeliveryPoints(db.settings) });
+    return send(res, 200, {
+      ...state,
+      deliveryPoints: listDeliveryPoints(db.settings),
+      deliveryScopeNote: getDeliveryScopeNote(db.settings),
+    });
+  }
+
+  if (pathname === '/api/wallet/mine' && method === 'GET') {
+    const u = auth(req);
+    if (!u?.userId) return send(res, 401, { error: '请先登录' });
+    const db = await load();
+    const { minePayload } = require('./services/wallet');
+    return send(res, 200, minePayload(db, u.userId));
+  }
+
+  if (pathname === '/api/wallet/recharge' && method === 'POST') {
+    const u = auth(req);
+    if (!u?.userId) return send(res, 401, { error: '请先登录' });
+    try {
+      const db = await load();
+      const user = db.users.find((x) => x.id === u.userId);
+      if (!user) return send(res, 401, { error: '用户不存在' });
+      const { createRecharge } = require('./services/wallet');
+      const recharge = createRecharge(db, user, body.tierId);
+      await save(db);
+      return send(res, 200, { recharge });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '创建充值单失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/wallet' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    const { getConfig } = require('./services/wallet');
+    return send(res, 200, { wallet: getConfig(db) });
+  }
+
+  if (pathname === '/api/admin/wallet' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const { updateConfig } = require('./services/wallet');
+      const wallet = updateConfig(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, wallet });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
   }
 
   if (pathname === '/api/loyalty/mine' && method === 'GET') {
@@ -368,7 +540,8 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/products' && method === 'GET') {
     const db = await load();
-    return send(res, 200, { list: db.products.filter((p) => p.status === 1).sort((a, b) => a.sort - b.sort) });
+    const { listPublicProducts } = require('./services/products');
+    return send(res, 200, { list: listPublicProducts(db) });
   }
 
   if (pathname.startsWith('/api/products/') && method === 'GET') {
@@ -376,16 +549,20 @@ async function handleApi(req, res, pathname) {
     const db = await load();
     const p = db.products.find((x) => x.id === id && x.status === 1);
     if (!p) return send(res, 404, { error: '商品不存在' });
-    return send(res, 200, p);
+    const { withCoverVariants, computeProductSales, withSales } = require('./services/products');
+    return send(res, 200, withCoverVariants(withSales(p, computeProductSales(db))));
   }
 
   if (pathname === '/api/orders/quote' && method === 'POST') {
     const user = auth(req);
     try {
       const quote = await quoteOrder({
+        items: body.items,
         productId: body.productId,
         specId: body.specId,
         extras: body.extras || [],
+        toppingIds: body.toppingIds || [],
+        sideMeal: body.sideMeal || null,
         quantity: body.quantity || 1,
         fulfillmentType: body.fulfillmentType,
         pickupAt: body.pickupAt,
@@ -407,9 +584,12 @@ async function handleApi(req, res, pathname) {
       const order = await createOrder({
         userId: user?.userId,
         openid: user?.openid,
+        items: body.items,
         productId: body.productId,
         specId: body.specId,
         extras: body.extras || [],
+        toppingIds: body.toppingIds || [],
+        sideMeal: body.sideMeal || null,
         quantity: body.quantity || 1,
         remark: body.remark,
         fulfillmentType: body.fulfillmentType,
@@ -463,7 +643,9 @@ async function handleApi(req, res, pathname) {
             : queue.phase === 'making'
               ? '正在制作'
               : queue.phase === 'ready'
-                ? '请取餐'
+                ? o.orderKind === 'retail' || o.skipQueue
+                  ? '成品可取，无需排队'
+                  : '请取餐'
                 : queue.phase === 'reserved'
                   ? `预约 ${o.pickupAtText || '稍后'} 取餐`
                   : queue.title || '',
@@ -510,11 +692,16 @@ async function handleApi(req, res, pathname) {
     const db = await load();
     const now = Date.now();
     const makeBatchId = status === 'making' ? `MB${now}` : null;
+    const toppingIds = Array.isArray(body.toppingIds) ? body.toppingIds : null;
+    const makeToppings =
+      toppingIds != null ? resolveToppingItems(db.toppings, toppingIds) : null;
     const updated = [];
 
+    const { restoreSideMealStock } = require('./services/sideMeals');
     for (const id of ids) {
       const order = db.orders.find((o) => o.id === id);
       if (!order) continue;
+      const prev = order.status;
       order.status = status;
       order.updatedAt = now;
       if (status === 'making') {
@@ -524,9 +711,31 @@ async function handleApi(req, res, pathname) {
         order.makeBatchCodes = ids
           .map((oid) => db.orders.find((x) => x.id === oid)?.pickupCode)
           .filter(Boolean);
+        // 水果捞制作时可多选小料，记到订单上
+        if (makeToppings && isFruitBowlOrder(order)) {
+          order.makeToppings = makeToppings;
+        }
       }
       if (status === 'ready') {
         order.readyAt = now;
+        if (makeToppings && isFruitBowlOrder(order)) {
+          order.makeToppings = makeToppings;
+        }
+        // 请取餐：释放现烤占用，烤盘可再做
+        if (['paid', 'making'].includes(prev)) {
+          try {
+            restoreSideMealStock(db, order);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      if (status === 'cancelled' && prev !== 'cancelled') {
+        try {
+          restoreSideMealStock(db, order);
+        } catch {
+          /* ignore */
+        }
       }
       if (status === 'done') {
         order.doneAt = now;
@@ -580,6 +789,22 @@ async function handleApi(req, res, pathname) {
       }
       if (body.status === 'ready') {
         order.readyAt = Date.now();
+        if (['paid', 'making'].includes(prev)) {
+          try {
+            const { restoreSideMealStock } = require('./services/sideMeals');
+            restoreSideMealStock(db, order);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      if (body.status === 'cancelled' && prev !== 'cancelled') {
+        try {
+          const { restoreSideMealStock } = require('./services/sideMeals');
+          restoreSideMealStock(db, order);
+        } catch {
+          /* ignore */
+        }
       }
       if (body.status === 'done') {
         order.doneAt = Date.now();
@@ -594,6 +819,12 @@ async function handleApi(req, res, pathname) {
       if (!order) return send(res, 404, { error: '订单不存在' });
       if (order.status !== 'pending_pay') return send(res, 400, { error: '仅未支付订单可取消' });
       restoreCouponForOrder(db, order);
+      try {
+        const { restoreSideMealStock } = require('./services/sideMeals');
+        restoreSideMealStock(db, order);
+      } catch {
+        /* ignore */
+      }
       order.status = 'cancelled';
       order.updatedAt = Date.now();
       await save(db);
@@ -617,16 +848,126 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/pay/create' && method === 'POST') {
     const user = auth(req);
     const db = await load();
-    const order = db.orders.find((o) => o.id === body.orderId);
-    if (!order) return send(res, 404, { error: '订单不存在' });
-    if (order.status !== 'pending_pay') return send(res, 400, { error: '订单不可支付' });
-
+    const payChannel = body.payChannel === 'balance' ? 'balance' : 'wechat';
     const clientIp =
       String(req.headers['x-forwarded-for'] || '')
         .split(',')[0]
         .trim() ||
       req.socket.remoteAddress ||
       '127.0.0.1';
+
+    // —— 储值充值单（仅微信，不可余额）——
+    if (body.rechargeId) {
+      const recharge = (db.recharges || []).find((r) => r.id === body.rechargeId);
+      if (!recharge) return send(res, 404, { error: '充值单不存在' });
+      if (recharge.status !== 'pending_pay') return send(res, 400, { error: '充值单不可支付' });
+      if (user?.userId && recharge.userId !== user.userId) {
+        return send(res, 403, { error: '无权支付该充值单' });
+      }
+
+      if (PAY_MODE === 'mock') {
+        const timeStamp = String(Math.floor(Date.now() / 1000));
+        const nonceStr = require('crypto').randomBytes(8).toString('hex');
+        const prepayId = `mock_${recharge.orderNo}`;
+        recharge.prepayId = prepayId;
+        recharge.updatedAt = Date.now();
+        await save(db);
+        return send(res, 200, {
+          mode: 'mock',
+          paid: false,
+          kind: 'recharge',
+          recharge,
+          payment: {
+            timeStamp,
+            nonceStr,
+            package: `prepay_id=${prepayId}`,
+            signType: 'MD5',
+            paySign: 'MOCK_PAY_SIGN',
+          },
+          message: '模拟充值预支付成功',
+        });
+      }
+
+      try {
+        const wechat = require('./services/wechat');
+        const openid = recharge.openid || user?.openid;
+        if (!openid || String(openid).startsWith('dev_')) {
+          return send(res, 400, {
+            error: '当前用户没有真实 openid，请用真机微信登录后再充值',
+          });
+        }
+        if (!recharge.openid) recharge.openid = openid;
+        const { payment, prepayId, mode: mchMode } = await wechat.createJsapiPrepay({
+          orderNo: recharge.orderNo,
+          amountYuan: recharge.payAmount,
+          openid,
+          description: `四季果先-储值${recharge.title}`,
+          clientIp: clientIp.replace('::ffff:', ''),
+        });
+        recharge.prepayId = prepayId;
+        recharge.updatedAt = Date.now();
+        await save(db);
+        return send(res, 200, {
+          mode: 'wechat',
+          paid: false,
+          kind: 'recharge',
+          merchantType: mchMode === 'partner' ? 'partner' : 'enterprise',
+          recharge,
+          payment,
+        });
+      } catch (e) {
+        console.error('pay/create recharge', e);
+        return send(res, e.status || 500, { error: e.message, raw: e.raw });
+      }
+    }
+
+    const order = db.orders.find((o) => o.id === body.orderId);
+    if (!order) return send(res, 404, { error: '订单不存在' });
+    if (order.status !== 'pending_pay') return send(res, 400, { error: '订单不可支付' });
+
+    // —— 整单余额支付（不可与微信混付）——
+    if (payChannel === 'balance') {
+      try {
+        const { getBalance, debit, ensureWallet } = require('./services/wallet');
+        ensureWallet(db);
+        if (!db.settings.wallet.enabled) {
+          return send(res, 400, { error: '储值未开启，请使用微信支付' });
+        }
+        const uid = order.userId || user?.userId;
+        if (!uid) return send(res, 401, { error: '请先登录' });
+        const amount = Number(order.amount) || 0;
+        const bal = getBalance(db, uid);
+        if (bal + 0.001 < amount) {
+          return send(res, 400, {
+            error: `余额不足（¥${bal.toFixed(2)}），请先充值或改用微信支付`,
+            balance: bal,
+          });
+        }
+        debit(db, uid, amount, {
+          type: 'order_pay',
+          orderId: order.id,
+          note: `订单 ${order.orderNo}`,
+        });
+        await save(db);
+        const paid = await markPaid(order.id, {
+          transactionId: `BAL${Date.now()}`,
+          payMode: 'balance',
+          payChannel: 'balance',
+          balancePaid: amount,
+        });
+        const { onOrderPaid } = require('./services/afterPay');
+        await onOrderPaid(paid);
+        return send(res, 200, {
+          mode: 'balance',
+          paid: true,
+          payChannel: 'balance',
+          order: paid,
+          message: '余额支付成功',
+        });
+      } catch (e) {
+        return send(res, e.status || 400, { error: e.message || '余额支付失败' });
+      }
+    }
 
     if (PAY_MODE === 'mock') {
       // 按「企业商户直连」真实链路模拟：下单预支付 → 前端收银台 → confirm 才入账
@@ -635,11 +976,13 @@ async function handleApi(req, res, pathname) {
       const nonceStr = require('crypto').randomBytes(8).toString('hex');
       const prepayId = `mock_${order.orderNo}`;
       order.prepayId = prepayId;
+      order.payChannel = 'wechat';
       order.updatedAt = Date.now();
       await save(db);
       return send(res, 200, {
         mode: 'mock',
         paid: false,
+        payChannel: 'wechat',
         merchantType: 'enterprise', // 目标方案：企业商户直连
         order,
         payment: {
@@ -675,11 +1018,13 @@ async function handleApi(req, res, pathname) {
         clientIp: clientIp.replace('::ffff:', ''),
       });
       order.prepayId = prepayId;
+      order.payChannel = 'wechat';
       order.updatedAt = Date.now();
       await save(db);
       return send(res, 200, {
         mode: 'wechat',
         paid: false,
+        payChannel: 'wechat',
         merchantType: mchMode === 'partner' ? 'partner' : 'enterprise',
         order,
         payment,
@@ -703,7 +1048,20 @@ async function handleApi(req, res, pathname) {
         return send(res, 200, wechat.notifySuccessXml(), { 'Content-Type': 'text/xml' });
       }
       const db = await load();
-      const order = db.orders.find((o) => o.orderNo === data.out_trade_no);
+      const outTradeNo = data.out_trade_no;
+      const recharge = (db.recharges || []).find((r) => r.orderNo === outTradeNo);
+      if (recharge) {
+        if (recharge.status === 'pending_pay') {
+          const { markRechargePaid } = require('./services/wallet');
+          markRechargePaid(db, recharge.id, {
+            transactionId: data.transaction_id,
+            payMode: 'wechat',
+          });
+          await save(db);
+        }
+        return send(res, 200, wechat.notifySuccessXml(), { 'Content-Type': 'text/xml' });
+      }
+      const order = db.orders.find((o) => o.orderNo === outTradeNo);
       if (!order) {
         return send(res, 200, wechat.notifyFailXml('ORDER'), { 'Content-Type': 'text/xml' });
       }
@@ -711,6 +1069,7 @@ async function handleApi(req, res, pathname) {
         const paid = await markPaid(order.id, {
           transactionId: data.transaction_id,
           payMode: 'wechat',
+          payChannel: 'wechat',
         });
         const { onOrderPaid } = require('./services/afterPay');
         await onOrderPaid(paid);
@@ -724,11 +1083,43 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/pay/confirm' && method === 'POST') {
     const db = await load();
+
+    // 充值确认
+    if (body.rechargeId) {
+      let recharge = (db.recharges || []).find((r) => r.id === body.rechargeId);
+      if (!recharge) return send(res, 404, { error: '充值单不存在' });
+      if (recharge.status === 'pending_pay' && PAY_MODE === 'mock') {
+        const { markRechargePaid } = require('./services/wallet');
+        markRechargePaid(db, recharge.id, { payMode: 'mock' });
+        await save(db);
+      }
+      if (recharge.status === 'pending_pay' && PAY_MODE === 'wechat') {
+        try {
+          const wechat = require('./services/wechat');
+          const q = await wechat.queryOrder(recharge.orderNo);
+          if (q.return_code === 'SUCCESS' && q.result_code === 'SUCCESS' && q.trade_state === 'SUCCESS') {
+            const { markRechargePaid } = require('./services/wallet');
+            markRechargePaid(db, recharge.id, {
+              transactionId: q.transaction_id,
+              payMode: 'wechat',
+            });
+            await save(db);
+          }
+        } catch (e) {
+          console.warn('pay/confirm recharge query', e.message);
+        }
+      }
+      recharge = (await load()).recharges.find((r) => r.id === body.rechargeId) || recharge;
+      const { getBalance } = require('./services/wallet');
+      const balance = getBalance(await load(), recharge.userId);
+      return send(res, 200, { recharge, balance });
+    }
+
     let order = db.orders.find((o) => o.id === body.orderId);
     if (!order) return send(res, 404, { error: '订单不存在' });
 
     if (order.status === 'pending_pay' && PAY_MODE === 'mock') {
-      order = await markPaid(order.id, { payMode: 'mock' });
+      order = await markPaid(order.id, { payMode: 'mock', payChannel: 'wechat' });
       const { onOrderPaid } = require('./services/afterPay');
       await onOrderPaid(order);
     }
@@ -742,6 +1133,7 @@ async function handleApi(req, res, pathname) {
           order = await markPaid(order.id, {
             transactionId: q.transaction_id,
             payMode: 'wechat',
+            payChannel: 'wechat',
           });
           const { onOrderPaid } = require('./services/afterPay');
           await onOrderPaid(order);
@@ -760,7 +1152,10 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/admin/delivery' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
     const db = await load();
-    return send(res, 200, { points: listDeliveryPoints(db.settings) });
+    return send(res, 200, {
+      points: listDeliveryPoints(db.settings),
+      scopeNote: getDeliveryScopeNote(db.settings),
+    });
   }
 
   if (pathname === '/api/admin/delivery' && method === 'PUT') {
@@ -770,6 +1165,27 @@ async function handleApi(req, res, pathname) {
       db.settings = applyDeliverySettings(db.settings, body.points);
       await save(db);
       return send(res, 200, { ok: true, points: listDeliveryPoints(db.settings) });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/reserve-categories' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, {
+      categories: ALL_PRODUCT_CATEGORIES,
+      enabled: getReserveCategories(db),
+    });
+  }
+
+  if (pathname === '/api/admin/reserve-categories' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const enabled = setReserveCategories(db, body?.enabled || body?.categories || []);
+      await save(db);
+      return send(res, 200, { ok: true, categories: ALL_PRODUCT_CATEGORIES, enabled });
     } catch (e) {
       return send(res, e.status || 400, { error: e.message || '保存失败' });
     }
@@ -797,13 +1213,145 @@ async function handleApi(req, res, pathname) {
     });
   }
 
+  if (pathname === '/api/admin/reports/sales' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const { salesReport } = require('./services/reports');
+    const groupBy = url.searchParams.get('groupBy') === 'month' ? 'month' : 'day';
+    return send(
+      res,
+      200,
+      salesReport(db, {
+        from: url.searchParams.get('from') || undefined,
+        to: url.searchParams.get('to') || undefined,
+        month: url.searchParams.get('month') || undefined,
+        groupBy,
+      })
+    );
+  }
+
+  if (pathname === '/api/admin/purchases' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    const { listPurchases } = require('./services/purchases');
+    return send(res, 200, { list: listPurchases(db) });
+  }
+
+  if (pathname === '/api/admin/purchases' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const { createPurchase } = require('./services/purchases');
+      const purchase = createPurchase(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, purchase });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  {
+    const m = pathname.match(/^\/api\/admin\/purchases\/([^/]+)$/);
+    if (m && method === 'PUT') {
+      if (!requireAdmin(req, res)) return;
+      try {
+        const db = await load();
+        const { updatePurchase } = require('./services/purchases');
+        const purchase = updatePurchase(db, decodeURIComponent(m[1]), body || {});
+        await save(db);
+        return send(res, 200, { ok: true, purchase });
+      } catch (e) {
+        return send(res, e.status || 400, { error: e.message || '更新失败' });
+      }
+    }
+    if (m && method === 'DELETE') {
+      if (!requireAdmin(req, res)) return;
+      try {
+        const db = await load();
+        const { removePurchase } = require('./services/purchases');
+        removePurchase(db, decodeURIComponent(m[1]));
+        await save(db);
+        return send(res, 200, { ok: true });
+      } catch (e) {
+        return send(res, e.status || 400, { error: e.message || '删除失败' });
+      }
+    }
+  }
+
   if (pathname === '/api/admin/users' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
     const db = await load();
     const url = new URL(req.url, `http://${req.headers.host}`);
     const segment = url.searchParams.get('segment') || 'all';
     const activeDays = Number(url.searchParams.get('activeDays') || 0) || undefined;
-    return send(res, 200, listUsersWithActivity(db, { segment, activeDays }));
+    const q = url.searchParams.get('q') || '';
+    const page = url.searchParams.get('page');
+    const pageSize = url.searchParams.get('pageSize');
+    return send(
+      res,
+      200,
+      listUsersWithActivity(db, {
+        segment,
+        activeDays,
+        q,
+        page: page != null && page !== '' ? Number(page) : undefined,
+        pageSize: pageSize != null && pageSize !== '' ? Number(pageSize) : undefined,
+      })
+    );
+  }
+
+  {
+    const m = pathname.match(/^\/api\/admin\/users\/([^/]+)(?:\/(balance))?$/);
+    if (m) {
+      const userId = decodeURIComponent(m[1]);
+      const action = m[2] || '';
+      if (method === 'GET' && !action) {
+        if (!requireAdmin(req, res)) return;
+        try {
+          const db = await load();
+          return send(res, 200, getUserAdminDetail(db, userId));
+        } catch (e) {
+          return send(res, e.status || 400, { error: e.message || '查询失败' });
+        }
+      }
+      if (method === 'PUT' && !action) {
+        if (!requireAdmin(req, res)) return;
+        try {
+          const db = await load();
+          const detail = updateUserAdmin(db, userId, body || {});
+          await save(db);
+          return send(res, 200, { ok: true, ...detail });
+        } catch (e) {
+          return send(res, e.status || 400, { error: e.message || '保存失败' });
+        }
+      }
+      if (method === 'POST' && action === 'balance') {
+        if (!requireAdmin(req, res)) return;
+        // 安全策略：禁止后台手工调余额，余额仅允许顾客充值/消费入账
+        return send(res, 403, {
+          error: '已禁止后台调整会员余额。余额仅可通过顾客充值或消费变动；如需纠错请走线下登记后由技术处理。',
+        });
+      }
+    }
+  }
+
+  if (pathname === '/api/admin/coupons/off15-3-scope' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, getOff15_3ScopePublic(db));
+  }
+
+  if (pathname === '/api/admin/coupons/off15-3-scope' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const scope = updateOff15_3Scope(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, ...scope });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
   }
 
   if (pathname === '/api/admin/coupons/grant' && method === 'POST') {
@@ -829,6 +1377,7 @@ async function handleApi(req, res, pathname) {
         threshold: body.threshold,
         fulfillment: body.fulfillment,
         count: body.count,
+        allowedProductIds: body.allowedProductIds,
       });
       await save(db);
       return send(res, 200, {
@@ -840,6 +1389,60 @@ async function handleApi(req, res, pathname) {
     } catch (e) {
       return send(res, e.status || 400, { error: e.message || '发券失败' });
     }
+  }
+
+  if (pathname === '/api/admin/lottery' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, lotteryAdminStats(db));
+  }
+
+  if (pathname === '/api/admin/lottery' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      ensureLottery(db);
+      const lottery = updateLottery(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, lottery, stats: lotteryAdminStats(db) });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/toppings' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, {
+      list: Array.isArray(db.toppings) ? db.toppings : [],
+      active: listActiveToppings(db.toppings),
+    });
+  }
+
+  if (pathname === '/api/admin/toppings' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      db.toppings = normalizeToppings(body.list || body.toppings || []);
+      await save(db);
+      return send(res, 200, { ok: true, list: db.toppings });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/toppings' && method === 'GET') {
+    const db = await load();
+    return send(res, 200, { list: listPublicToppings(db.toppings) });
+  }
+
+  if (pathname === '/api/side-meal' && method === 'GET') {
+    const db = await load();
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const category = url.searchParams.get('category') || '';
+    const { publicSideMeal, ensureSideMeal } = require('./services/sideMeals');
+    ensureSideMeal(db);
+    return send(res, 200, publicSideMeal(db, category));
   }
 
   if (pathname === '/api/admin/orders' && method === 'GET') {
@@ -855,7 +1458,12 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/admin/products' && method === 'GET') {
     if (!requireAdmin(req, res)) return;
-    return send(res, 200, { list: (await load()).products });
+    const db = await load();
+    const { listAdminProducts, getProductOrderMap } = require('./services/products');
+    return send(res, 200, {
+      list: listAdminProducts(db),
+      productOrder: getProductOrderMap(db),
+    });
   }
 
   /** 可选商品封面图（菜单素材库） */
@@ -888,6 +1496,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/admin/products' && method === 'POST') {
     if (!requireAdmin(req, res)) return;
     const db = await load();
+    const sortNum = Number(body.sort);
     const product = {
       id: crypto.randomUUID(),
       name: body.name || '未命名果切',
@@ -895,14 +1504,51 @@ async function handleApi(req, res, pathname) {
       cover: body.cover || '/uploads/demo-mix.svg',
       category: body.category || '经典果切',
       status: body.status == null ? 1 : Number(body.status),
-      sort: Number(body.sort) || db.products.length + 1,
+      sort: Number.isFinite(sortNum) ? sortNum : 100,
       specs: body.specs || [{ id: 'm', name: '中杯', price: 18.9, stock: 999 }],
       extras: body.extras || [],
       createdAt: Date.now(),
     };
     db.products.push(product);
+    // 若该分类已有手动顺序，新商品追加到末尾
+    try {
+      const { getProductOrderMap } = require('./services/products');
+      const orderMap = getProductOrderMap(db);
+      const cat = product.category;
+      if (Array.isArray(orderMap[cat]) && orderMap[cat].length) {
+        if (!db.settings.productOrder) db.settings.productOrder = {};
+        db.settings.productOrder[cat] = [...orderMap[cat].filter((id) => id !== product.id), product.id];
+        product.sort = db.settings.productOrder[cat].length * 10;
+      }
+    } catch {
+      /* ignore */
+    }
     await save(db);
     return send(res, 200, { product });
+  }
+
+  if (pathname === '/api/admin/products/reorder' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const { saveCategoryProductOrder, listAdminProducts, getProductOrderMap } = require('./services/products');
+      const category = String(body.category || '').trim();
+      if (!category) return send(res, 400, { error: '请指定分类后再保存顺序' });
+      const mode = body.mode === 'sales' ? 'sales' : 'manual';
+      const result =
+        mode === 'sales'
+          ? saveCategoryProductOrder(db, category, null)
+          : saveCategoryProductOrder(db, category, Array.isArray(body.ids) ? body.ids : []);
+      await save(db);
+      return send(res, 200, {
+        ok: true,
+        ...result,
+        list: listAdminProducts(db),
+        productOrder: getProductOrderMap(db),
+      });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存顺序失败' });
+    }
   }
 
   const adminProduct = pathname.match(/^\/api\/admin\/products\/([^/]+)$/);
@@ -912,7 +1558,15 @@ async function handleApi(req, res, pathname) {
     const idx = db.products.findIndex((p) => p.id === adminProduct[1]);
     if (idx < 0) return send(res, 404, { error: '商品不存在' });
     if (method === 'PUT') {
-      db.products[idx] = { ...db.products[idx], ...body, id: db.products[idx].id };
+      const prev = db.products[idx];
+      const next = { ...prev, ...body, id: prev.id };
+      if (body.sort != null && body.sort !== '') {
+        const s = Number(body.sort);
+        next.sort = Number.isFinite(s) ? s : prev.sort;
+      }
+      // 销量由订单统计，不允许手改覆盖
+      delete next.sales;
+      db.products[idx] = next;
       await save(db);
       return send(res, 200, { product: db.products[idx] });
     }
@@ -920,6 +1574,31 @@ async function handleApi(req, res, pathname) {
       db.products[idx].status = 0;
       await save(db);
       return send(res, 200, { ok: true });
+    }
+  }
+
+  if (pathname === '/api/admin/side-meal' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    const { ensureSideMeal, DEFAULT_SIDE_MEAL } = require('./services/sideMeals');
+    const { ALL_PRODUCT_CATEGORIES } = require('./services/promo');
+    return send(res, 200, {
+      sideMeal: ensureSideMeal(db),
+      defaults: DEFAULT_SIDE_MEAL,
+      categories: ALL_PRODUCT_CATEGORIES,
+    });
+  }
+
+  if (pathname === '/api/admin/side-meal' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const { saveSideMealConfig } = require('./services/sideMeals');
+      const sideMeal = saveSideMealConfig(db, body.sideMeal || body);
+      await save(db);
+      return send(res, 200, { ok: true, sideMeal });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
     }
   }
 
@@ -1022,6 +1701,20 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // 进货发票上传 + OCR 预填
+    if (pathname === '/api/admin/purchases/invoice-upload' && req.method === 'POST') {
+      if (!requireAdmin(req, res)) return;
+      try {
+        const buf = await readBuffer(req, 12 * 1024 * 1024);
+        if (!buf.length) return send(res, 400, { error: '空文件' });
+        const { uploadAndParseInvoice } = require('./services/purchases');
+        const result = await uploadAndParseInvoice(buf, req.headers['content-type']);
+        return send(res, 200, { ok: true, ...result });
+      } catch (e) {
+        return send(res, e.status || 500, { error: e.message || '上传失败' });
+      }
+    }
+
     // 视频二进制上传（勿走 JSON body）— 支持 makeBatchId 或 orderId（手机拍摄上传）
     if (pathname === '/api/admin/videos/upload' && req.method === 'POST') {
       if (!requireAdmin(req, res)) return;
@@ -1098,7 +1791,9 @@ ensure()
 server.listen(PORT, () => {
   console.log(`四季果先 API 已启动: http://localhost:${PORT}`);
   console.log(`管理端: http://localhost:${PORT}/admin/`);
-  console.log(`账号: ${ADMIN_USER} / ${ADMIN_PASS}  支付模式: ${PAY_MODE}`);
+  console.log(
+    `管理账号: ${ADMIN_USER}（密码已隐藏）· token ${ADMIN_TOKEN_DAYS} 天 · 登录失败 ${ADMIN_LOGIN_MAX_FAILS} 次 / ${Math.round(ADMIN_LOGIN_WINDOW_MS / 60000)} 分钟锁定 · 支付: ${PAY_MODE}`
+  );
 });
   })
   .catch((e) => {

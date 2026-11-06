@@ -18,9 +18,9 @@
         <h1>门店管理端</h1>
         <p class="muted">手机接单 · 出码 · 打印贴纸</p>
         <label>账号</label>
-        <input id="username" value="admin" autocomplete="username" />
+        <input id="username" value="" autocomplete="username" placeholder="账号" />
         <label>密码</label>
-        <input id="password" type="password" value="admin123" autocomplete="current-password" />
+        <input id="password" type="password" value="" autocomplete="current-password" placeholder="密码" />
         <button id="loginBtn" class="btn primary">登录</button>
         <p id="loginError" class="error"></p>
       </div>
@@ -40,8 +40,16 @@
           <button type="button" data-tab="dashboard" class="nav active">今日概览</button>
           <button type="button" data-tab="orders" class="nav">订单 / 打印</button>
           <button type="button" data-tab="products" class="nav">商品规格</button>
+          <button type="button" data-tab="toppings" class="nav">小料</button>
+          <button type="button" data-tab="sidemeal" class="nav">小食设置</button>
           <button type="button" data-tab="delivery" class="nav">配送费</button>
-          <button type="button" data-tab="users" class="nav">用户 / 发券</button>
+          <button type="button" data-tab="reserve" class="nav">预定分类</button>
+          <button type="button" data-tab="users" class="nav">会员</button>
+          <button type="button" data-tab="coupons" class="nav">发券</button>
+          <button type="button" data-tab="lottery" class="nav">开业抽奖</button>
+          <button type="button" data-tab="wallet" class="nav">储值</button>
+          <button type="button" data-tab="reports" class="nav">报表</button>
+          <button type="button" data-tab="purchases" class="nav">进货</button>
           <button type="button" data-tab="verify" class="nav">查单</button>
           <button type="button" data-tab="hardware" class="nav">打印 / 标签</button>
         </nav>
@@ -68,6 +76,21 @@
 
         <div id="tab-dashboard" class="tab">
           <div class="stats" id="stats"></div>
+          <div class="panel" id="dashSideMealPanel">
+            <h3>现烤小食 · 当前剩余</h3>
+            <p class="muted" style="margin:0 0 10px">含现烤小食的订单<strong>支付后 −1</strong>；点<strong>请取餐</strong>或取消后 +1。烤好多了可手动 +5/+10。为 0 时结算页暂不展示。</p>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <input id="dash_sm_stock" type="number" min="0" step="1" placeholder="例如 20" style="width:120px;font-size:18px;font-weight:700" />
+              <button type="button" class="btn primary sm" id="dashSmStockAdd5" title="又烤好一批">+5</button>
+              <button type="button" class="btn primary sm" id="dashSmStockAdd10">+10</button>
+              <button type="button" class="btn sm" id="dashSmStockZero">清零</button>
+              <label class="switch" style="font-weight:600">
+                <input type="checkbox" id="dash_sm_unlimited" />
+                <span>不限量</span>
+              </label>
+              <span id="dash_sm_status" class="muted"></span>
+            </div>
+          </div>
           <div class="panel">
             <h3>待制作订单</h3>
             <div class="batch-bar">
@@ -99,16 +122,70 @@
         </div>
 
         <div id="tab-products" class="tab hidden">
-          <div class="toolbar">
-            <button type="button" id="addProductBtn" class="btn primary">新增果切</button>
+          <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+            <button type="button" id="addProductBtn" class="btn primary">新增商品</button>
+            <button type="button" id="saveProductOrderBtn" class="btn primary" disabled>保存顺序</button>
+            <button type="button" id="previewSalesOrderBtn" class="btn">预览按销量</button>
+            <button type="button" id="resetSalesOrderBtn" class="btn">恢复默认按销量</button>
+            <span class="muted" id="productOrderHint" style="font-size:12px">先选分类 → 拖拽或上移/下移 → 点「保存顺序」</span>
+          </div>
+          <div class="product-cat-tabs" id="productCatTabs" role="tablist" aria-label="商品分类">
+            <button type="button" class="cat-tab on" data-cat="">全部</button>
+            <button type="button" class="cat-tab" data-cat="果切系列">果切系列</button>
+            <button type="button" class="cat-tab" data-cat="水果零售">水果零售</button>
+            <button type="button" class="cat-tab" data-cat="水果捞">水果捞</button>
+            <button type="button" class="cat-tab" data-cat="热果奶">热果奶</button>
+            <button type="button" class="cat-tab" data-cat="经典热饮">经典热饮</button>
           </div>
           <div id="productTable" class="table-wrap"></div>
+        </div>
+
+        <div id="tab-toppings" class="tab hidden">
+          <div class="panel">
+            <h3>小料维护</h3>
+            <p class="muted">供水果捞制作台多选；名称、规格、价格可改。下架后制作台不再显示。</p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+              <button type="button" class="btn primary" id="addToppingBtn">新增小料</button>
+              <button type="button" class="btn primary" id="saveToppingsBtn">保存全部</button>
+              <button type="button" class="btn" id="reloadToppingsBtn">刷新</button>
+            </div>
+            <div id="toppingsTable" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="tab-sidemeal" class="tab hidden">
+          <div class="panel">
+            <h3>小食设置 · 现烤加购</h3>
+            <p class="muted">小程序<strong>结算页</strong>可选加购：现烤蛋白一份 + 主食。优惠价为实收，原价划线（原价需 ≥ 优惠价）。仅勾选的适用分类会显示；纯「水果零售」不显示。</p>
+            <label class="switch" style="margin:14px 0;font-size:15px;color:var(--text,#1f2a1f);font-weight:600">
+              <input type="checkbox" id="sm_enabled" />
+              <span>开启小食加购</span>
+            </label>
+            <p id="sm_status" class="muted" style="margin:-4px 0 12px"></p>
+            <label>标题</label>
+            <input id="sm_title" placeholder="加一份现烤小食" />
+            <label>副标题</label>
+            <input id="sm_subtitle" placeholder="现烤鸡胸 + 蜜薯，出炉现热 · 配果切刚好" />
+            <p class="muted" style="margin:12px 0 0">当前剩余份数请在<strong>今日概览</strong>页调整（方便烤完随时加减）。</p>
+            <label style="margin-top:12px;display:block">适用商品分类</label>
+            <div id="sm_categories" class="reserve-cat-list" style="margin-top:8px"></div>
+            <h4 style="margin:16px 0 8px;font-size:14px">蛋白选项</h4>
+            <div id="sm_proteins" class="table-wrap"></div>
+            <button type="button" class="btn sm" id="addSmProteinBtn" style="margin-top:8px">＋ 添加蛋白</button>
+            <h4 style="margin:16px 0 8px;font-size:14px">主食选项</h4>
+            <div id="sm_carbs" class="table-wrap"></div>
+            <button type="button" class="btn sm" id="addSmCarbBtn" style="margin-top:8px">＋ 添加主食</button>
+            <div class="toolbar" style="margin-top:16px;gap:8px">
+              <button type="button" class="btn primary" id="saveSideMealBtn">保存小食设置</button>
+              <button type="button" class="btn" id="reloadSideMealBtn">刷新</button>
+            </div>
+          </div>
         </div>
 
         <div id="tab-delivery" class="tab hidden">
           <div class="panel">
             <h3>送达点 / 配送费</h3>
-            <p class="muted">顾客下单时自行选择；此处只改名称与费用。到店取费用固定为 0。</p>
+            <p class="muted">仅配送机器人产业园园区内。顾客下单时自行选择；此处只改名称与费用。到店取费用固定为 0。</p>
             <div id="deliveryList" class="delivery-list"></div>
             <div class="toolbar" style="margin-top:12px">
               <button type="button" id="saveDeliveryBtn" class="btn primary">保存配送配置</button>
@@ -116,14 +193,65 @@
           </div>
         </div>
 
+        <div id="tab-reserve" class="tab hidden">
+          <div class="panel">
+            <h3>预定分类</h3>
+            <p class="muted">
+              勾选的大分类可在小程序选「提前预定」（11:40 / 12:00 · 17:40 / 18:00，照顾下班早晚）并使用预定券。
+              零售等成品请勿勾选，顾客只能现取。
+            </p>
+            <div id="reserveCategoryList" class="reserve-cat-list" style="margin-top:12px"></div>
+            <div class="toolbar" style="margin-top:12px;gap:8px">
+              <button type="button" id="saveReserveBtn" class="btn primary">保存预定分类</button>
+              <button type="button" id="reloadReserveBtn" class="btn">刷新</button>
+            </div>
+          </div>
+        </div>
+
         <div id="tab-users" class="tab hidden">
           <div class="stats" id="userStats"></div>
+          <div class="panel">
+            <h3>会员维护</h3>
+            <p class="muted">可搜索、改昵称/手机/备注。会员余额不可在后台手工调整，仅充值/消费自动入账。</p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+              <input id="userSearch" placeholder="搜手机 / 昵称 / 备注" style="min-width:200px" />
+              <button type="button" class="btn" id="searchUsersBtn">搜索</button>
+              <button type="button" class="btn" id="reloadUsersBtn">刷新</button>
+              <label>每页
+                <select id="userPageSize">
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </label>
+            </div>
+            <div id="userTable" class="table-wrap" style="margin-top:12px"></div>
+            <div id="userPager" class="pager" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="tab-coupons" class="tab hidden">
+          <div class="stats" id="couponUserStats"></div>
           <div class="panel">
             <h3>按活跃度发券</h3>
             <p class="muted">
               活跃 = 近 <span id="activeDaysLabel">14</span> 天内有支付订单；不活跃 = 更久未下单或从未下单。
               券发到用户<strong>小程序券包</strong>，不会自动进微信卡包，也不会微信推送（除非另配订阅消息）。
             </p>
+            <div style="margin:0 0 14px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:10px">
+              <h4 style="margin:0 0 8px;font-size:14px">满15减3 · 限定商品</h4>
+              <p class="muted" style="margin:0 0 8px" id="off153Hint">配置后，满15减3 仅可用于指定一款水果捞 + 一款果切。</p>
+              <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+                <label>水果捞
+                  <select id="off153Bowl" style="min-width:160px"></select>
+                </label>
+                <label>果切
+                  <select id="off153Cut" style="min-width:160px"></select>
+                </label>
+                <button type="button" class="btn primary" id="saveOff153Btn">保存限定</button>
+                <button type="button" class="btn" id="presetOff153Btn" title="门槛15 / 面额3">填入发券：满15减3</button>
+              </div>
+            </div>
             <div class="toolbar" style="flex-wrap:wrap;gap:8px">
               <label>人群
                 <select id="userSegment">
@@ -153,18 +281,110 @@
                   <option value="reserve">仅预定</option>
                 </select>
               </label>
-              <button type="button" class="btn" id="reloadUsersBtn">刷新列表</button>
+              <button type="button" class="btn" id="reloadCouponUsersBtn">刷新预览</button>
               <button type="button" class="btn primary" id="grantCouponsBtn">给当前人群发券</button>
             </div>
-            <div id="userTable" class="table-wrap" style="margin-top:12px"></div>
+            <div id="couponUserTable" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="tab-lottery" class="tab hidden">
+          <div class="panel">
+            <h3>开业抽奖配置</h3>
+            <p class="muted">
+              默认关闭，不上线。下方「权重」可改中奖概率（按权重占比换算，不必凑满 100）。折券限原价≤30 元。测试期可反复抽；正式上线前记得关测试并限每人一次。
+            </p>
+            <p class="muted" id="lotteryEnableHint" style="margin:8px 0 0">必须勾选「开启活动」并点保存，仅改日期不会上线。</p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center">
+              <label class="switch"><input type="checkbox" id="lotteryEnabled" /> <span>开启活动</span></label>
+              <label>开始日 <input id="lotteryStart" type="date" /></label>
+              <label>结束日 <input id="lotteryEnd" type="date" /></label>
+              <label>券有效天数 <input id="lotteryValidDays" type="number" min="1" max="365" value="30" style="width:72px" /></label>
+              <label>标题 <input id="lotteryTitle" style="width:140px" /></label>
+              <button type="button" class="btn primary" id="saveLotteryBtn">保存配置</button>
+              <button type="button" class="btn" id="reloadLotteryBtn">刷新</button>
+            </div>
+            <pre id="lotteryStats" class="muted" style="margin-top:12px;white-space:pre-wrap"></pre>
+            <div id="lotteryPrizeTable" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="tab-wallet" class="tab hidden">
+          <div class="panel">
+            <h3>储值档位</h3>
+            <p class="muted">
+              顾客微信支付实付「本金」，到账本金+赠金。点餐只能整单余额或整单微信，不可混付。
+            </p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center">
+              <label class="switch"><input type="checkbox" id="walletEnabled" /> <span>开启储值</span></label>
+              <button type="button" class="btn" id="addWalletTierBtn">加一档</button>
+              <button type="button" class="btn primary" id="saveWalletBtn">保存</button>
+              <button type="button" class="btn" id="reloadWalletBtn">刷新</button>
+            </div>
+            <div id="walletTierTable" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="tab-reports" class="tab hidden">
+          <div class="panel">
+            <h3>销售报表</h3>
+            <p class="muted">按上海时区汇总已支付订单；支持按日 / 按月查看支付方式与商品拆分。</p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center">
+              <label class="switch"><input type="radio" name="reportGroup" value="day" checked /> <span>按日</span></label>
+              <label class="switch"><input type="radio" name="reportGroup" value="month" /> <span>按月</span></label>
+              <label>从 <input id="reportFrom" type="date" /></label>
+              <label>到 <input id="reportTo" type="date" /></label>
+              <label>月份 <input id="reportMonth" type="month" /></label>
+              <button type="button" class="btn primary" id="loadReportBtn">查询</button>
+              <button type="button" class="btn" id="reportLast7Btn">近 7 天</button>
+              <button type="button" class="btn" id="reportThisMonthBtn">本月</button>
+              <button type="button" class="btn" id="reportLast6MonthsBtn">近 6 月</button>
+            </div>
+            <div id="reportSummary" class="stats report-summary" style="margin-top:14px"></div>
+            <div id="reportDays" class="report-days" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="tab-purchases" class="tab hidden">
+          <div class="panel">
+            <h3>进货台账</h3>
+            <p class="muted">可上传发票识别预填（需配置 OCR 密钥），也可纯手动录入；保存前均可改。</p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center">
+              <button type="button" class="btn primary" id="purchaseManualBtn">手动新增</button>
+              <button type="button" class="btn" id="purchaseInvoiceBtn">上传发票</button>
+              <input type="file" id="purchaseInvoiceFile" accept="image/*,application/pdf" class="hidden" />
+              <button type="button" class="btn" id="reloadPurchasesBtn">刷新</button>
+            </div>
+            <div id="purchaseList" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+          <div id="purchaseEditor" class="panel purchase-editor hidden" style="margin-top:14px">
+            <h3 id="purchaseEditorTitle">进货单</h3>
+            <p id="purchaseOcrHint" class="muted"></p>
+            <div class="purchase-form">
+              <label>日期 <input id="pu_date" type="date" /></label>
+              <label>供应商 <input id="pu_supplier" /></label>
+              <label>税号 <input id="pu_taxNo" /></label>
+              <label>发票号 <input id="pu_invoiceNo" /></label>
+              <label>金额(价税合计) <input id="pu_amount" type="number" step="0.01" min="0" /></label>
+              <label>税额 <input id="pu_taxAmount" type="number" step="0.01" min="0" /></label>
+              <label class="full">备注 <input id="pu_note" /></label>
+              <label class="full">明细(每行：品名,数量,单位,金额)
+                <textarea id="pu_items" rows="4" placeholder="西瓜,10,kg,120"></textarea>
+              </label>
+              <div id="pu_invoicePreview" class="invoice-preview muted"></div>
+            </div>
+            <div class="toolbar" style="margin-top:12px;gap:8px">
+              <button type="button" class="btn primary" id="savePurchaseBtn">保存进货单</button>
+              <button type="button" class="btn ghost" id="cancelPurchaseBtn">取消</button>
+            </div>
           </div>
         </div>
 
         <div id="tab-verify" class="tab hidden">
           <div class="panel verify-panel">
             <h3>查取餐码</h3>
-            <p class="muted">正常不用核销。果切递出柜台，或放进外卖柜时，点一次「请取餐」或「已放入柜」即可。这里只在对不上号时查询；放了两小时还没取，会自动记为已取餐。</p>
-            <input id="verifyInput" placeholder="取餐码 / 扫码内容" inputmode="text" autocomplete="off" />
+            <p class="muted">正常不用核销。果切递出柜台，或放进外卖柜时，点一次「请取餐」或「已放入柜」即可。顾客报号对不上时在此查询；放了两小时还没取，会自动记为已取餐。</p>
+            <input id="verifyInput" placeholder="取餐号 如 A001" inputmode="text" autocomplete="off" />
             <button type="button" id="verifyBtn" class="btn primary">顾客已取走</button>
             <pre id="verifyResult"></pre>
           </div>
@@ -284,10 +504,35 @@
         <button type="button" data-tab="orders" class="nav"><span class="ico">单</span><span>订单</span></button>
         <button type="button" data-tab="verify" class="nav"><span class="ico">查</span><span>查单</span></button>
         <button type="button" data-tab="products" class="nav"><span class="ico">品</span><span>商品</span></button>
+        <button type="button" data-tab="sidemeal" class="nav"><span class="ico">食</span><span>小食</span></button>
         <button type="button" data-tab="delivery" class="nav"><span class="ico">配</span><span>配送</span></button>
       </nav>
     </section>
   </div>
+
+  <!-- 会员编辑弹窗 -->
+  <dialog id="userDialog">
+    <form method="dialog" id="userForm" class="user-form">
+      <h3>会员资料</h3>
+      <input type="hidden" id="u_id" />
+      <div class="purchase-form">
+        <label>昵称 <input id="u_nickName" required /></label>
+        <label>手机 <input id="u_phone" inputmode="tel" placeholder="11 位手机号" /></label>
+        <label class="full">备注 <input id="u_note" placeholder="店内备注，顾客不可见" /></label>
+      </div>
+      <p class="muted" id="u_meta" style="margin:10px 0"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">关闭</button>
+        <button type="button" id="saveUserBtn" class="btn primary">保存资料</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--line);margin:14px 0" />
+      <p class="muted" style="margin:0 0 8px;color:#e65100;font-weight:600">已禁止后台调余额（防盗用）。余额只随顾客充值/消费变化，流水只读。</p>
+      <h4 style="margin:16px 0 8px;font-size:14px">最近流水</h4>
+      <div id="u_ledger" class="table-wrap"></div>
+      <h4 style="margin:16px 0 8px;font-size:14px">优惠券</h4>
+      <div id="u_coupons" class="table-wrap"></div>
+    </form>
+  </dialog>
 
   <!-- 商品编辑弹窗 -->
   <dialog id="productDialog">
@@ -296,10 +541,17 @@
       <input type="hidden" id="p_id" />
       <label>名称</label>
       <input id="p_name" required />
-      <label>分类</label>
-      <input id="p_category" />
+      <label>类型</label>
+      <select id="p_category" required>
+        <option value="果切系列">果切系列</option>
+        <option value="水果零售">水果零售</option>
+        <option value="水果捞">水果捞</option>
+        <option value="热果奶">热果奶</option>
+        <option value="经典热饮">经典热饮</option>
+      </select>
       <label>简介</label>
       <textarea id="p_desc" rows="2"></textarea>
+      <p class="muted" id="p_sales_hint" style="margin:4px 0 8px;font-size:12px"></p>
       <label>商品图片</label>
       <div class="cover-editor">
         <img id="p_cover_preview" class="cover-preview" alt="封面预览" />
@@ -313,9 +565,11 @@
         </div>
       </div>
       <div id="coverGallery" class="cover-gallery hidden"></div>
-      <label>规格 JSON（id/name/price）</label>
-      <textarea id="p_specs" rows="4"></textarea>
-      <label>加料 JSON</label>
+      <label>规格</label>
+      <div id="p_specs_editor" class="specs-editor"></div>
+      <button type="button" class="btn sm" id="addSpecBtn" style="margin:6px 0 12px">＋ 添加规格</button>
+      <textarea id="p_specs" class="hidden" rows="1" aria-hidden="true"></textarea>
+      <label>加料 JSON（可选）</label>
       <textarea id="p_extras" rows="3"></textarea>
       <div class="dialog-actions">
         <button value="cancel" class="btn">取消</button>

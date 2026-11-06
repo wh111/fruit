@@ -1,7 +1,7 @@
 <view class="page">
   <view class="card tip-card">
-    <view class="tip-title">按包装标价付款</view>
-    <view class="tip-desc">店内散装称重后包装上有价格，请按标价输入金额完成微信支付。</view>
+    <view class="tip-title">自定义金额付款</view>
+    <view class="tip-desc">输入应付金额，完成微信支付。可用于散装称重、临时加购等场景。</view>
   </view>
 
   <view class="card">
@@ -18,14 +18,14 @@
         bindinput="onAmount"
       />
     </view>
-    <view class="hint">请与包装上的价格一致，最少 0.01 元</view>
+    <view class="hint">最少 0.01 元，最多 999.99 元</view>
   </view>
 
   <view class="card">
     <view class="label">备注（选填）</view>
     <input
       class="remark"
-      placeholder="如：葡萄、火龙果"
+      placeholder="如：葡萄、加购"
       maxlength="40"
       value="{{remark}}"
       bindinput="onRemark"

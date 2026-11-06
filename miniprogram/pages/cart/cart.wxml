@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="empty muted" wx:if="{{!items.length}}">购物车是空的，去点单加几样吧</view>
+
+  <view class="list" wx:if="{{items.length}}">
+    <view class="card row" wx:for="{{items}}" wx:key="index" wx:for-index="index">
+      <image class="cover" src="{{item.coverUrl}}" mode="aspectFill" wx:if="{{item.coverUrl}}" />
+      <view class="info">
+        <view class="name">{{item.productName}}</view>
+        <view class="muted">{{item.specName}}<text wx:if="{{item.toppingText}}"> · {{item.toppingText}}</text></view>
+        <view class="bottom">
+          <text class="price">¥{{item.unitPrice}}</text>
+          <view class="qty">
+            <view class="qbtn" data-index="{{index}}" bindtap="dec">-</view>
+            <text>{{item.quantity}}</text>
+            <view class="qbtn" data-index="{{index}}" bindtap="inc">+</view>
+          </view>
+        </view>
+      </view>
+      <view class="del" data-index="{{index}}" bindtap="onRemove">删除</view>
+    </view>
+  </view>
+
+  <view class="footer" wx:if="{{items.length}}">
+    <view class="total">
+      <view class="muted">共 {{count}} 件</view>
+      <view>预估 <text class="price">¥{{estimate}}</text></view>
+    </view>
+    <view class="btn-primary pay" bindtap="goCheckout">去结算</view>
+  </view>
+</view>

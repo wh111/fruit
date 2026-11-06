@@ -7,6 +7,9 @@ const state = {
   makeBatchId: '',
   recording: false,
   uploading: false,
+  toppings: [],
+  selectedToppingIds: new Set(),
+  ordersCache: [],
 };
 
 const $ = (s) => document.querySelector(s);
@@ -54,6 +57,7 @@ async function login() {
     state.token = data.token;
     localStorage.setItem('sg_make_token', data.token);
     showMain(true);
+    await loadToppings();
     await startCamera();
     await refreshList();
   } catch (e) {
@@ -159,14 +163,103 @@ function selectedIds() {
   return $$('.order-check:checked').map((el) => el.value);
 }
 
+function isFruitBowl(order) {
+  if (!order) return false;
+  const cat = String(order.productCategory || '');
+  if (cat === '水果捞') return true;
+  if (Array.isArray(order.items) && order.items.some((it) => it && it.productCategory === '水果捞')) {
+    return true;
+  }
+  return /水果捞|捞$/.test(String(order.productName || ''));
+}
+
+function orderItemsHtml(o) {
+  const items = Array.isArray(o.items) && o.items.length ? o.items : null;
+  if (items) {
+    return items
+      .map((it) => {
+        const tops = (it.toppings || []).map((t) => t.name).filter(Boolean);
+        const tip = tops.length ? ` · 小料 ${tops.join('/')}` : '';
+        return `<div>${it.productName} · ${it.specName}×${it.quantity}${tip}</div>`;
+      })
+      .join('');
+  }
+  return `<div>${o.productName} · ${o.specName}</div>`;
+}
+
+function selectedFruitBowlOrders() {
+  const ids = new Set(selectedIds());
+  return (state.ordersCache || []).filter((o) => ids.has(o.id) && isFruitBowl(o));
+}
+
+function selectedToppingIds() {
+  return [...state.selectedToppingIds];
+}
+
 function updateSelHint() {
   const ids = selectedIds();
   const codes = $$('.order-check:checked').map((el) => el.dataset.code).filter(Boolean);
   $('#selHint').textContent = ids.length ? `已选 ${ids.length}：${codes.join('、')}` : '未选择';
+  updateToppingPanel();
+}
+
+function renderToppingChips() {
+  const box = $('#toppingChips');
+  if (!box) return;
+  const list = state.toppings || [];
+  if (!list.length) {
+    box.innerHTML = '<span class="muted">暂无上架小料，请到后台「小料」维护</span>';
+    return;
+  }
+  box.innerHTML = list
+    .map((t) => {
+      const on = state.selectedToppingIds.has(t.id) ? 'on' : '';
+      const price = Number(t.price) > 0 ? ` ¥${t.price}` : '';
+      return `<button type="button" class="topping-chip ${on}" data-id="${t.id}">${t.name}${price}</button>`;
+    })
+    .join('');
+  box.querySelectorAll('.topping-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      if (state.selectedToppingIds.has(id)) state.selectedToppingIds.delete(id);
+      else state.selectedToppingIds.add(id);
+      renderToppingChips();
+      updateToppingPanel();
+    });
+  });
+}
+
+function updateToppingPanel() {
+  const bowls = selectedFruitBowlOrders();
+  const panel = $('#toppingPanel');
+  if (!panel) return;
+  if (!bowls.length) {
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+  const names = selectedToppingIds()
+    .map((id) => (state.toppings || []).find((t) => t.id === id)?.name)
+    .filter(Boolean);
+  $('#toppingHint').textContent = names.length
+    ? `已选小料：${names.join('、')}（将写入 ${bowls.length} 单水果捞）`
+    : `已选 ${bowls.length} 单水果捞，可点选小料后开始制作`;
+}
+
+async function loadToppings() {
+  try {
+    const data = await api('/api/admin/toppings');
+    state.toppings = data.active || (data.list || []).filter((t) => t.status !== 0);
+    renderToppingChips();
+  } catch {
+    state.toppings = [];
+    renderToppingChips();
+  }
 }
 
 async function refreshList() {
   const { list } = await api('/api/admin/orders');
+  state.ordersCache = list || [];
   const show = list
     .filter((o) => ['paid', 'making', 'ready'].includes(o.status))
     .sort((a, b) => {
@@ -179,12 +272,20 @@ async function refreshList() {
     ? show
         .map((o) => {
           const checkable = ['paid', 'making'].includes(o.status);
+          const sideExtras = (o.extras || []).filter((e) => e && e.kind === 'sideMeal');
+          const sideMeal =
+            (o.sideMeal && o.sideMeal.name) || (sideExtras[0] && sideExtras[0].name) || '';
+          const sideTag = sideMeal
+            ? `<div class="muted">代餐 ${sideMeal.replace(/^小食套餐·/, '')}</div>`
+            : '';
+          const bowlTag = isFruitBowl(o) ? ' · 含水果捞' : '';
           return `<label class="card">
-            ${checkable ? `<input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" ${o.status === 'making' ? 'checked' : ''}/>` : '<span style="width:20px"></span>'}
+            ${checkable ? `<input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" data-bowl="${isFruitBowl(o) ? '1' : '0'}" ${o.status === 'making' ? 'checked' : ''}/>` : '<span style="width:20px"></span>'}
             <div class="code">${o.pickupCode || '--'}</div>
             <div class="meta">
-              <div>${o.productName} · ${o.specName}</div>
-              <div class="tag ${o.status}">${STATUS[o.status] || o.status}${o.videoUrl ? ' · 已有视频' : ''}</div>
+              ${orderItemsHtml(o)}
+              ${sideTag}
+              <div class="tag ${o.status}">${STATUS[o.status] || o.status}${o.videoUrl ? ' · 已有视频' : ''}${bowlTag}</div>
               <div class="muted">${o.fulfillmentType === 'reserve' ? `预约 ${o.pickupAtText || ''}` : '现取'}${
                 o.deliveryPoint && o.deliveryPoint !== 'shop' ? ` · ${o.deliveryPointName}` : ' · 到店'
               } · ¥${o.amount}</div>
@@ -207,12 +308,20 @@ async function startMaking() {
     $('#statusText').textContent = '开始制作并录像…';
     if (!state.stream) await startCamera();
     startRecorder();
+    const payload = { ids, status: 'making' };
+    if (selectedFruitBowlOrders().length) {
+      payload.toppingIds = selectedToppingIds();
+    }
     const data = await api('/api/orders/batch-status', {
       method: 'POST',
-      body: JSON.stringify({ ids, status: 'making' }),
+      body: JSON.stringify(payload),
     });
     state.makeBatchId = data.makeBatchId || '';
-    $('#statusText').textContent = data.tip || `制作中 ${data.count} 单，正在录像`;
+    const tipExtra =
+      payload.toppingIds && payload.toppingIds.length
+        ? `，小料 ${payload.toppingIds.length} 种`
+        : '';
+    $('#statusText').textContent = (data.tip || `制作中 ${data.count} 单，正在录像`) + tipExtra;
     await refreshList();
   } catch (e) {
     await stopRecorder(false);
@@ -242,9 +351,14 @@ async function finishReady() {
     $('#statusText').textContent = '停止录像并上传…';
     const blob = await stopRecorder(true);
 
+    const readyPayload = { ids, status: 'ready' };
+    const bowlIds = ids.filter((id) => isFruitBowl((state.ordersCache || []).find((o) => o.id === id)));
+    if (bowlIds.length && selectedToppingIds().length) {
+      readyPayload.toppingIds = selectedToppingIds();
+    }
     const batchData = await api('/api/orders/batch-status', {
       method: 'POST',
-      body: JSON.stringify({ ids, status: 'ready' }),
+      body: JSON.stringify(readyPayload),
     });
 
     // 取 makeBatchId：优先录像时记下的，否则从订单读
@@ -298,7 +412,9 @@ $('#readyBtn').addEventListener('click', finishReady);
 
 if (state.token) {
   showMain(true);
-  startCamera().then(refreshList).catch(() => refreshList());
+  Promise.all([loadToppings(), startCamera().catch(() => {})])
+    .then(() => refreshList())
+    .catch(() => refreshList());
 } else {
   showMain(false);
 }

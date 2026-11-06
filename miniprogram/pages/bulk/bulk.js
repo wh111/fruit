@@ -122,7 +122,7 @@ Page({
           const { confirm } = await new Promise((resolve) => {
             wx.showModal({
               title: '模拟支付',
-              content: `散装水果应付 ¥${payAmount}`,
+              content: `自定义金额应付 ¥${payAmount}`,
               confirmText: '支付',
               cancelText: '取消',
               success: resolve,

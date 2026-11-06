@@ -3,12 +3,11 @@ const { request } = require('../../utils/api');
 Page({
   data: {
     shopName: '四季果先',
-    shopPhone: '18813017847',
+    shopPhone: '15701511086',
     groupBuyHint: '',
     points: [
       '适合企业团建、部门下午茶、会议茶歇',
       '建议 10 份起订，可混搭现菜单品',
-      '按预售波次取餐：12:00 / 18:00',
       '价格与配送细节电话确认即可',
     ],
   },
@@ -21,8 +20,8 @@ Page({
     try {
       const shop = await request('/api/shop');
       this.setData({
-        shopName: shop.shopName || '四季果先',
-        shopPhone: shop.shopPhone || '18813017847',
+        shopName: shop.shopName || '四季果先（徐先生）',
+        shopPhone: shop.shopPhone || '15701511086',
         groupBuyHint: shop.groupBuyHint || this.data.groupBuyHint,
       });
     } catch (_) {

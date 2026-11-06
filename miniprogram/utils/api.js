@@ -70,13 +70,13 @@ function wxLoginWithTimeout(ms = 8000) {
 function rememberGrantPending(data) {
   if (data && data.welcomeGranted) {
     wx.setStorageSync('welcomeGrantedPending', {
-      count: data.welcomeCouponCount || 21,
+      count: data.welcomeCouponCount || 15,
       at: Date.now(),
     });
   }
   if (data && data.monthlyGranted) {
     wx.setStorageSync('monthlyGrantedPending', {
-      count: data.monthlyCouponCount || 3,
+      count: data.monthlyCouponCount || 1,
       at: Date.now(),
     });
   }
@@ -151,8 +151,13 @@ async function bindPhoneNumber(detail) {
       payload.mockPhone = wx.getStorageSync('sg_dev_mock_phone') || '13800138000';
       payload._devMock = true;
     } else {
+      const tip = [errMsg, errno != null ? `errno=${errno}` : '']
+        .filter(Boolean)
+        .join(' · ');
       throw new Error(
-        '未拿到微信手机号凭证。请用真机预览；小程序须企业主体认证，并在公众平台开通「手机号快速验证」（含免费额度或资源包）'
+        tip
+          ? `未拿到微信手机号凭证（${tip}）`
+          : '未拿到微信手机号凭证。请检查：隐私指引已声明手机号、点了允许授权、已购买「手机号快速验证」资源包'
       );
     }
   }

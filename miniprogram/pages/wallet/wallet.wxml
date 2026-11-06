@@ -1,0 +1,32 @@
+<view class="page">
+  <view class="card bal">
+    <view class="muted">可用余额</view>
+    <view class="amount">¥{{balance}}</view>
+  </view>
+
+  <view class="card" wx:if="{{!enabled}}">
+    <view class="muted">储值活动暂未开启</view>
+  </view>
+
+  <view class="card" wx:elif="{{tiers.length}}">
+    <view class="title">选择充值档位</view>
+    <view class="muted tip">实付档位金额，到账本金+赠金；点餐时可用余额整单支付</view>
+    <view
+      class="tier {{tierId === item.id ? 'on' : ''}}"
+      wx:for="{{tiers}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="onPick"
+    >
+      <view class="tier-main">
+        <text class="tier-title">{{item.title}}</text>
+        <text class="tier-credit">到账 ¥{{item.creditAmount}}</text>
+      </view>
+      <view class="tier-pay">实付 ¥{{item.payAmount}}</view>
+    </view>
+  </view>
+
+  <view class="footer" wx:if="{{enabled && tiers.length}}">
+    <view class="btn-primary" bindtap="submit">微信支付充值</view>
+  </view>
+</view>

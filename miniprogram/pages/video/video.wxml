@@ -1,6 +1,6 @@
 <view class="page" wx:if="{{order}}">
   <view class="card head">
-    <view class="code">取餐码 {{order.pickupCode}}</view>
+    <view class="code">取餐号 {{order.pickupCode}}</view>
     <view class="muted">{{order.productName}} · {{order.specName}}</view>
     <view class="muted" wx:if="{{batchText}}">同批：{{batchText}}</view>
   </view>

@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="hero card">
+    <view class="tag">开业活动</view>
+    <view class="title">{{campaign.title || '开业抽奖'}}</view>
+    <view class="sub">{{campaign.subtitle || '登录抽好礼 · 每人限一次'}}</view>
+    <view class="date muted" wx:if="{{dateText}}">活动时间：{{dateText}}</view>
+    <view class="status" wx:if="{{statusText}}">{{statusText}}</view>
+  </view>
+
+  <view class="card prizes">
+    <view class="section">奖品一览</view>
+    <view class="prize" wx:for="{{prizes}}" wx:key="id">
+      <view class="prize-title">{{item.title}}</view>
+      <view class="prize-desc muted">{{item.desc || item.rateText}}</view>
+      <view class="prize-rate">{{item.rateText}}</view>
+    </view>
+  </view>
+
+  <view class="card result" wx:if="{{myPrize}}">
+    <view class="section">我的结果</view>
+    <view class="result-title">{{myPrize.title}}</view>
+    <view class="muted" wx:if="{{myPrize.type === 'none'}}">感谢参与，欢迎到店尝鲜</view>
+    <view class="muted" wx:else>奖品已放入「我的优惠券」，下单结算时选用</view>
+    <view class="btn-line" bindtap="goCoupons" wx:if="{{myPrize.type !== 'none'}}">查看优惠券</view>
+  </view>
+
+  <view class="actions">
+    <button
+      class="btn-primary draw"
+      loading="{{drawing}}"
+      disabled="{{!canDraw || drawing}}"
+      bindtap="onDraw"
+    >{{drawBtnText}}</button>
+    <view class="btn-ghost" bindtap="goHome">去点单</view>
+  </view>
+
+  <view class="card rules" wx:if="{{rules.length}}">
+    <view class="section">活动规则</view>
+    <view class="rule" wx:for="{{rules}}" wx:key="*this">· {{item}}</view>
+  </view>
+</view>

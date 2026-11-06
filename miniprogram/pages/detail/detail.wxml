@@ -6,12 +6,12 @@
     <view class="price">¥{{unitPrice}}</view>
   </view>
 
-  <view class="card promo-card" wx:if="{{promoHint || loyaltyLabel || loyaltyHint}}">
+  <view class="card promo-card" wx:if="{{promoHint || loyaltyHint || isRetail}}">
     <view class="promo-title">优惠说明</view>
-    <view class="promo-line" wx:if="{{loyaltyLabel}}">{{loyaltyLabel}}（可与立减券同享）</view>
-    <view class="promo-line" wx:elif="{{loyaltyHint}}">{{loyaltyHint}}</view>
+    <view class="promo-line" wx:if="{{loyaltyHint}}">{{loyaltyHint}}</view>
     <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
-    <view class="muted">按单现切，取餐前最多半小时制作。预定仅 12 点 / 18 点取餐，一份也做。</view>
+    <view class="muted" wx:if="{{isRetail}}">成品零售可与果切同车；混点时整单进制作队列。</view>
+    <view class="muted" wx:else>按单现切，取餐前最多40分钟制作。可多选加入购物车一并结算。</view>
   </view>
 
   <view class="card">
@@ -40,68 +40,17 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="section-title">取餐方式</view>
-    <view class="modes">
+  <view class="card" wx:if="{{isFruitBowl && toppings.length}}">
+    <view class="section-title">小料（可多选，默认不加）</view>
+    <view class="muted" style="margin-bottom:16rpx">鸡胸、水煮蛋、坚果等，按份加价</view>
+    <view class="chips">
       <view
-        class="mode {{fulfillmentType === 'reserve' ? 'on' : ''}} {{canReserve ? '' : 'off'}}"
-        data-type="reserve"
-        bindtap="onFulfillment"
-      >
-        <view class="mode-name">提前预定</view>
-        <view class="mode-desc">{{reserveDesc}}</view>
-      </view>
-      <view
-        class="mode {{fulfillmentType === 'now' ? 'on' : ''}}"
-        data-type="now"
-        bindtap="onFulfillment"
-      >
-        <view class="mode-name">现作现取</view>
-        <view class="mode-desc">马上做，高峰可能要等</view>
-      </view>
-    </view>
-    <view class="slot-wrap" wx:if="{{fulfillmentType === 'reserve' && canReserve}}">
-      <view class="section-title" style="margin-top:24rpx">取餐时间</view>
-      <view class="chips">
-        <view
-          class="chip {{slotIndex === index ? 'on' : ''}}"
-          wx:for="{{slots}}"
-          wx:key="pickupAt"
-          wx:for-index="index"
-          data-index="{{index}}"
-          bindtap="onSlot"
-        >{{item.label}}</view>
-      </view>
-    </view>
-  </view>
-
-  <view class="card">
-    <view class="section-title">送达方式</view>
-    <view class="modes col">
-      <view
-        class="mode {{deliveryPoint === item.id ? 'on' : ''}}"
-        wx:for="{{deliveryPoints}}"
+        class="chip {{toppingMap[item.id] ? 'on' : ''}}"
+        wx:for="{{toppings}}"
         wx:key="id"
         data-id="{{item.id}}"
-        bindtap="onDelivery"
-      >
-        <view class="mode-name">
-          {{item.name}}
-          <text class="fee" wx:if="{{item.fee > 0}}">+¥{{item.fee}}</text>
-          <text class="fee free" wx:else>免费</text>
-        </view>
-        <view class="mode-desc">{{item.tip}}</view>
-      </view>
-    </view>
-  </view>
-
-  <view class="card coupon-card" bindtap="onPickCoupon">
-    <view class="coupon-row">
-      <view class="section-title" style="margin:0">优惠券</view>
-      <view class="coupon-value {{hasDiscount ? 'on' : ''}}">{{couponLabel}}</view>
-    </view>
-    <view class="muted" style="margin-top:8rpx">
-      每单限用 1 张优惠券
+        bindtap="onTopping"
+      >{{item.name}} +¥{{item.price}}</view>
     </view>
   </view>
 
@@ -112,29 +61,14 @@
       <text>{{quantity}}</text>
       <view class="qbtn" bindtap="inc">+</view>
     </view>
-    <view class="section-title" style="margin-top:24rpx">备注</view>
-    <input class="remark" placeholder="少冰 / 分开装等" value="{{remark}}" bindinput="onRemark" />
   </view>
 
-  <view class="footer">
+  <view class="footer dual">
     <view class="total">
-      <view wx:if="{{hasDiscount}}" class="save">{{discountLabel}}</view>
-      <view class="muted" wx:if="{{deliveryFee > 0}}" style="font-size:22rpx;margin-bottom:4rpx">含配送费 ¥{{deliveryFee}}</view>
-      <view>
-        合计 <text class="price">¥{{total}}</text>
-        <text class="strike" wx:if="{{hasDiscount}}">¥{{originalTotal}}</text>
-      </view>
+      <view class="muted" style="font-size:22rpx">单价</view>
+      <view class="price">¥{{unitPrice}}</view>
     </view>
-    <view
-      wx:if="{{hasPhone}}"
-      class="btn-primary pay"
-      bindtap="submit"
-    >去支付</view>
-    <button
-      wx:else
-      class="btn-primary pay phone-pay"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="onPhoneThenPay"
-    >授权手机号并支付</button>
+    <view class="btn-ghost" bindtap="addCart">加入购物车</view>
+    <view class="btn-primary pay" bindtap="buyNow">立即购买</view>
   </view>
 </view>

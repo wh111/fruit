@@ -2,10 +2,10 @@ const crypto = require('crypto');
 const { load, save } = require('../db');
 const QR = require('./qrcode');
 const {
-  todayKey,
   normalizeFulfillment,
   formatPickupLabel,
   round2,
+  categoryAllowsReserve,
 } = require('./promo');
 const {
   findCoupon,
@@ -16,7 +16,17 @@ const {
   restoreCouponForOrder,
 } = require('./coupon');
 const { getLoyaltyState, applyLoyaltyAndCoupon } = require('./loyalty');
-const { normalizeDelivery, listDeliveryPoints } = require('./delivery');
+const { normalizeDelivery, listDeliveryPoints, getDeliveryScopeNote } = require('./delivery');
+const { resolveToppingItems, isFruitBowlOrder } = require('./toppings');
+const { resolveSideMeal, categoryAllowsSideMeal } = require('./sideMeals');
+
+/** 仅水果捞可加小料；解析并计价用 */
+function resolveOrderToppings(db, product, toppingIds) {
+  if (!product || !isFruitBowlOrder({ productCategory: product.category, productName: product.name })) {
+    return [];
+  }
+  return resolveToppingItems(db.toppings, toppingIds || []);
+}
 
 const PICKUP_AUTO_DONE_MS = 2 * 60 * 60 * 1000;
 
@@ -35,15 +45,36 @@ function settlePickedOrders(db, now = Date.now()) {
   return changed;
 }
 
-function nextPickupCode(db) {
-  const key = todayKey();
-  if (db.seq.orderDay !== key) {
-    db.seq.orderDay = key;
-    db.seq.pickupNo = 0;
+/** 取餐号全局累加，不按天清零；对齐历史最大号，避免重复 */
+function ensurePickupSeq(db) {
+  if (!db.seq || typeof db.seq !== 'object') db.seq = { orderDay: '', pickupNo: 0 };
+  let max = Number(db.seq.pickupNo) || 0;
+  for (const o of db.orders || []) {
+    const m = String(o.pickupCode || '').match(/^A(\d+)$/i);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  db.seq.pickupNo += 1;
-  const n = String(db.seq.pickupNo).padStart(3, '0');
+  if (max > (Number(db.seq.pickupNo) || 0)) db.seq.pickupNo = max;
+  return db.seq;
+}
+
+function nextPickupCode(db) {
+  const seq = ensurePickupSeq(db);
+  seq.pickupNo = (Number(seq.pickupNo) || 0) + 1;
+  const n = String(seq.pickupNo).padStart(3, '0');
   return `A${n}`;
+}
+
+/** 成品零售：已做好，支付后直接可取，不进果切排队 */
+function isNoQueueCategory(category) {
+  const c = String(category || '');
+  return c === '水果零售' || c === '零售什锦';
+}
+
+function isNoQueueOrder(order) {
+  if (!order) return false;
+  if (order.orderKind === 'bulk' || order.orderKind === 'retail') return true;
+  if (order.skipQueue) return true;
+  return isNoQueueCategory(order.productCategory);
 }
 
 function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) {
@@ -58,9 +89,29 @@ function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) 
       extraItems.push({ id: ex.id, name: ex.name, price: ex.price });
     }
   }
+  // 商品原价（不含小料）：折券「原价≤30」按此判断
+  const baseUnitPrice = round2(unit);
+  // 水果捞小料（独立目录 db.toppings）
+  for (const t of promoOpts.toppingItems || []) {
+    if (!t || !t.id) continue;
+    unit += Number(t.price) || 0;
+    extraItems.push({ id: t.id, name: t.name, price: t.price, kind: 'topping' });
+  }
+  // 健康代餐小食套餐：按单加购一次（不随果杯份数翻倍）
+  const sideMeal = promoOpts.sideMeal || null;
+  const sideMealPrice = sideMeal && Number(sideMeal.price) > 0 ? round2(sideMeal.price) : 0;
+  if (sideMeal && sideMealPrice > 0) {
+    extraItems.push({
+      id: sideMeal.id,
+      name: `小食套餐·${sideMeal.name}`,
+      price: sideMealPrice,
+      kind: 'sideMeal',
+    });
+  }
   const qty = Math.max(1, Number(quantity) || 1);
   const unitPrice = round2(unit);
-  const originalAmount = round2(unitPrice * qty);
+  const originalAmount = round2(unitPrice * qty + sideMealPrice);
+  const baseAmount = round2(baseUnitPrice * qty);
   const fulfillmentType = promoOpts.fulfillmentType === 'reserve' ? 'reserve' : 'now';
   const pickupAt = fulfillmentType === 'reserve' ? promoOpts.pickupAt || null : null;
 
@@ -75,13 +126,22 @@ function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) 
   if (coupon) {
     const check = canUseCoupon(coupon, {
       originalAmount,
+      baseAmount,
       fulfillmentType,
       now: promoOpts.now || Date.now(),
+      product,
+      unitPrice,
+      baseUnitPrice,
+      db: promoOpts.db || null,
     });
     if (!check.ok) throw Object.assign(new Error(check.reason), { status: 400 });
   }
 
-  const priced = applyLoyaltyAndCoupon(originalAmount, loyalty, coupon);
+  // 先加小料得到应付原价，再算折扣（折在含小料总额上）
+  const priced = applyLoyaltyAndCoupon(originalAmount, loyalty, coupon, {
+    product,
+    unitPrice,
+  });
   const delivery = normalizeDelivery(promoOpts.deliveryPoint, promoOpts.settings);
   const foodAmount = priced.amount;
   const amount = round2(foodAmount + delivery.deliveryFee);
@@ -91,12 +151,16 @@ function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) 
     extraItems,
     quantity: qty,
     unitPrice,
+    baseUnitPrice,
+    baseAmount,
     fulfillmentType,
     pickupAt,
     pickupAtText: pickupAt ? formatPickupLabel(pickupAt) : '',
     ...priced,
     foodAmount,
     amount,
+    sideMeal: sideMeal || null,
+    sideMealPrice,
     ...delivery,
   };
 }
@@ -117,69 +181,279 @@ function resolveLoyalty(db, { userId, openid, now }) {
   return getLoyaltyState(db, { userId, openid, now, includeCurrent: true });
 }
 
-async function quoteOrder({
-  productId,
-  specId,
-  extras,
-  quantity,
-  fulfillmentType,
-  pickupAt,
-  deliveryPoint,
-  couponId,
-  userId,
-  openid,
-  autoCoupon = true,
-}) {
-  const db = await load();
-  const product = db.products.find((p) => p.id === productId && p.status === 1);
+function resolveOrderSideMeal(db, products, sideMealSel) {
+  if (!sideMealSel || !sideMealSel.proteinId) return null;
+  const list = Array.isArray(products) ? products : products ? [products] : [];
+  const ok = list.some((p) => p && categoryAllowsSideMeal(db, p.category));
+  if (!ok) {
+    throw Object.assign(new Error('该商品不可加购小食套餐'), { status: 400 });
+  }
+  return resolveSideMeal(db, sideMealSel);
+}
+
+/** 统一成 items[]；兼容旧单品入参 */
+function normalizeOrderItemsInput(input = {}) {
+  if (Array.isArray(input.items) && input.items.length) {
+    return input.items.map((it) => ({
+      productId: it.productId,
+      specId: it.specId,
+      quantity: Math.max(1, Number(it.quantity) || 1),
+      extras: Array.isArray(it.extras) ? it.extras : [],
+      toppingIds: Array.isArray(it.toppingIds) ? it.toppingIds : [],
+    }));
+  }
+  if (!input.productId || !input.specId) {
+    throw Object.assign(new Error('请选择商品和规格'), { status: 400 });
+  }
+  return [
+    {
+      productId: input.productId,
+      specId: input.specId,
+      quantity: Math.max(1, Number(input.quantity) || 1),
+      extras: Array.isArray(input.extras) ? input.extras : [],
+      toppingIds: Array.isArray(input.toppingIds) ? input.toppingIds : [],
+    },
+  ];
+}
+
+/** 单行计价（不含小食套餐） */
+function priceOrderLine(db, raw) {
+  const product = db.products.find((p) => p.id === raw.productId && p.status === 1);
   if (!product) throw Object.assign(new Error('商品不存在'), { status: 404 });
-  if (!productId || !specId) throw Object.assign(new Error('请选择商品和规格'), { status: 400 });
-  const now = Date.now();
-  const fulfillment = normalizeFulfillment({ fulfillmentType, pickupAt, now });
-  const loyalty = resolveLoyalty(db, { userId, openid, now });
-
-  const bare = calcAmount(product, specId, extras || [], quantity, {
-    ...fulfillment,
-    deliveryPoint,
-    now,
-    loyalty,
+  if (!raw.specId) throw Object.assign(new Error('请选择商品和规格'), { status: 400 });
+  const toppingItems = resolveOrderToppings(db, product, raw.toppingIds);
+  const line = calcAmount(product, raw.specId, raw.extras || [], raw.quantity, {
+    toppingItems,
+    sideMeal: null,
     settings: db.settings,
+    deliveryPoint: 'shop',
+    fulfillmentType: 'now',
+    loyalty: { monthCount: 0, tier: 0, rate: 0, label: '' },
+    coupon: null,
+    db,
   });
+  const lineExtras = (line.extraItems || []).filter((e) => e && e.kind !== 'sideMeal');
+  return {
+    productId: product.id,
+    productName: product.name,
+    productCategory: product.category || '',
+    cover: product.cover || '',
+    specId: line.spec.id,
+    specName: line.spec.name,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    baseUnitPrice: line.baseUnitPrice,
+    lineAmount: round2(line.unitPrice * line.quantity),
+    baseAmount: line.baseAmount,
+    extras: lineExtras,
+    toppings: toppingItems,
+    product,
+  };
+}
 
-  let coupon = null;
-  if (couponId === '' || couponId === null) {
-    coupon = null;
-  } else if (couponId) {
-    coupon = findCoupon(db, couponId, userId);
-    if (!coupon) throw Object.assign(new Error('优惠券不存在'), { status: 400 });
-  } else if (autoCoupon && userId) {
-    coupon = pickBestCoupon(db, userId, {
-      originalAmount: bare.originalAmount,
-      fulfillmentType: fulfillment.fulfillmentType,
-      now,
+function summarizeCartLines(lines) {
+  const categories = [...new Set(lines.map((l) => l.productCategory).filter(Boolean))];
+  const allRetail = lines.every((l) => isNoQueueCategory(l.productCategory));
+  const productName = lines
+    .map((l) => `${l.productName}${l.quantity > 1 ? `×${l.quantity}` : ''}`)
+    .join('、');
+  const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
+  const first = lines[0];
+  return {
+    productName: productName || first.productName,
+    productCategory: categories.length === 1 ? categories[0] : '混合',
+    cover: first.cover || '',
+    productId: lines.length === 1 ? first.productId : 'cart',
+    specId: lines.length === 1 ? first.specId : 'multi',
+    specName:
+      lines.length === 1
+        ? first.specName
+        : lines.map((l) => `${l.specName}×${l.quantity}`).join('、'),
+    quantity: totalQty,
+    unitPrice: lines.length === 1 ? first.unitPrice : round2(lines.reduce((s, l) => s + l.lineAmount, 0) / Math.max(1, totalQty)),
+    skipQueue: allRetail,
+    orderKind: allRetail ? 'retail' : 'normal',
+    categories,
+    primaryProduct: lines.find((l) => !isNoQueueCategory(l.productCategory))?.product || first.product,
+  };
+}
+
+function calcCartAmount(lines, promoOpts = {}) {
+  const summary = summarizeCartLines(lines);
+  const foodLines = round2(lines.reduce((s, l) => s + l.lineAmount, 0));
+  const baseAmount = round2(lines.reduce((s, l) => s + l.baseAmount, 0));
+  const sideMeal = promoOpts.sideMeal || null;
+  const sideMealPrice = sideMeal && Number(sideMeal.price) > 0 ? round2(sideMeal.price) : 0;
+  const originalAmount = round2(foodLines + sideMealPrice);
+
+  const extraItems = [];
+  for (const l of lines) {
+    for (const e of l.extras || []) {
+      if (!e) continue;
+      extraItems.push({ ...e, productId: l.productId, productName: l.productName });
+    }
+  }
+  if (sideMeal && sideMealPrice > 0) {
+    extraItems.push({
+      id: sideMeal.id,
+      name: `小食套餐·${sideMeal.name}`,
+      price: sideMealPrice,
+      kind: 'sideMeal',
     });
   }
 
-  const priced = calcAmount(product, specId, extras || [], quantity, {
+  const fulfillmentType = promoOpts.fulfillmentType === 'reserve' ? 'reserve' : 'now';
+  const pickupAt = fulfillmentType === 'reserve' ? promoOpts.pickupAt || null : null;
+  const loyalty = promoOpts.loyalty || { monthCount: 0, tier: 0, rate: 0, label: '' };
+  const product = summary.primaryProduct;
+  const unitPrice = summary.unitPrice;
+  const baseUnitPrice = round2(baseAmount / Math.max(1, summary.quantity));
+
+  let coupon = promoOpts.coupon || null;
+  if (coupon) {
+    const check = canUseCoupon(coupon, {
+      originalAmount,
+      baseAmount,
+      fulfillmentType,
+      now: promoOpts.now || Date.now(),
+      product,
+      unitPrice,
+      baseUnitPrice,
+      db: promoOpts.db || null,
+    });
+    if (!check.ok) throw Object.assign(new Error(check.reason), { status: 400 });
+  }
+
+  const priced = applyLoyaltyAndCoupon(originalAmount, loyalty, coupon, {
+    product,
+    unitPrice,
+  });
+  const delivery = normalizeDelivery(promoOpts.deliveryPoint, promoOpts.settings);
+  const foodAmount = priced.amount;
+  const amount = round2(foodAmount + delivery.deliveryFee);
+
+  return {
+    items: lines.map((l) => ({
+      productId: l.productId,
+      productName: l.productName,
+      productCategory: l.productCategory,
+      cover: l.cover,
+      specId: l.specId,
+      specName: l.specName,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      lineAmount: l.lineAmount,
+      extras: l.extras,
+      toppings: l.toppings,
+    })),
+    extraItems,
+    toppings: lines.flatMap((l) => l.toppings || []),
+    quantity: summary.quantity,
+    unitPrice: summary.unitPrice,
+    baseUnitPrice,
+    baseAmount,
+    fulfillmentType,
+    pickupAt,
+    pickupAtText: pickupAt ? formatPickupLabel(pickupAt) : '',
+    ...priced,
+    foodAmount,
+    amount,
+    sideMeal: sideMeal || null,
+    sideMealPrice,
+    productId: summary.productId,
+    productName: summary.productName,
+    productCategory: summary.productCategory,
+    cover: summary.cover,
+    specId: summary.specId,
+    specName: summary.specName,
+    skipQueue: summary.skipQueue,
+    orderKind: summary.orderKind,
+    primaryProduct: product,
+    ...delivery,
+  };
+}
+
+function assertReserveAllowed(db, lines, fulfillment) {
+  if (fulfillment.fulfillmentType !== 'reserve') return;
+  const bad = lines.find((l) => !categoryAllowsReserve(db, l.productCategory));
+  if (bad) {
+    throw Object.assign(new Error(`「${bad.productName}」不支持预定，请改为现作现取`), { status: 400 });
+  }
+}
+
+async function quoteOrder(input = {}) {
+  const db = await load();
+  const rawItems = normalizeOrderItemsInput(input);
+  const lines = rawItems.map((it) => priceOrderLine(db, it));
+  const now = Date.now();
+  const fulfillment = normalizeFulfillment({
+    fulfillmentType: input.fulfillmentType,
+    pickupAt: input.pickupAt,
+    now,
+  });
+  assertReserveAllowed(db, lines, fulfillment);
+
+  const loyalty = resolveLoyalty(db, { userId: input.userId, openid: input.openid, now });
+  const products = lines.map((l) => l.product);
+  const sideMeal = resolveOrderSideMeal(db, products, input.sideMeal);
+
+  const bare = calcCartAmount(lines, {
     ...fulfillment,
-    deliveryPoint,
+    deliveryPoint: input.deliveryPoint,
+    now,
+    loyalty,
+    settings: db.settings,
+    sideMeal,
+    db,
+  });
+
+  let coupon = null;
+  if (input.couponId === '' || input.couponId === null) {
+    coupon = null;
+  } else if (input.couponId) {
+    coupon = findCoupon(db, input.couponId, input.userId);
+    if (!coupon) throw Object.assign(new Error('优惠券不存在'), { status: 400 });
+  } else if (input.autoCoupon !== false && input.userId) {
+    coupon = pickBestCoupon(db, input.userId, {
+      originalAmount: bare.originalAmount,
+      baseAmount: bare.baseAmount,
+      fulfillmentType: fulfillment.fulfillmentType,
+      now,
+      product: bare.primaryProduct,
+      unitPrice: bare.unitPrice,
+      baseUnitPrice: bare.baseUnitPrice,
+      db,
+    });
+  }
+
+  const priced = calcCartAmount(lines, {
+    ...fulfillment,
+    deliveryPoint: input.deliveryPoint,
     now,
     coupon,
     loyalty,
     settings: db.settings,
+    sideMeal,
+    db,
   });
-  const availableCoupons = userId
-    ? listAvailableForOrder(db, userId, {
+  const availableCoupons = input.userId
+    ? listAvailableForOrder(db, input.userId, {
         originalAmount: bare.originalAmount,
+        baseAmount: bare.baseAmount,
         fulfillmentType: fulfillment.fulfillmentType,
         now,
         afterLoyaltyAmount: round2(bare.originalAmount - (priced.loyaltySave || 0)),
+        product: bare.primaryProduct,
+        unitPrice: bare.unitPrice,
+        baseUnitPrice: bare.baseUnitPrice,
+        db,
       })
     : [];
 
   return {
     ...priced,
     deliveryPoints: listDeliveryPoints(db.settings),
+    deliveryScopeNote: getDeliveryScopeNote(db.settings),
     availableCoupons,
     selectedCouponId: priced.couponId || null,
     loyalty: {
@@ -195,70 +469,79 @@ async function quoteOrder({
   };
 }
 
-async function createOrder({
-  userId,
-  openid,
-  productId,
-  specId,
-  extras,
-  quantity,
-  remark,
-  fulfillmentType,
-  pickupAt,
-  deliveryPoint,
-  couponId,
-  autoCoupon = true,
-}) {
+async function createOrder(input = {}) {
   const db = await load();
-  const product = db.products.find((p) => p.id === productId && p.status === 1);
-  if (!product) throw Object.assign(new Error('商品不存在'), { status: 404 });
-  if (!productId || !specId) throw Object.assign(new Error('请选择商品和规格'), { status: 400 });
-
+  const rawItems = normalizeOrderItemsInput(input);
+  const lines = rawItems.map((it) => priceOrderLine(db, it));
   const now = Date.now();
-  const fulfillment = normalizeFulfillment({ fulfillmentType, pickupAt, now });
-  const loyalty = resolveLoyalty(db, { userId, openid, now });
-  const bare = calcAmount(product, specId, extras || [], quantity, {
+  const fulfillment = normalizeFulfillment({
+    fulfillmentType: input.fulfillmentType,
+    pickupAt: input.pickupAt,
+    now,
+  });
+  assertReserveAllowed(db, lines, fulfillment);
+
+  const loyalty = resolveLoyalty(db, { userId: input.userId, openid: input.openid, now });
+  const products = lines.map((l) => l.product);
+  const sideMeal = resolveOrderSideMeal(db, products, input.sideMeal);
+
+  const bare = calcCartAmount(lines, {
     ...fulfillment,
-    deliveryPoint,
+    deliveryPoint: input.deliveryPoint,
     now,
     loyalty,
     settings: db.settings,
+    sideMeal,
+    db,
   });
 
   let coupon = null;
-  if (couponId === '' || couponId === null) {
+  if (input.couponId === '' || input.couponId === null) {
     coupon = null;
-  } else if (couponId) {
-    coupon = findCoupon(db, couponId, userId);
+  } else if (input.couponId) {
+    coupon = findCoupon(db, input.couponId, input.userId);
     if (!coupon) throw Object.assign(new Error('优惠券不存在'), { status: 400 });
-  } else if (autoCoupon && userId) {
-    coupon = pickBestCoupon(db, userId, {
+  } else if (input.autoCoupon !== false && input.userId) {
+    coupon = pickBestCoupon(db, input.userId, {
       originalAmount: bare.originalAmount,
+      baseAmount: bare.baseAmount,
       fulfillmentType: fulfillment.fulfillmentType,
       now,
+      product: bare.primaryProduct,
+      unitPrice: bare.unitPrice,
+      baseUnitPrice: bare.baseUnitPrice,
+      db,
     });
   }
 
-  const priced = calcAmount(product, specId, extras || [], quantity, {
+  const priced = calcCartAmount(lines, {
     ...fulfillment,
-    deliveryPoint,
+    deliveryPoint: input.deliveryPoint,
     now,
     coupon,
     loyalty,
     settings: db.settings,
+    sideMeal,
+    db,
   });
 
   const order = {
     id: crypto.randomUUID(),
     orderNo: `SG${Date.now()}${Math.floor(Math.random() * 900 + 100)}`,
-    userId: userId || null,
-    openid: openid || null,
-    productId: product.id,
-    productName: product.name,
-    cover: product.cover,
-    specId: priced.spec.id,
-    specName: priced.spec.name,
+    userId: input.userId || null,
+    openid: input.openid || null,
+    orderKind: priced.orderKind,
+    productCategory: priced.productCategory,
+    skipQueue: priced.skipQueue,
+    productId: priced.productId,
+    productName: priced.productName,
+    cover: priced.cover,
+    specId: priced.specId,
+    specName: priced.specName,
+    items: priced.items,
     extras: priced.extraItems,
+    toppings: priced.toppings,
+    sideMeal: priced.sideMeal || null,
     quantity: priced.quantity,
     unitPrice: priced.unitPrice,
     originalAmount: priced.originalAmount,
@@ -281,7 +564,7 @@ async function createOrder({
     fulfillmentType: priced.fulfillmentType,
     pickupAt: priced.pickupAt,
     pickupAtText: priced.pickupAtText,
-    remark: remark || '',
+    remark: input.remark || '',
     status: 'pending_pay',
     pickupCode: null,
     qrPayload: null,
@@ -293,7 +576,7 @@ async function createOrder({
   };
 
   if (priced.couponId) {
-    consumeCoupon(db, priced.couponId, order.id, userId);
+    consumeCoupon(db, priced.couponId, order.id, input.userId);
   }
 
   db.orders.unshift(order);
@@ -301,7 +584,7 @@ async function createOrder({
   return order;
 }
 
-/** 散装称重：顾客按包装标价自行输入金额支付（无优惠券/会员折） */
+/** 自定义金额：顾客自行输入金额支付（无优惠券/会员折） */
 async function createBulkOrder({ userId, openid, amount, remark }) {
   const yuan = round2(Number(amount));
   if (!Number.isFinite(yuan) || yuan < 0.01) {
@@ -323,10 +606,10 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
     openid: openid || null,
     orderKind: 'bulk',
     productId: 'bulk',
-    productName: '散装水果',
+    productName: '自定义金额',
     cover: '',
     specId: 'bulk',
-    specName: '称重计价',
+    specName: '自定义',
     extras: [],
     quantity: 1,
     unitPrice: yuan,
@@ -366,7 +649,7 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
   return order;
 }
 
-async function markPaid(orderId, { transactionId, payMode } = {}) {
+async function markPaid(orderId, { transactionId, payMode, payChannel, balancePaid } = {}) {
   const db = await load();
   const order = db.orders.find((o) => o.id === orderId);
   if (!order) throw Object.assign(new Error('订单不存在'), { status: 404 });
@@ -376,12 +659,14 @@ async function markPaid(orderId, { transactionId, payMode } = {}) {
   }
 
   const pickupCode = nextPickupCode(db);
-  // 散装已称重包装，支付后直接可取，不进果切排队
-  order.status = order.orderKind === 'bulk' ? 'ready' : 'paid';
+  // 自定义金额 / 水果零售成品：支付后直接可取，不进果切排队
+  order.status = isNoQueueOrder(order) ? 'ready' : 'paid';
   order.pickupCode = pickupCode;
   order.qrPayload = JSON.stringify({ t: 'sijiguoxian', orderNo: order.orderNo, pickupCode });
   order.transactionId = transactionId || `MOCK${Date.now()}`;
   order.payMode = payMode || process.env.PAY_MODE || 'mock';
+  if (payChannel) order.payChannel = payChannel;
+  if (balancePaid != null) order.balancePaid = Number(balancePaid) || 0;
   order.paidAt = Date.now();
   order.printed = false;
   order.updatedAt = Date.now();
@@ -390,6 +675,15 @@ async function markPaid(orderId, { transactionId, payMode } = {}) {
     touchOrderPaid(db, order, order.paidAt);
   } catch {
     /* ignore */
+  }
+  // 支付成功占用现烤剩余；请取餐/取消后再释放
+  if (order.sideMeal) {
+    try {
+      const { consumeSideMealStock } = require('./sideMeals');
+      consumeSideMealStock(db, order);
+    } catch (e) {
+      if (e && e.status === 400) throw e;
+    }
   }
   await save(db);
   return order;
@@ -406,6 +700,12 @@ async function cancelPendingOrder(orderId, user) {
     throw Object.assign(new Error('无权取消该订单'), { status: 403 });
   }
   restoreCouponForOrder(db, order);
+  try {
+    const { restoreSideMealStock } = require('./sideMeals');
+    restoreSideMealStock(db, order);
+  } catch {
+    /* ignore */
+  }
   order.status = 'cancelled';
   order.updatedAt = Date.now();
   await save(db);
@@ -426,16 +726,17 @@ function getQueueInfo(order, db) {
   const status = order.status;
 
   if (status === 'pending_pay') {
+    const noQueue = isNoQueueOrder(order);
     return {
       phase: 'pending_pay',
       title: '待支付',
-      tip: '请完成支付后进入排队',
+      tip: noQueue ? '支付后即可取货，无需排队制作' : '请完成支付后进入排队',
       ahead: null,
       position: null,
       steps: [
         { key: 'pay', label: '下单支付', done: false, current: true },
-        { key: 'queue', label: '排队制作', done: false, current: false },
-        { key: 'ready', label: '取餐', done: false, current: false },
+        { key: 'queue', label: noQueue ? '成品备货' : '排队制作', done: false, current: false },
+        { key: 'ready', label: noQueue ? '取货' : '取餐', done: false, current: false },
       ],
     };
   }
@@ -472,12 +773,26 @@ function getQueueInfo(order, db) {
       return {
         phase: 'ready',
         title: '已支付',
-        tip: `取货码 ${code}，请带好包装离店（必要时出示）`,
+        tip: `取货号 ${code}，到柜台报号即可`,
         ahead: 0,
         position: 0,
         steps: [
           { key: 'pay', label: '下单支付', done: true, current: false },
           { key: 'queue', label: '称重计价', done: true, current: false },
+          { key: 'ready', label: '取货', done: false, current: true },
+        ],
+      };
+    }
+    if (isNoQueueOrder(order)) {
+      return {
+        phase: 'ready',
+        title: '请取货',
+        tip: `成品已备好，取货号 ${code}，到柜台报号对一下即可`,
+        ahead: 0,
+        position: 0,
+        steps: [
+          { key: 'pay', label: '下单支付', done: true, current: false },
+          { key: 'queue', label: '成品备货', done: true, current: false },
           { key: 'ready', label: '取货', done: false, current: true },
         ],
       };
@@ -490,8 +805,8 @@ function getQueueInfo(order, db) {
       phase: 'ready',
       title: locker ? '已投柜，请取餐' : '请取餐',
       tip: locker
-        ? `已放入「${locker}」，取餐码 ${code}。取餐时请核对取餐码。`
-        : `取餐码 ${code}，请到柜台出示`,
+        ? `已放入「${locker}」，取餐号 ${code}。取餐时请核对取餐号。`
+        : `取餐号 ${code}，到柜台报号，店员对一下即可`,
       ahead: 0,
       position: 0,
       steps: [
@@ -509,8 +824,8 @@ function getQueueInfo(order, db) {
       phase: 'reserved',
       title: '已预约',
       tip: when
-        ? `已排入 ${when} 批次，取餐前半小时内现切（取餐码 ${order.pickupCode || ''}）`
-        : `已预约，取餐前半小时内现切（取餐码 ${order.pickupCode || ''}）`,
+        ? `已排入 ${when} 批次，取餐前40分钟内现切（取餐号 ${order.pickupCode || ''}）`
+        : `已预约，取餐前40分钟内现切（取餐号 ${order.pickupCode || ''}）`,
       ahead: null,
       position: null,
       pickupAt: order.pickupAt || null,
@@ -525,6 +840,7 @@ function getQueueInfo(order, db) {
 
   const paidAt = order.paidAt || order.createdAt || 0;
   const active = (db.orders || []).filter((o) => {
+    if (isNoQueueOrder(o)) return false;
     if (o.status === 'making') return true;
     if (o.status !== 'paid') return false;
     return o.fulfillmentType !== 'reserve';
@@ -547,7 +863,7 @@ function getQueueInfo(order, db) {
     phase: making ? 'making' : 'queued',
     title: making ? '正在制作' : '排队中',
     tip: making
-      ? `师傅正在制作您的果切（取餐码 ${order.pickupCode}）${batchTip}`
+      ? `师傅正在制作您的果切（取餐号 ${order.pickupCode}）${batchTip}`
       : ahead === 0
         ? '马上轮到您，请稍候'
         : `前面还有 ${ahead} 单，您排第 ${position} 位`,
@@ -575,5 +891,7 @@ module.exports = {
   nextPickupCode,
   settlePickedOrders,
   getQueueInfo,
+  isNoQueueCategory,
+  isNoQueueOrder,
   restoreCouponForOrder,
 };

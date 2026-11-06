@@ -14,6 +14,8 @@ Page({
     order: null,
     qrDataUrl: '',
     extraText: '',
+    sideMealText: '',
+    itemLines: [],
     statusText: '',
     queue: {},
   },
@@ -60,7 +62,28 @@ Page({
   async load(silent) {
     try {
       const data = await request(`/api/orders/${this.id}`);
-      const extras = (data.order.extras || []).map((e) => e.name).join('、');
+      const extrasList = data.order.extras || [];
+      const items = Array.isArray(data.order.items) ? data.order.items : [];
+      const itemLines = items.map((it) => {
+        const tops = (it.toppings || []).map((t) => t.name).filter(Boolean);
+        return {
+          name: `${it.productName} · ${it.specName}×${it.quantity}${
+            tops.length ? `（${tops.join('、')}）` : ''
+          }`,
+        };
+      });
+      const toppings = items.length
+        ? ''
+        : extrasList
+            .filter((e) => e && e.kind !== 'sideMeal')
+            .map((e) => e.name)
+            .join('、');
+      const sideFromExtras = extrasList.find((e) => e && e.kind === 'sideMeal');
+      const sideMealText =
+        (sideFromExtras && sideFromExtras.name) ||
+        (data.order.sideMeal && data.order.sideMeal.name
+          ? `小食套餐·${data.order.sideMeal.name}`
+          : '');
       const queue = data.queue || {};
       const isLocker = data.order.deliveryPoint && data.order.deliveryPoint !== 'shop';
       let statusText = STATUS[data.order.status] || data.order.status;
@@ -72,7 +95,9 @@ Page({
       this.setData({
         order: data.order,
         qrDataUrl: data.qrDataUrl || '',
-        extraText: extras,
+        extraText: toppings,
+        sideMealText,
+        itemLines,
         statusText,
         queue,
       });

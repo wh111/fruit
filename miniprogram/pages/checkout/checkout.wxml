@@ -1,0 +1,180 @@
+<view class="page" wx:if="{{items.length}}">
+  <view class="card">
+    <view class="section-title">商品</view>
+    <view class="item-row" wx:for="{{items}}" wx:key="index">
+      <view>
+        <view class="item-name">{{item.productName}}</view>
+        <view class="item-meta">{{item.specName}} ×{{item.quantity}}<text wx:if="{{item.toppingText}}"> · {{item.toppingText}}</text></view>
+      </view>
+      <view class="item-right">
+        <view class="price">¥{{item.lineDisplay}}</view>
+      </view>
+    </view>
+    <view class="mix-tip" wx:if="{{willQueue && hasRetail}}">含零售成品，整单进入制作队列一并出品</view>
+    <view class="mix-tip" wx:elif="{{!willQueue}}">全部为成品零售，支付后即可取货</view>
+  </view>
+
+  <view class="card promo-card" wx:if="{{promoHint || loyaltyLabel || loyaltyHint}}">
+    <view class="promo-title">优惠说明</view>
+    <view class="promo-line" wx:if="{{loyaltyLabel}}">{{loyaltyLabel}}（可与立减券同享）</view>
+    <view class="promo-line" wx:elif="{{loyaltyHint}}">{{loyaltyHint}}</view>
+    <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
+  </view>
+
+  <view class="card" wx:if="{{sideMealAllowed}}">
+    <view class="section-title">{{sideMealTitle}}</view>
+    <view class="muted" style="margin-bottom:8rpx">{{sideMealSubtitle}}</view>
+    <view class="muted" style="margin-bottom:12rpx" wx:if="{{sideMealStockTip}}">{{sideMealStockTip}}</view>
+    <view class="side-meal-box">
+      <view class="side-meal-step">① 选现烤蛋白（套餐价含主食）</view>
+      <view class="protein-list">
+        <view
+          class="protein-card {{sideProteinId === item.id ? 'on' : ''}} {{item.recommend ? 'rec' : ''}}"
+          wx:for="{{sideProteins}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onSideProtein"
+        >
+          <view class="protein-top">
+            <text class="protein-name">{{item.name}}</text>
+            <text class="protein-tag" wx:if="{{item.tag}}">{{item.tag}}</text>
+          </view>
+          <view class="protein-meta">{{item.weight}} · ¥{{item.price}}<text class="chip-strike" wx:if="{{item.onSale}}">¥{{item.originalPrice}}</text></view>
+          <view class="protein-nutri" wx:if="{{item.nutritionTip}}">{{item.nutritionTip}}</view>
+        </view>
+      </view>
+      <view class="side-meal-step">② 配主食（含在套餐内）</view>
+      <view class="chips">
+        <view
+          class="chip {{sideCarbId === item.id ? 'on' : ''}} {{sideProteinId ? '' : 'dim'}}"
+          wx:for="{{sideCarbs}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onSideCarb"
+        >{{item.name}}{{item.weight}}</view>
+      </view>
+      <view class="side-meal-pick" wx:if="{{sideMealPickText}}">已选：{{sideMealPickText}}（支付后扣剩余）</view>
+      <view class="muted" wx:else>请点选上方蛋白才会加购；不选则不加、不扣剩余</view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{!allowReserveCategory}}">
+    <view class="section-title">取货说明</view>
+    <view class="muted">本单商品不支持提前预定，下单后现作现取。</view>
+  </view>
+
+  <view class="card" wx:else>
+    <view class="section-title">取餐方式</view>
+    <view class="modes">
+      <view
+        class="mode {{fulfillmentType === 'reserve' ? 'on' : ''}} {{canReserve ? '' : 'off'}}"
+        data-type="reserve"
+        bindtap="onFulfillment"
+      >
+        <view class="mode-name">提前预定</view>
+        <view class="mode-desc">{{reserveDesc}}</view>
+      </view>
+      <view
+        class="mode {{fulfillmentType === 'now' ? 'on' : ''}}"
+        data-type="now"
+        bindtap="onFulfillment"
+      >
+        <view class="mode-name">现作现取</view>
+        <view class="mode-desc">马上做，高峰可能要等</view>
+      </view>
+    </view>
+    <view class="slot-wrap" wx:if="{{fulfillmentType === 'reserve' && canReserve}}">
+      <view class="section-title" style="margin-top:24rpx">取餐时间</view>
+      <view class="chips">
+        <view
+          class="chip {{slotIndex === index ? 'on' : ''}}"
+          wx:for="{{slots}}"
+          wx:key="pickupAt"
+          wx:for-index="index"
+          data-index="{{index}}"
+          bindtap="onSlot"
+        >{{item.label}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">送达方式</view>
+    <view class="delivery-scope">{{deliveryScopeNote}}</view>
+    <view class="modes col">
+      <view
+        class="mode {{deliveryPoint === item.id ? 'on' : ''}}"
+        wx:for="{{deliveryPoints}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onDelivery"
+      >
+        <view class="mode-name">
+          {{item.name}}
+          <text class="fee" wx:if="{{item.fee > 0}}">+¥{{item.fee}}</text>
+          <text class="fee free" wx:else>免费</text>
+        </view>
+        <view class="mode-desc">{{item.tip}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card coupon-card" bindtap="onPickCoupon">
+    <view class="coupon-row">
+      <view class="section-title" style="margin:0">优惠券</view>
+      <view class="coupon-value {{hasDiscount ? 'on' : ''}}">{{couponLabel}}</view>
+    </view>
+    <view class="muted" style="margin-top:8rpx">每单限用 1 张优惠券</view>
+  </view>
+
+  <view class="card" wx:if="{{walletEnabled}}">
+    <view class="section-title">支付方式</view>
+    <view class="muted" style="margin-bottom:16rpx">余额 ¥{{balance}} · 默认会员支付，不可与微信混付</view>
+    <view class="modes">
+      <view
+        class="mode {{payChannel === 'balance' ? 'on' : ''}}"
+        data-channel="balance"
+        bindtap="onPayChannel"
+      >
+        <view class="mode-name">会员支付</view>
+        <view class="mode-desc">{{balanceEnough ? '整单扣余额' : '余额不足，去充值'}}</view>
+      </view>
+      <view
+        class="mode {{payChannel === 'wechat' ? 'on' : ''}}"
+        data-channel="wechat"
+        bindtap="onPayChannel"
+      >
+        <view class="mode-name">微信支付</view>
+        <view class="mode-desc">整单微信付款</view>
+      </view>
+    </view>
+    <view class="recharge-link" wx:if="{{!balanceEnough}}" bindtap="goRecharge">余额不足，去充值 ›</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">备注</view>
+    <input class="remark" placeholder="少冰 / 分开装等" value="{{remark}}" bindinput="onRemark" />
+  </view>
+
+  <view class="footer">
+    <view class="total">
+      <view wx:if="{{hasDiscount}}" class="save">{{discountLabel}}</view>
+      <view class="muted" wx:if="{{deliveryFee > 0}}" style="font-size:22rpx;margin-bottom:4rpx">含配送费 ¥{{deliveryFee}}</view>
+      <view>
+        合计 <text class="price">¥{{total}}</text>
+        <text class="strike" wx:if="{{hasDiscount}}">¥{{originalTotal}}</text>
+      </view>
+    </view>
+    <view
+      wx:if="{{hasPhone}}"
+      class="btn-primary pay"
+      bindtap="submit"
+    >{{payChannel === 'balance' ? (balanceEnough ? '会员支付' : '去充值') : '微信支付'}}</view>
+    <button
+      wx:else
+      class="btn-primary pay phone-pay"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onPhoneThenPay"
+    >授权手机号并支付</button>
+  </view>
+</view>

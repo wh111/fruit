@@ -1,0 +1,188 @@
+.page { padding-bottom: 180rpx; }
+.section-title { font-weight: 700; margin-bottom: 16rpx; }
+.chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.chip {
+  padding: 14rpx 24rpx;
+  border-radius: 999rpx;
+  background: #f5f1ea;
+  color: #555;
+  font-size: 26rpx;
+}
+.chip.on {
+  background: #fff3e0;
+  color: #e8910f;
+  outline: 2rpx solid #f5a623;
+  font-weight: 600;
+}
+.chip-strike {
+  margin-left: 8rpx;
+  color: #b0b0b0;
+  font-size: 22rpx;
+  text-decoration: line-through;
+  font-weight: 400;
+}
+.chip.dim { opacity: 0.55; }
+.side-meal-box {
+  margin-top: 4rpx;
+  padding: 16rpx 18rpx 18rpx;
+  border-radius: 16rpx;
+  background: #f7f4ee;
+}
+.side-meal-step {
+  margin: 12rpx 0 10rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #5c5346;
+}
+.side-meal-step:first-child { margin-top: 0; }
+.side-meal-pick {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #e8910f;
+  line-height: 1.4;
+}
+.protein-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.protein-card {
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: #fff;
+  border: 2rpx solid transparent;
+}
+.protein-card.on {
+  border-color: #f5a623;
+  background: #fff8e7;
+}
+.protein-card.rec {
+  box-shadow: inset 0 0 0 1rpx rgba(245, 166, 35, 0.35);
+}
+.protein-top {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+.protein-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #333;
+}
+.protein-tag {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #fff;
+  background: #ef6c00;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+}
+.protein-meta {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #e8910f;
+  font-weight: 600;
+}
+.protein-nutri {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #8a8a8a;
+}
+.remark {
+  background: #f7f4ee;
+  border-radius: 12rpx;
+  padding: 16rpx;
+}
+.promo-card {
+  background: linear-gradient(135deg, #fff8e7 0%, #e8f5e9 100%);
+}
+.promo-title { font-weight: 800; margin-bottom: 8rpx; }
+.promo-line { color: #3d8b40; font-size: 26rpx; line-height: 1.5; margin-bottom: 8rpx; }
+.delivery-scope {
+  margin: 0 0 16rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 12rpx;
+  background: #fff8e7;
+  color: #e65100;
+  font-size: 24rpx;
+  line-height: 1.45;
+  font-weight: 600;
+}
+.modes { display: flex; gap: 16rpx; }
+.modes.col { flex-direction: column; }
+.mode {
+  flex: 1;
+  padding: 20rpx 18rpx;
+  border-radius: 20rpx;
+  background: #f7f4ee;
+  border: 2rpx solid transparent;
+}
+.mode.on { background: #fff8e7; border-color: #f5a623; }
+.mode.off { opacity: 0.45; }
+.mode-name { font-weight: 700; font-size: 28rpx; }
+.mode-desc { margin-top: 8rpx; color: #8a8a8a; font-size: 22rpx; line-height: 1.4; }
+.recharge-link {
+  margin-top: 16rpx;
+  color: #e65100;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.mode .fee { margin-left: 10rpx; font-size: 22rpx; color: #e8910f; font-weight: 600; }
+.mode .fee.free { color: #4caf50; }
+.coupon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.coupon-value {
+  flex: 1;
+  text-align: right;
+  color: #8a8a8a;
+  font-size: 26rpx;
+}
+.coupon-value.on { color: #e8910f; font-weight: 700; }
+.coupon-value::after { content: ' ›'; color: #bbb; font-weight: 400; }
+.footer {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  background: #fff;
+  padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 20rpx;
+  box-shadow: 0 -8rpx 24rpx rgba(0,0,0,0.04);
+}
+.total { flex: 1; font-size: 28rpx; }
+.save { color: #4caf50; font-size: 22rpx; font-weight: 700; margin-bottom: 4rpx; }
+.strike {
+  margin-left: 10rpx;
+  color: #b0b0b0;
+  font-size: 24rpx;
+  text-decoration: line-through;
+  font-weight: 400;
+}
+.pay { flex: 1.2; }
+.phone-pay {
+  margin: 0;
+  border: none;
+  line-height: 1.2;
+  font-size: 30rpx;
+}
+.phone-pay::after { border: none; }
+.item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #f0ebe3;
+}
+.item-row:last-child { border-bottom: none; }
+.item-name { font-weight: 600; font-size: 28rpx; }
+.item-meta { color: #8a8a8a; font-size: 22rpx; margin-top: 6rpx; }
+.item-right { text-align: right; flex-shrink: 0; }
+.mix-tip {
+  margin-top: 12rpx;
+  color: #e65100;
+  font-size: 22rpx;
+  line-height: 1.4;
+}

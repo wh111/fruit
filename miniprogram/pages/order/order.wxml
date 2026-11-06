@@ -1,7 +1,7 @@
 <view class="page" wx:if="{{order}}">
   <view class="success card">
     <view class="ok">{{queue.title || statusText}}</view>
-    <view class="hint">{{queue.tip || '请向店员出示取餐码'}}</view>
+    <view class="hint">{{queue.tip || '到柜台报取餐号，店员对一下号即可'}}</view>
 
     <!-- 进度条 -->
     <view class="steps" wx:if="{{queue.steps && queue.steps.length}}">
@@ -20,7 +20,7 @@
       <view class="queue-num reserved">
         <text class="big">{{order.pickupAtText}}</text>
       </view>
-      <view class="queue-meta muted">店员会在取餐时间前半小时内现切制作，高峰不用现场等</view>
+      <view class="queue-meta muted">店员会在取餐时间前40分钟内现切制作，高峰不用现场等</view>
     </view>
 
     <view class="queue-box" wx:if="{{queue.phase === 'queued' || queue.phase === 'making'}}">
@@ -37,16 +37,26 @@
       <view class="queue-meta muted" wx:else>请耐心等待，做好后会显示「请取餐」</view>
     </view>
 
+    <view class="code-label">取餐号</view>
     <view class="code">{{order.pickupCode}}</view>
     <image wx:if="{{qrDataUrl}}" class="qr" src="{{qrDataUrl}}" mode="aspectFit" show-menu-by-longpress />
-    <view class="muted">到店报取餐码即可</view>
+    <view class="muted">到柜台报这个号，店员对一下就行</view>
 
   </view>
 
   <view class="card">
-    <view class="row"><text>商品</text><text>{{order.productName}}</text></view>
-    <view class="row"><text>规格</text><text>{{order.specName}} ×{{order.quantity}}</text></view>
-    <view class="row" wx:if="{{extraText}}"><text>加料</text><text>{{extraText}}</text></view>
+    <block wx:if="{{itemLines.length}}">
+      <view class="row" wx:for="{{itemLines}}" wx:key="index">
+        <text>商品</text>
+        <text>{{item.name}}</text>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="row"><text>商品</text><text>{{order.productName}}</text></view>
+      <view class="row"><text>规格</text><text>{{order.specName}} ×{{order.quantity}}</text></view>
+    </block>
+    <view class="row" wx:if="{{extraText}}"><text>小料</text><text>{{extraText}}</text></view>
+    <view class="row" wx:if="{{sideMealText}}"><text>代餐</text><text>{{sideMealText}}</text></view>
     <view class="row"><text>取餐</text><text>{{order.fulfillmentType === 'reserve' ? (order.pickupAtText || '预约') : '现作现取'}}</text></view>
     <view class="row"><text>送达</text><text>{{order.deliveryPointName || '到店取'}}<text wx:if="{{order.deliveryFee > 0}}"> · 配送费¥{{order.deliveryFee}}</text></text></view>
     <view class="row" wx:if="{{order.discountAmount > 0}}"><text>优惠</text><text>{{order.discountLabel}}</text></view>

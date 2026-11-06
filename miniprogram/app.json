@@ -2,10 +2,14 @@
   "pages": [
     "pages/index/index",
     "pages/detail/detail",
+    "pages/cart/cart",
+    "pages/checkout/checkout",
     "pages/bulk/bulk",
     "pages/order/order",
     "pages/orders/orders",
     "pages/coupons/coupons",
+    "pages/lottery/lottery",
+    "pages/wallet/wallet",
     "pages/groupbuy/groupbuy",
     "pages/profile/profile"
   ],
@@ -43,5 +47,5 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "__usePrivacyCheck__": true
+  "__usePrivacyCheck__": false
 }

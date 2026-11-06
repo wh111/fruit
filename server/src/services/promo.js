@@ -1,15 +1,13 @@
 /**
  * 提前预定批次（Asia/Shanghai）
- * 仅两个批次：
- * - 11:00 前预定，12:00 取餐
- * - 17:00 前预定，18:00 取餐
+ * 午/晚各两档，照顾下班早晚：
+ * - 11:00 前预定 → 11:40 或 12:00 取餐
+ * - 17:00 前预定 → 17:40 或 18:00 取餐
  * 现作现取为补充；优惠走优惠券
  */
 const TZ = '+08:00';
 const LUNCH_ORDER_BEFORE = 11 * 60;
-const LUNCH_PICKUP = 12 * 60;
 const EVENING_ORDER_BEFORE = 17 * 60;
-const EVENING_PICKUP = 18 * 60;
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -36,6 +34,20 @@ function shopParts(ms = Date.now()) {
   const hour = Number(parts.hour);
   const minute = Number(parts.minute);
   return { y, m, d, hour, minute, minutes: hour * 60 + minute };
+}
+
+/** 门店时区星期：0=周日 … 5=周五 … 6=周六 */
+function shopWeekday(ms = Date.now()) {
+  const s = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    weekday: 'short',
+  }).format(new Date(ms));
+  const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return map[s] ?? -1;
+}
+
+function isShopFriday(ms = Date.now()) {
+  return shopWeekday(ms) === 5;
 }
 
 function shopStamp(y, m, d, hour, minute) {
@@ -76,21 +88,39 @@ function batchDefs(now = Date.now()) {
   const n = shopParts(now);
   return [
     {
-      code: 'lunch',
+      code: 'lunch-40',
       orderBefore: LUNCH_ORDER_BEFORE,
-      pickupMinutes: LUNCH_PICKUP,
+      pickupMinutes: 11 * 60 + 40,
+      time: '11:40',
+      pickupAt: shopStamp(n.y, n.m, n.d, 11, 40),
+      label: '11:40 取餐（偏早）',
+      reason: '11:00 前预定，11:40 取餐',
+    },
+    {
+      code: 'lunch-hour',
+      orderBefore: LUNCH_ORDER_BEFORE,
+      pickupMinutes: 12 * 60,
       time: '12:00',
       pickupAt: shopStamp(n.y, n.m, n.d, 12, 0),
-      label: '12:00 取餐',
+      label: '12:00 取餐（偏晚）',
       reason: '11:00 前预定，12:00 取餐',
     },
     {
-      code: 'evening',
+      code: 'evening-40',
       orderBefore: EVENING_ORDER_BEFORE,
-      pickupMinutes: EVENING_PICKUP,
+      pickupMinutes: 17 * 60 + 40,
+      time: '17:40',
+      pickupAt: shopStamp(n.y, n.m, n.d, 17, 40),
+      label: '17:40 取餐（偏早）',
+      reason: '17:00 前预定，17:40 取餐',
+    },
+    {
+      code: 'evening-hour',
+      orderBefore: EVENING_ORDER_BEFORE,
+      pickupMinutes: 18 * 60,
       time: '18:00',
       pickupAt: shopStamp(n.y, n.m, n.d, 18, 0),
-      label: '18:00 取餐',
+      label: '18:00 取餐（偏晚）',
       reason: '17:00 前预定，18:00 取餐',
     },
   ];
@@ -135,21 +165,68 @@ function applyDiscount(originalAmount, disc) {
   };
 }
 
-function getPromoState(now = Date.now()) {
+/** 默认支持预定的大分类（零售等成品默认关闭） */
+const DEFAULT_RESERVE_CATEGORIES = ['果切系列', '水果捞'];
+
+/** 管理端可选的全部大分类 */
+const ALL_PRODUCT_CATEGORIES = [
+  '果切系列',
+  '水果零售',
+  '水果捞',
+  '热果奶',
+  '经典热饮',
+];
+
+function getReserveCategories(db) {
+  const raw = db && db.settings && db.settings.reserveCategories;
+  if (Array.isArray(raw)) {
+    return raw.map((x) => String(x || '').trim()).filter(Boolean);
+  }
+  return DEFAULT_RESERVE_CATEGORIES.slice();
+}
+
+function setReserveCategories(db, list) {
+  if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+  const allowed = new Set(ALL_PRODUCT_CATEGORIES);
+  const next = (Array.isArray(list) ? list : [])
+    .map((x) => String(x || '').trim())
+    .filter((x) => x && allowed.has(x));
+  // 去重保序
+  const seen = new Set();
+  db.settings.reserveCategories = next.filter((x) => {
+    if (seen.has(x)) return false;
+    seen.add(x);
+    return true;
+  });
+  return db.settings.reserveCategories;
+}
+
+function categoryAllowsReserve(db, category) {
+  const cat = String(category || '').trim();
+  if (!cat) return false;
+  return getReserveCategories(db).includes(cat);
+}
+
+function getPromoState(now = Date.now(), db = null) {
   const n = shopParts(now);
   const lunchOpen = n.minutes < LUNCH_ORDER_BEFORE;
   const eveningOpen = n.minutes < EVENING_ORDER_BEFORE;
   const slots = buildSlots(now);
   const banners = [];
-  if (lunchOpen) banners.push('11 点前可预定 12 点取餐');
-  if (eveningOpen) banners.push('5 点前可预定 6 点取餐');
+  if (lunchOpen) banners.push('11 点前可预定 11:40 或 12:00 取餐');
+  if (eveningOpen) banners.push('5 点前可预定 17:40 或 18:00 取餐');
   if (!lunchOpen && !eveningOpen) {
     banners.push('今日预定批次已结束，可现作现取');
   }
   let reserveDesc = '今日预定已结束';
-  if (lunchOpen && eveningOpen) reserveDesc = '可选 12:00 / 18:00 取餐';
-  else if (lunchOpen) reserveDesc = '11 点前预定，12 点取餐';
-  else if (eveningOpen) reserveDesc = '5 点前预定，6 点取餐';
+  if (lunchOpen && eveningOpen) {
+    reserveDesc = '可选 11:40 / 12:00 / 17:40 / 18:00（照顾下班早晚）';
+  } else if (lunchOpen) {
+    reserveDesc = '11 点前预定，可选 11:40 或 12:00 取餐';
+  } else if (eveningOpen) {
+    reserveDesc = '5 点前预定，可选 17:40 或 18:00 取餐';
+  }
+  const reserveCategories = getReserveCategories(db);
   return {
     now,
     lunchOpen,
@@ -159,10 +236,12 @@ function getPromoState(now = Date.now()) {
     banners,
     hint: banners.join('；'),
     reserveDesc,
+    reserveCategories,
     rules: [
-      '11:00 前可预定 12:00 取餐',
-      '17:00 前可预定 18:00 取餐',
+      '11:00 前可预定：11:40（偏早）或 12:00（偏晚）取餐',
+      '17:00 前可预定：17:40（偏早）或 18:00（偏晚）取餐',
       '优惠请使用优惠券；预定可用预定立减券',
+      '仅支持预定的商品分类可选提前预定',
     ],
   };
 }
@@ -178,7 +257,7 @@ function normalizeFulfillment({ fulfillmentType, pickupAt, now = Date.now() }) {
   }
   const batch = matchBatch(ts, now);
   if (!batch) {
-    throw Object.assign(new Error('仅可预定 12:00 或 18:00 取餐'), { status: 400 });
+    throw Object.assign(new Error('仅可预定 11:40 / 12:00 / 17:40 / 18:00 取餐'), { status: 400 });
   }
   const n = shopParts(now);
   if (n.minutes >= batch.orderBefore) {
@@ -189,8 +268,12 @@ function normalizeFulfillment({ fulfillmentType, pickupAt, now = Date.now() }) {
 
 module.exports = {
   DISCOUNT_RATE: 0,
+  DEFAULT_RESERVE_CATEGORIES,
+  ALL_PRODUCT_CATEGORIES,
   todayKey,
   shopParts,
+  shopWeekday,
+  isShopFriday,
   shopStamp,
   formatHm,
   formatPickupLabel,
@@ -199,6 +282,9 @@ module.exports = {
   applyDiscount,
   buildSlots,
   getPromoState,
+  getReserveCategories,
+  setReserveCategories,
+  categoryAllowsReserve,
   normalizeFulfillment,
   round2,
 };

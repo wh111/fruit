@@ -35,7 +35,10 @@ function decorateItems(items) {
     const qty = Math.max(1, Number(it.quantity) || 1);
     return {
       ...it,
-      toppingText: (it.toppingNames || []).join('、'),
+      toppingText: [
+        ...((it.extraNames || []).length ? [(it.extraNames || []).join('、')] : []),
+        ...((it.toppingNames || []).length ? [(it.toppingNames || []).join('、')] : []),
+      ].join(' · '),
       lineDisplay: (unit * qty).toFixed(2),
     };
   });
@@ -248,7 +251,12 @@ Page({
         reserveDesc =
           promo.reserveDesc || '可选 11:40 / 12:00 / 17:40 / 18:00 取餐，可用预定券';
       }
-      else if (!allowReserveCategory) reserveDesc = '本单有商品不支持预定';
+      else if (!allowReserveCategory) {
+        const onlyRetail =
+          cats.length > 0 &&
+          cats.every((c) => c === '水果零售' || c === '零售什锦');
+        reserveDesc = onlyRetail ? '水果零售仅支持现取' : '本单有商品不支持预定';
+      }
       this.setData({
         slots,
         slotIndex,
@@ -460,7 +468,7 @@ Page({
       await this.submit();
     } catch (err) {
       wx.hideLoading();
-      wx.showToast({ title: (err && err.message) || '请先授权手机号', icon: 'none' });
+      wx.showToast({ title: (err && err.message) || '请先完成手机号快捷登录', icon: 'none' });
     }
   },
 
@@ -493,7 +501,7 @@ Page({
         title: '余额不足',
         content: `当前余额 ¥${Number(this.data.balance || 0).toFixed(2)}，请先充值后再用会员支付`,
         confirmText: '去充值',
-        cancelText: '改用微信',
+        cancelText: '改用在线支付',
         success: (res) => {
           if (res.confirm) this.goRecharge();
           else this.setData({ payChannel: 'wechat' });
@@ -526,7 +534,7 @@ Page({
       if (!(user.hasPhone || user.phone)) {
         wx.hideLoading();
         this.setData({ hasPhone: false });
-        wx.showToast({ title: '请先授权手机号', icon: 'none' });
+        wx.showToast({ title: '请先完成手机号快捷登录', icon: 'none' });
         return;
       }
       this.setData({ hasPhone: true });

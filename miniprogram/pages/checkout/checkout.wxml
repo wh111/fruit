@@ -10,8 +10,7 @@
         <view class="price">¥{{item.lineDisplay}}</view>
       </view>
     </view>
-    <view class="mix-tip" wx:if="{{willQueue && hasRetail}}">含零售成品，整单进入制作队列一并出品</view>
-    <view class="mix-tip" wx:elif="{{!willQueue}}">全部为成品零售，支付后即可取货</view>
+    <view class="mix-tip" wx:if="{{!willQueue}}">全部为成品零售，支付后即可取货</view>
   </view>
 
   <view class="card promo-card" wx:if="{{promoHint || loyaltyLabel || loyaltyHint}}">
@@ -175,6 +174,6 @@
       class="btn-primary pay phone-pay"
       open-type="getPhoneNumber"
       bindgetphonenumber="onPhoneThenPay"
-    >授权手机号并支付</button>
+    >手机号快捷登录并支付</button>
   </view>
 </view>

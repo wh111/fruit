@@ -7,6 +7,7 @@ const {
   bindPhoneNumber,
 } = require('../../utils/api');
 const cartUtil = require('../../utils/cart');
+const { enableShareMenu, homeShare } = require('../../utils/share');
 
 const WHEEL_COLORS = ['#ef6c00', '#f9a825', '#43a047', '#fb8c00', '#66bb6a', '#e65100'];
 const SPIN_MS = 4200;
@@ -74,8 +75,18 @@ Page({
   _spinTimer: null,
 
   onShow() {
+    enableShareMenu();
     this.refreshCartBar();
     this.load();
+  },
+
+  onShareAppMessage() {
+    return homeShare();
+  },
+
+  onShareTimeline() {
+    const share = homeShare();
+    return { title: share.title };
   },
 
   refreshCartBar() {
@@ -105,12 +116,13 @@ Page({
   },
 
   async refreshPhoneState() {
+    // 审核要求：进点单页可先浏览，不强制弹手机号授权
     try {
       const me = await request('/api/auth/me');
       if (me && me.user) {
         wx.setStorageSync('user', me.user);
         const hasPhone = !!(me.user.hasPhone || me.user.phone);
-        this.setData({ hasPhone, showPhoneAuth: !hasPhone });
+        this.setData({ hasPhone });
         return hasPhone;
       }
     } catch (_) {
@@ -118,9 +130,15 @@ Page({
     }
     const user = wx.getStorageSync('user') || {};
     const hasPhone = !!(user.hasPhone || user.phone);
-    const skipped = !!wx.getStorageSync('sg_phone_skip_session');
-    this.setData({ hasPhone, showPhoneAuth: !hasPhone && !skipped });
+    this.setData({ hasPhone });
     return hasPhone;
+  },
+
+  /** 用户主动操作时再弹出手机号快捷登录 */
+  openPhoneAuth() {
+    if (this.data.hasPhone) return false;
+    this.setData({ showPhoneAuth: true });
+    return true;
   },
 
   async load() {
@@ -259,6 +277,7 @@ Page({
   async onBanner() {
     try {
       await ensureLogin();
+      if (!this.data.hasPhone && this.openPhoneAuth()) return;
       wx.navigateTo({ url: '/pages/coupons/coupons' });
     } catch (e) {
       wx.showToast({ title: e.message || '请先登录', icon: 'none' });
@@ -330,9 +349,7 @@ Page({
     const monthlyCount = pending.monthlyCount || 0;
     const reserveAmt = pending.reserveAmt || 3;
     const afterGrantModals = () => {
-      if (!this.data.hasPhone && !wx.getStorageSync('sg_phone_skip_session')) {
-        this.setData({ showPhoneAuth: true });
-      }
+      /* 不自动索要手机号，避免审核判定「未体验即强制授权」 */
     };
     if (grantedCount) {
       wx.showModal({
@@ -387,9 +404,6 @@ Page({
       wheelTransition: 'none',
     });
     if (hadPending) this.runAfterLotteryQueue();
-    else if (!this.data.hasPhone && !wx.getStorageSync('sg_phone_skip_session')) {
-      this.setData({ showPhoneAuth: true });
-    }
   },
 
   lotteryAgain() {
@@ -476,12 +490,12 @@ Page({
           ? '开发环境已绑测试号'
           : data.merged
             ? '已同步到原账号'
-            : '绑定成功',
+            : '登录成功',
         icon: data.devMock ? 'none' : 'success',
       });
     } catch (err) {
       wx.hideLoading();
-      wx.showToast({ title: (err && err.message) || '授权失败', icon: 'none' });
+      wx.showToast({ title: (err && err.message) || '登录失败', icon: 'none' });
     }
   },
 });

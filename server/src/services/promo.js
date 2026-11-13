@@ -165,24 +165,30 @@ function applyDiscount(originalAmount, disc) {
   };
 }
 
-/** 默认支持预定的大分类（零售等成品默认关闭） */
+/** 默认支持预定的大分类（水果零售等成品永不参与预定） */
 const DEFAULT_RESERVE_CATEGORIES = ['果切系列', '水果捞'];
 
-/** 管理端可选的全部大分类 */
+/** 永不支持预定的分类（成品零售现取） */
+const NO_RESERVE_CATEGORIES = new Set(['水果零售', '零售什锦']);
+
+/** 管理端可选的全部大分类（不含水果零售） */
 const ALL_PRODUCT_CATEGORIES = [
   '果切系列',
-  '水果零售',
   '水果捞',
   '热果奶',
   '经典热饮',
 ];
 
+function isNoReserveCategory(category) {
+  return NO_RESERVE_CATEGORIES.has(String(category || '').trim());
+}
+
 function getReserveCategories(db) {
   const raw = db && db.settings && db.settings.reserveCategories;
-  if (Array.isArray(raw)) {
-    return raw.map((x) => String(x || '').trim()).filter(Boolean);
-  }
-  return DEFAULT_RESERVE_CATEGORIES.slice();
+  const list = Array.isArray(raw)
+    ? raw.map((x) => String(x || '').trim()).filter(Boolean)
+    : DEFAULT_RESERVE_CATEGORIES.slice();
+  return list.filter((c) => !isNoReserveCategory(c));
 }
 
 function setReserveCategories(db, list) {
@@ -190,7 +196,7 @@ function setReserveCategories(db, list) {
   const allowed = new Set(ALL_PRODUCT_CATEGORIES);
   const next = (Array.isArray(list) ? list : [])
     .map((x) => String(x || '').trim())
-    .filter((x) => x && allowed.has(x));
+    .filter((x) => x && allowed.has(x) && !isNoReserveCategory(x));
   // 去重保序
   const seen = new Set();
   db.settings.reserveCategories = next.filter((x) => {
@@ -203,7 +209,7 @@ function setReserveCategories(db, list) {
 
 function categoryAllowsReserve(db, category) {
   const cat = String(category || '').trim();
-  if (!cat) return false;
+  if (!cat || isNoReserveCategory(cat)) return false;
   return getReserveCategories(db).includes(cat);
 }
 

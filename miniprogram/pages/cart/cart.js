@@ -2,11 +2,16 @@ const { mediaUrl } = require('../../utils/api');
 const cart = require('../../utils/cart');
 
 function decorate(list) {
-  return (list || []).map((it) => ({
-    ...it,
-    coverUrl: it.coverUrl || mediaUrl(it.cover),
-    toppingText: (it.toppingNames || []).join('、'),
-  }));
+  return (list || []).map((it) => {
+    const parts = [];
+    if ((it.extraNames || []).length) parts.push((it.extraNames || []).join('、'));
+    if ((it.toppingNames || []).length) parts.push((it.toppingNames || []).join('、'));
+    return {
+      ...it,
+      coverUrl: it.coverUrl || mediaUrl(it.cover),
+      toppingText: parts.join(' · '),
+    };
+  });
 }
 
 Page({

@@ -30,8 +30,17 @@ const defaultDb = () => ({
   seq: { orderDay: '', pickupNo: 0 },
 });
 
-/** 商品上的加料已停用。坚果等小料走 db.toppings，结账默认不选。 */
-const DIY_EXTRAS = [];
+/** 水果捞自选水果（不含草莓、车厘子；小料仍走 db.toppings） */
+const DIY_FRUIT_EXTRAS = [
+  { id: 'hami', name: '哈密瓜', price: 0 },
+  { id: 'honeydew', name: '甜瓜', price: 0 },
+  { id: 'dragon', name: '红心火龙果', price: 0 },
+  { id: 'banana', name: '香蕉', price: 0 },
+  { id: 'mango', name: '芒果', price: 0 },
+  { id: 'pineapple', name: '凤梨', price: 0 },
+  { id: 'shine', name: '阳光玫瑰', price: 0 },
+];
+const DIY_EXTRAS = DIY_FRUIT_EXTRAS;
 
 /** 水果超级碗（少糖正餐碗，客单价 ¥30–38） */
 function fruitSuperBowlProducts(now, uid, img) {
@@ -292,82 +301,34 @@ function fruitCutMenuProducts(now, img) {
   ];
 }
 
-/** 水果捞系列（市面流行款，客单价 ¥22–28） */
-function fruitMixProducts(now, uid, img) {
+/** 水果捞：仅上线三拼 / 五拼自选（酸奶底；水果现场自选） */
+function fruitMixProducts(now, _uid, img) {
+  const fruits = DIY_FRUIT_EXTRAS.map((e) => ({ ...e }));
   return [
     {
-      id: uid(),
-      name: '招牌酸奶水果捞',
-      desc: '浓稠原味酸奶+三种时令水果，透明碗装',
+      id: 'mix-diy-3',
+      name: '三拼自选水果捞',
+      desc: '酸奶底 · 自选 3 种水果',
       cover: img('mix-yogurt-fruit.png'),
       category: '水果捞',
       status: 1,
       sort: 200,
-      specs: [
-        { id: 's300', name: '300g', price: 22, stock: 999 },
-        { id: 's450', name: '450g', price: 28, stock: 999 },
-      ],
-      extras: [],
+      extraPick: 3,
+      specs: [{ id: 'std', name: '标准份', price: 22, stock: 999 }],
+      extras: fruits,
       createdAt: now,
     },
     {
-      id: uid(),
-      name: '椰奶西米捞',
-      desc: '生椰乳底+西米+芒果西瓜，清凉解腻',
-      cover: img('mix-coconut-sago.png'),
-      category: '水果捞',
-      status: 1,
-      sort: 210,
-      specs: [
-        { id: 's300', name: '300g', price: 24, stock: 999 },
-        { id: 's450', name: '450g', price: 28, stock: 999 },
-      ],
-      extras: [],
-      createdAt: now,
-    },
-    {
-      id: uid(),
-      name: '杨枝甘露捞',
-      desc: '芒果泥+西柚粒+西米+椰奶，经典港式',
+      id: 'mix-diy-5',
+      name: '五拼自选水果捞',
+      desc: '酸奶底 · 自选 5 种水果',
       cover: img('mix-mango-pomelo.png'),
       category: '水果捞',
       status: 1,
-      sort: 220,
-      specs: [
-        { id: 's300', name: '300g', price: 26, stock: 999 },
-        { id: 's450', name: '450g', price: 30, stock: 999 },
-      ],
-      extras: [],
-      createdAt: now,
-    },
-    {
-      id: uid(),
-      name: '芋圆烧仙草捞',
-      desc: '手作芋圆+烧仙草+水果，Q弹有层次',
-      cover: img('mix-taro-grassjelly.png'),
-      category: '水果捞',
-      status: 1,
-      sort: 230,
-      specs: [
-        { id: 's300', name: '300g', price: 26, stock: 999 },
-        { id: 's450', name: '450g', price: 30, stock: 999 },
-      ],
-      extras: [],
-      createdAt: now,
-    },
-    {
-      id: uid(),
-      name: '血糯米酸奶捞',
-      desc: '血糯米垫底+酸奶+水果，饱腹下午茶',
-      cover: img('mix-purple-rice.png'),
-      category: '水果捞',
-      status: 1,
-      sort: 240,
-      specs: [
-        { id: 's300', name: '300g', price: 28, stock: 999 },
-        { id: 's450', name: '450g', price: 32, stock: 999 },
-      ],
-      extras: [],
+      sort: 210,
+      extraPick: 5,
+      specs: [{ id: 'std', name: '标准份', price: 28, stock: 999 }],
+      extras: fruits,
       createdAt: now,
     },
   ];
@@ -381,19 +342,18 @@ function seedProducts(db) {
   db.products = [
     // —— 一、果切系列（单拼 / 双拼 / 三拼） ——
     ...fruitCutMenuProducts(now, img),
-    // —— 水果零售（多规格，可走抽奖免单） ——
+    // —— 水果零售（免洗什锦 400g / 500g，可走抽奖免单） ——
     {
       id: uid(),
-      name: '时令水果零售',
-      desc: '当日时令鲜果拼装，可选规格；免洗袋装，开袋即食',
-      cover: img('fruit-colorful-four.png'),
+      name: '免洗什锦',
+      desc: '免洗袋装时令什锦，开袋即食 · 可选 400g / 500g',
+      cover: img('retail-blueberry-tomato-shine.jpg'),
       category: '水果零售',
       status: 1,
       sort: 25,
       specs: [
-        { id: 's', name: '小盒约200g', price: 12, stock: 999 },
-        { id: 'm', name: '中盒约300g', price: 16, stock: 999 },
-        { id: 'l', name: '大盒约400g', price: 20, stock: 999 },
+        { id: 's400', name: '400g', price: 20, stock: 999 },
+        { id: 's500', name: '500g', price: 25, stock: 999 },
       ],
       extras: [],
       createdAt: now,
@@ -550,6 +510,7 @@ async function load() {
     await ensureToppings(db);
     await ensureRetireLegacyBowls(db);
     await ensureFruitCutMenu(db);
+    await ensureDiyFruitMixMenu(db);
     try {
       const { ensureSideMeal } = require('./services/sideMeals');
       ensureSideMeal(db);
@@ -578,6 +539,7 @@ async function load() {
   await ensureToppings(db);
   await ensureRetireLegacyBowls(db);
   await ensureFruitCutMenu(db);
+  await ensureDiyFruitMixMenu(db);
   try {
     const { ensureSideMeal } = require('./services/sideMeals');
     ensureSideMeal(db);
@@ -799,6 +761,74 @@ async function ensureFruitCutMenu(db) {
   if (changed) await save(db);
 }
 
+/**
+ * 水果捞只保留三拼/五拼自选；旧款水果捞、热果奶、经典热饮全部下架。
+ * 自选 SKU 每次对齐 extras / extraPick / 文案（价格若已人工改过则保留）。
+ */
+async function ensureDiyFruitMixMenu(db) {
+  if (!Array.isArray(db.products)) db.products = [];
+  const now = Date.now();
+  const img = (name) => `/assets/products/menu/${name}`;
+  const wanted = fruitMixProducts(now, null, img);
+  const wantedIds = new Set(wanted.map((p) => p.id));
+  let changed = false;
+
+  for (const p of wanted) {
+    const idx = db.products.findIndex((x) => x && x.id === p.id);
+    if (idx < 0) {
+      db.products.push({ ...p, extras: p.extras.map((e) => ({ ...e })) });
+      changed = true;
+      continue;
+    }
+    const cur = db.products[idx];
+    // 不覆盖 status：后台下架后须保持下架，避免重启又强制上架
+    const patch = {
+      name: p.name,
+      desc: p.desc,
+      category: '水果捞',
+      sort: p.sort,
+      extraPick: p.extraPick,
+      cover: cur.cover || p.cover,
+      extras: DIY_FRUIT_EXTRAS.map((e) => ({ ...e })),
+    };
+    if (!Array.isArray(cur.specs) || !cur.specs.length) {
+      patch.specs = p.specs.map((s) => ({ ...s }));
+    }
+    let dirty = false;
+    for (const [k, v] of Object.entries(patch)) {
+      const same =
+        k === 'extras'
+          ? JSON.stringify(cur.extras || []) === JSON.stringify(v)
+          : cur[k] === v;
+      if (!same) {
+        cur[k] = v;
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      cur.updatedAt = now;
+      changed = true;
+    }
+  }
+
+  for (const cur of db.products) {
+    if (!cur) continue;
+    const cat = String(cur.category || '');
+    if (cat === '水果捞' && !wantedIds.has(cur.id) && cur.status !== 0) {
+      cur.status = 0;
+      cur.updatedAt = now;
+      changed = true;
+    }
+    if ((cat === '热果奶' || cat === '经典热饮') && cur.status !== 0) {
+      cur.status = 0;
+      cur.updatedAt = now;
+      changed = true;
+    }
+  }
+
+  if (changed) await save(db);
+}
+
 async function save(db) {
   if (DRIVER === 'mysql') {
     const mysql = require('./db-mysql');
@@ -818,8 +848,10 @@ module.exports = {
   fruitMixProducts,
   fruitSuperBowlProducts,
   ensureFruitCutMenu,
+  ensureDiyFruitMixMenu,
   DATA_DIR,
   DB_FILE,
   DRIVER,
   DIY_EXTRAS,
+  DIY_FRUIT_EXTRAS,
 };

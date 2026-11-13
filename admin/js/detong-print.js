@@ -598,6 +598,144 @@
       .filter((x) => x.code);
   }
 
+  /** 稳定条码：优先规格/商品自带 barcode，否则由商品 id + 规格 id 生成 */
+  function skuBarcode(product, spec) {
+    const clean = (raw) =>
+      String(raw || '')
+        .replace(/[^0-9A-Za-z\-]/g, '')
+        .slice(0, 22);
+    if (spec && spec.barcode) {
+      const c = clean(spec.barcode);
+      if (c) return c;
+    }
+    if (product && product.barcode) {
+      const c = clean(product.barcode);
+      if (c) return c;
+    }
+    const pid = String(product && product.id ? product.id : '')
+      .replace(/-/g, '')
+      .slice(-10);
+    const sid = String((spec && spec.id) || 'std').replace(/[^0-9A-Za-z]/g, '') || 'std';
+    return clean(`SG${pid}${sid}`) || `SG${Date.now().toString().slice(-8)}`;
+  }
+
+  function isRetailMixProduct(p) {
+    if (!p) return false;
+    const cat = String(p.category || '');
+    return cat === '水果零售' || cat === '零售什锦';
+  }
+
+  function retailDefaultCopies() {
+    const n = Number($('retailLabelDefaultCopies')?.value);
+    if (!Number.isFinite(n) || n < 0) return 10;
+    return Math.min(200, Math.floor(n));
+  }
+
+  function collectRetailPrintItems() {
+    return [...document.querySelectorAll('#retailLabelBody tr[data-code]')]
+      .map((tr) => {
+        const copies = Math.max(0, Math.min(200, Number(tr.querySelector('.retail-copies')?.value) || 0));
+        if (copies <= 0) return null;
+        return {
+          code: tr.dataset.code,
+          title: tr.dataset.title || '',
+          price: tr.dataset.price !== '' ? tr.dataset.price : undefined,
+          copies,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  async function loadRetailMixLabels() {
+    const body = $('retailLabelBody');
+    const hint = $('retailLabelHint');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="5" class="muted">加载中…</td></tr>';
+    if (hint) hint.textContent = '';
+    try {
+      const token = localStorage.getItem('sg_admin_token') || '';
+      const res = await fetch('/api/admin/products', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '拉取商品失败');
+
+      const onShelf = (data.list || []).filter((p) => isRetailMixProduct(p) && p.status !== 0);
+      const rows = [];
+      onShelf.forEach((p) => {
+        const specs = p.specs && p.specs.length ? p.specs : [{ id: 'std', name: '标准', price: 0 }];
+        specs.forEach((sp) => {
+          const code = skuBarcode(p, sp);
+          const title = `${p.name}${sp.name ? ' · ' + sp.name : ''}`;
+          rows.push({
+            productId: p.id,
+            name: p.name,
+            specName: sp.name || '',
+            price: sp.price,
+            code,
+            title,
+          });
+        });
+      });
+
+      if (!rows.length) {
+        body.innerHTML =
+          '<tr><td colspan="5" class="muted">暂无上架的水果零售商品。请到「商品」页把什锦上架（400g / 500g）。</td></tr>';
+        if (hint) hint.textContent = '未找到上架菜单';
+        return;
+      }
+
+      const def = retailDefaultCopies();
+      body.innerHTML = rows
+        .map(
+          (r) => `<tr data-code="${escapeAttr(r.code)}" data-title="${escapeAttr(r.title)}" data-price="${escapeAttr(r.price ?? '')}">
+            <td>${escapeHtml(r.name)}</td>
+            <td>${escapeHtml(r.specName || '-')}</td>
+            <td>${r.price != null && r.price !== '' ? '¥' + r.price : '-'}</td>
+            <td class="code-cell">${escapeHtml(r.code)}</td>
+            <td><input type="number" class="retail-copies" min="0" max="200" value="${def}" /></td>
+          </tr>`
+        )
+        .join('');
+      if (hint) hint.textContent = `已加载 ${onShelf.length} 个上架商品 · ${rows.length} 个规格`;
+    } catch (e) {
+      body.innerHTML = `<tr><td colspan="5" class="muted">${escapeHtml(e.message || '加载失败')}</td></tr>`;
+      if (hint) hint.textContent = e.message || '加载失败';
+      if (typeof toast === 'function') toast(e.message || '加载水果零售菜单失败');
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, '&#39;');
+  }
+
+  function fillRetailCopies(value) {
+    const n = Math.max(0, Math.min(200, Number(value) || 0));
+    document.querySelectorAll('#retailLabelBody .retail-copies').forEach((inp) => {
+      inp.value = String(n);
+    });
+  }
+
+  async function printRetailMixLabels() {
+    const items = collectRetailPrintItems();
+    if (!items.length) {
+      if (typeof toast === 'function') toast('请先填写要打印的张数（大于 0）');
+      setBatchProgress('未选择打印张数');
+      return;
+    }
+    const total = items.reduce((sum, it) => sum + it.copies, 0);
+    if (!confirm(`将打印 ${items.length} 种规格，共 ${total} 张条形码标签，确认？`)) return;
+    await runBatch(items);
+  }
+
   function setBatchProgress(msg) {
     const el = $('batchPrintProgress');
     if (el) el.textContent = msg || '';
@@ -736,15 +874,12 @@
           .filter((p) => p.status !== 0)
           .flatMap((p) => {
             const specs = p.specs && p.specs.length ? p.specs : [{ id: 'std', name: '标准', price: 0 }];
-            return specs.map((sp) => {
-              const raw = String(p.barcode || `SG${String(p.id).replace(/-/g, '').slice(-8)}${sp.id || ''}`);
-              return {
-                code: raw.replace(/[^0-9A-Za-z\-]/g, '').slice(0, 22) || `SG${Date.now().toString().slice(-8)}`,
-                title: `${p.name}${sp.name ? ' · ' + sp.name : ''}`,
-                price: sp.price,
-                copies,
-              };
-            });
+            return specs.map((sp) => ({
+              code: skuBarcode(p, sp),
+              title: `${p.name}${sp.name ? ' · ' + sp.name : ''}`,
+              price: sp.price,
+              copies,
+            }));
           });
         if (!items.length) throw new Error('没有在售商品');
         await runBatch(items);
@@ -753,6 +888,25 @@
         setBatchProgress(e.message || '失败');
       }
     });
+
+    $('retailLabelRefresh')?.addEventListener('click', () => {
+      loadRetailMixLabels();
+    });
+    $('retailLabelFillCopies')?.addEventListener('click', () => {
+      fillRetailCopies(retailDefaultCopies());
+    });
+    $('retailLabelClearCopies')?.addEventListener('click', () => {
+      fillRetailCopies(0);
+    });
+    $('retailLabelPrint')?.addEventListener('click', () => {
+      printRetailMixLabels();
+    });
+    // 首次进入管理端时若已在标签页，稍后由 admin.refresh 再拉一次
+    setTimeout(() => {
+      if (document.getElementById('tab-hardware') && !document.getElementById('tab-hardware').classList.contains('hidden')) {
+        loadRetailMixLabels();
+      }
+    }, 0);
 
     const previewBatch = () => {
       const mode = document.querySelector('input[name="batchMode"]:checked')?.value || 'serial';
@@ -803,6 +957,8 @@
     printBarcodeLabel,
     printBarcodeBatch,
     buildSerialItems,
+    skuBarcode,
+    loadRetailMixLabels,
     loadSettings,
     saveSettings,
     refreshPrinterSelect,

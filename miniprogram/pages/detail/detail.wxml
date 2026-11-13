@@ -6,12 +6,15 @@
     <view class="price">¥{{unitPrice}}</view>
   </view>
 
-  <view class="card promo-card" wx:if="{{promoHint || loyaltyHint || isRetail}}">
+  <view class="card" wx:if="{{isRetail}}">
+    <view class="muted">成品现取，不参与预定。</view>
+  </view>
+
+  <view class="card promo-card" wx:elif="{{promoHint || loyaltyHint}}">
     <view class="promo-title">优惠说明</view>
     <view class="promo-line" wx:if="{{loyaltyHint}}">{{loyaltyHint}}</view>
     <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
-    <view class="muted" wx:if="{{isRetail}}">成品零售可与果切同车；混点时整单进制作队列。</view>
-    <view class="muted" wx:else>按单现切，取餐前最多40分钟制作。可多选加入购物车一并结算。</view>
+    <view class="muted">现切现做，取餐前约 40 分钟。</view>
   </view>
 
   <view class="card">
@@ -27,7 +30,21 @@
     </view>
   </view>
 
-  <view class="card" wx:if="{{product.extras.length}}">
+  <view class="card" wx:if="{{extraPick > 0}}">
+    <view class="section-title">自选水果（必选 {{extraPick}} 种）</view>
+    <view class="muted" style="margin-bottom:16rpx">已选 {{extras.length}}/{{extraPick}}</view>
+    <view class="chips">
+      <view
+        class="chip {{extraMap[item.id] ? 'on' : ''}}"
+        wx:for="{{product.extras}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onExtra"
+      >{{item.name}}</view>
+    </view>
+  </view>
+
+  <view class="card" wx:elif="{{product.extras && product.extras.length}}">
     <view class="section-title">加料（可多选）</view>
     <view class="chips">
       <view
@@ -42,7 +59,6 @@
 
   <view class="card" wx:if="{{isFruitBowl && toppings.length}}">
     <view class="section-title">小料（可多选，默认不加）</view>
-    <view class="muted" style="margin-bottom:16rpx">鸡胸、水煮蛋、坚果等，按份加价</view>
     <view class="chips">
       <view
         class="chip {{toppingMap[item.id] ? 'on' : ''}}"

@@ -1,5 +1,6 @@
 const { request, mediaUrl } = require('../../utils/api');
 const cartUtil = require('../../utils/cart');
+const { enableShareMenu, productShare } = require('../../utils/share');
 
 Page({
   data: {
@@ -8,6 +9,7 @@ Page({
     specId: '',
     extras: [],
     extraMap: {},
+    extraPick: 0,
     quantity: 1,
     unitPrice: '0.00',
     promoHint: '',
@@ -21,7 +23,21 @@ Page({
 
   onLoad(query) {
     this.productId = query.id;
+    enableShareMenu();
     this.load();
+  },
+
+  onShareAppMessage() {
+    return productShare(this.data.product, this.data.coverUrl);
+  },
+
+  onShareTimeline() {
+    const share = productShare(this.data.product, this.data.coverUrl);
+    return {
+      title: share.title,
+      query: this.data.product && this.data.product.id ? `id=${this.data.product.id}` : '',
+      imageUrl: share.imageUrl || '',
+    };
   },
 
   async load() {
@@ -30,12 +46,16 @@ Page({
       const specId = (p.specs && p.specs[0] && p.specs[0].id) || '';
       const isRetail = p.category === '水果零售' || p.category === '零售什锦';
       const isFruitBowl = p.category === '水果捞' || /水果捞|捞$/.test(String(p.name || ''));
+      const extraPick = Math.max(0, Number(p.extraPick) || 0);
       this.setData({
         product: p,
         coverUrl: mediaUrl(p.coverDetail || p.coverList || p.cover),
         specId,
         isRetail,
         isFruitBowl,
+        extraPick,
+        extras: [],
+        extraMap: {},
         toppings: [],
         toppingIds: [],
         toppingMap: {},
@@ -92,10 +112,15 @@ Page({
     const id = e.currentTarget.dataset.id;
     let extras = [...this.data.extras];
     const extraMap = { ...this.data.extraMap };
+    const need = Math.max(0, Number(this.data.extraPick) || 0);
     if (extraMap[id]) {
       extras = extras.filter((x) => x !== id);
       delete extraMap[id];
     } else {
+      if (need > 0 && extras.length >= need) {
+        wx.showToast({ title: `最多选 ${need} 种`, icon: 'none' });
+        return;
+      }
       extras.push(id);
       extraMap[id] = true;
     }
@@ -128,13 +153,30 @@ Page({
   },
 
   buildLine() {
-    const { product, specId, extras, toppingIds, toppings, quantity, unitPrice, coverUrl } =
-      this.data;
+    const {
+      product,
+      specId,
+      extras,
+      extraPick,
+      toppingIds,
+      toppings,
+      quantity,
+      unitPrice,
+      coverUrl,
+    } = this.data;
     if (!product || !specId) {
       wx.showToast({ title: '请选择规格', icon: 'none' });
       return null;
     }
+    const need = Math.max(0, Number(extraPick) || 0);
+    if (need > 0 && (extras || []).length !== need) {
+      wx.showToast({ title: `请自选 ${need} 种水果`, icon: 'none' });
+      return null;
+    }
     const spec = (product.specs || []).find((s) => s.id === specId);
+    const extraNames = (product.extras || [])
+      .filter((ex) => (extras || []).includes(ex.id))
+      .map((ex) => ex.name);
     const toppingNames = (toppings || [])
       .filter((t) => (toppingIds || []).includes(t.id))
       .map((t) => t.name);
@@ -147,6 +189,7 @@ Page({
       specId,
       specName: (spec && spec.name) || '',
       extras: extras || [],
+      extraNames,
       toppingIds: toppingIds || [],
       toppingNames,
       quantity: Math.max(1, Number(quantity) || 1),

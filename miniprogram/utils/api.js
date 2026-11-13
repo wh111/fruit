@@ -121,10 +121,10 @@ async function bindPhoneNumber(detail) {
 
   // 用户拒绝 / 额度不足等
   if (/deny|cancel|拒绝/i.test(errMsg) || errno === 103 || errno === 104) {
-    throw new Error('需要授权手机号才能保持优惠一致');
+    throw new Error('需要手机号快捷登录才能保持优惠一致');
   }
   if (errno === 1400001) {
-    throw new Error('手机号授权次数已达上限，请稍后再试');
+    throw new Error('手机号快捷登录次数已达上限，请稍后再试');
   }
 
   const payload = {};
@@ -144,7 +144,7 @@ async function bindPhoneNumber(detail) {
   if (!payload.code && !payload.encryptedData) {
     const denied = /deny|cancel|拒绝/i.test(errMsg);
     if (denied) {
-      throw new Error('需要授权手机号才能保持优惠一致');
+      throw new Error('需要手机号快捷登录才能保持优惠一致');
     }
     // 未完成认证时，微信不返回手机号凭证。开发版和体验版直接绑测试号。
     if (env !== 'release') {
@@ -156,8 +156,8 @@ async function bindPhoneNumber(detail) {
         .join(' · ');
       throw new Error(
         tip
-          ? `未拿到微信手机号凭证（${tip}）`
-          : '未拿到微信手机号凭证。请检查：隐私指引已声明手机号、点了允许授权、已购买「手机号快速验证」资源包'
+          ? `未拿到手机号登录凭证（${tip}）`
+          : '未拿到手机号登录凭证。请检查：隐私指引已声明手机号、点了允许、已购买「手机号快速验证」资源包'
       );
     }
   }

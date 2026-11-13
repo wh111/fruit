@@ -43,6 +43,7 @@ function addToCart(line) {
     specId: line.specId,
     specName: line.specName || '',
     extras: Array.isArray(line.extras) ? line.extras.slice() : [],
+    extraNames: Array.isArray(line.extraNames) ? line.extraNames.slice() : [],
     toppingIds: Array.isArray(line.toppingIds) ? line.toppingIds.slice() : [],
     toppingNames: Array.isArray(line.toppingNames) ? line.toppingNames.slice() : [],
     quantity: Math.max(1, Number(line.quantity) || 1),

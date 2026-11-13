@@ -60,6 +60,43 @@
   font-size: 28rpx;
 }
 
+.modes {
+  display: flex;
+  gap: 16rpx;
+}
+
+.mode {
+  flex: 1;
+  padding: 20rpx 18rpx;
+  border-radius: 20rpx;
+  background: #f7f4ee;
+  border: 2rpx solid transparent;
+}
+
+.mode.on {
+  background: #fff8e7;
+  border-color: #f5a623;
+}
+
+.mode-name {
+  font-weight: 700;
+  font-size: 28rpx;
+}
+
+.mode-desc {
+  margin-top: 8rpx;
+  color: #8a8a8a;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.recharge-link {
+  margin-top: 16rpx;
+  color: #e65100;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
 .pay-bar {
   position: fixed;
   left: 0;

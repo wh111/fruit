@@ -28,20 +28,55 @@ Page({
     remark: '',
     hasPhone: false,
     paying: false,
+    walletEnabled: false,
+    balance: 0,
+    payChannel: 'wechat',
+    balanceEnough: false,
   },
 
   onShow() {
     const user = wx.getStorageSync('user') || {};
     this.setData({ hasPhone: !!(user.hasPhone || user.phone) });
+    this.loadWallet();
+  },
+
+  async loadWallet() {
+    try {
+      await ensureLogin();
+      const data = await request('/api/wallet/mine');
+      const balance = Number(data.balance) || 0;
+      const amount = parseAmount(this.data.amountText);
+      const enabled = !!data.enabled;
+      const patch = {
+        walletEnabled: enabled,
+        balance,
+        balanceEnough: enabled && amount != null && balance + 0.001 >= amount,
+      };
+      if (enabled && !this._payChannelTouched) patch.payChannel = 'balance';
+      else if (!enabled) patch.payChannel = 'wechat';
+      this.setData(patch);
+    } catch (_) {
+      /* ignore */
+    }
+  },
+
+  refreshBalanceEnough() {
+    const amount = parseAmount(this.data.amountText);
+    const balance = Number(this.data.balance) || 0;
+    this.setData({
+      balanceEnough: this.data.walletEnabled && amount != null && balance + 0.001 >= amount,
+    });
   },
 
   onAmount(e) {
     const amountText = e.detail.value;
     const amount = parseAmount(amountText);
+    const balance = Number(this.data.balance) || 0;
     this.setData({
       amountText,
       displayAmount: formatDisplay(amount),
       canPay: amount != null,
+      balanceEnough: this.data.walletEnabled && amount != null && balance + 0.001 >= amount,
     });
   },
 
@@ -49,9 +84,33 @@ Page({
     this.setData({ remark: e.detail.value });
   },
 
+  onPayChannel(e) {
+    const channel = e.currentTarget.dataset.channel;
+    this._payChannelTouched = true;
+    if (channel === 'balance' && this.data.canPay && !this.data.balanceEnough) {
+      this.setData({ payChannel: 'balance' });
+      wx.showModal({
+        title: '请充值',
+        content: `当前余额 ¥${Number(this.data.balance || 0).toFixed(2)}，请先充值后再用会员支付`,
+        confirmText: '去充值',
+        cancelText: '改用在线支付',
+        success: (res) => {
+          if (res.confirm) this.goRecharge();
+          else this.setData({ payChannel: 'wechat' });
+        },
+      });
+      return;
+    }
+    this.setData({ payChannel: channel });
+  },
+
+  goRecharge() {
+    wx.navigateTo({ url: '/pages/wallet/wallet' });
+  },
+
   async onPhoneThenPay(e) {
     try {
-      wx.showLoading({ title: '授权中' });
+      wx.showLoading({ title: '登录中' });
       await ensureLogin();
       const data = await bindPhoneNumber(e.detail || {});
       wx.hideLoading();
@@ -60,10 +119,11 @@ Page({
         wx.showToast({ title: '已同步优惠到本号', icon: 'none' });
         await new Promise((r) => setTimeout(r, 400));
       }
+      await this.loadWallet();
       await this.submit();
     } catch (err) {
       wx.hideLoading();
-      wx.showToast({ title: (err && err.message) || '请先授权手机号', icon: 'none' });
+      wx.showToast({ title: (err && err.message) || '请先完成手机号快捷登录', icon: 'none' });
     }
   },
 
@@ -74,6 +134,11 @@ Page({
       wx.showToast({ title: '请输入有效金额', icon: 'none' });
       return;
     }
+    const payChannel = this.data.payChannel || 'wechat';
+    if (payChannel === 'balance' && !this.data.balanceEnough) {
+      this.goRecharge();
+      return;
+    }
     try {
       this.setData({ paying: true });
       wx.showLoading({ title: '下单中' });
@@ -82,7 +147,7 @@ Page({
       if (!(user.hasPhone || user.phone)) {
         wx.hideLoading();
         this.setData({ hasPhone: false, paying: false });
-        wx.showToast({ title: '请先授权手机号', icon: 'none' });
+        wx.showToast({ title: '请先完成手机号快捷登录', icon: 'none' });
         return;
       }
       this.setData({ hasPhone: true });
@@ -98,8 +163,15 @@ Page({
 
       const pay = await request('/api/pay/create', {
         method: 'POST',
-        data: { orderId: order.id },
+        data: { orderId: order.id, payChannel },
       });
+
+      if (pay.paid || pay.mode === 'balance') {
+        wx.hideLoading();
+        this.setData({ paying: false });
+        wx.redirectTo({ url: `/pages/order/order?id=${order.id}` });
+        return;
+      }
 
       wx.hideLoading();
       wx.showLoading({ title: '支付中' });

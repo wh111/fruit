@@ -122,12 +122,21 @@
         </div>
 
         <div id="tab-products" class="tab hidden">
-          <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
-            <button type="button" id="addProductBtn" class="btn primary">新增商品</button>
-            <button type="button" id="saveProductOrderBtn" class="btn primary" disabled>保存顺序</button>
-            <button type="button" id="previewSalesOrderBtn" class="btn">预览按销量</button>
-            <button type="button" id="resetSalesOrderBtn" class="btn">恢复默认按销量</button>
-            <span class="muted" id="productOrderHint" style="font-size:12px">先选分类 → 拖拽或上移/下移 → 点「保存顺序」</span>
+          <div class="product-toolbar">
+            <div class="toolbar product-toolbar-row">
+              <button type="button" id="addProductBtn" class="btn primary">新增商品</button>
+              <button type="button" id="saveProductOrderBtn" class="btn primary" disabled>保存顺序</button>
+              <button type="button" id="previewSalesOrderBtn" class="btn">预览按销量</button>
+              <button type="button" id="resetSalesOrderBtn" class="btn">恢复默认按销量</button>
+              <span class="muted" id="productOrderHint">先选分类 → 拖拽或上移/下移 → 点「保存顺序」</span>
+            </div>
+            <div class="toolbar product-toolbar-row">
+              <button type="button" id="selectAllProductsBtn" class="btn">全选当前</button>
+              <button type="button" id="clearProductSelectionBtn" class="btn">取消勾选</button>
+              <button type="button" id="batchOnProductsBtn" class="btn primary">批量上架</button>
+              <button type="button" id="batchOffProductsBtn" class="btn">批量下架</button>
+              <span class="muted" id="productSelectionHint">已选 0</span>
+            </div>
           </div>
           <div class="product-cat-tabs" id="productCatTabs" role="tablist" aria-label="商品分类">
             <button type="button" class="cat-tab on" data-cat="">全部</button>
@@ -198,7 +207,7 @@
             <h3>预定分类</h3>
             <p class="muted">
               勾选的大分类可在小程序选「提前预定」（11:40 / 12:00 · 17:40 / 18:00，照顾下班早晚）并使用预定券。
-              零售等成品请勿勾选，顾客只能现取。
+              水果零售为成品现取，固定不参与预定。
             </p>
             <div id="reserveCategoryList" class="reserve-cat-list" style="margin-top:12px"></div>
             <div class="toolbar" style="margin-top:12px;gap:8px">
@@ -432,8 +441,8 @@
           </div>
 
           <div class="panel prose">
-            <h3>③ 批量生产 · 条形码标签</h3>
-            <p class="muted">用于杯贴预印、货架码、规格码。改完模板后选一种方式生成并打印。</p>
+            <h3>③ 水果零售 · 什锦包装标签</h3>
+            <p class="muted">从「商品 → 水果零售」上架菜单读取 400g / 500g 等规格，包装时按张数打印条形码。</p>
             <label>批量标签品牌</label>
             <input id="batchTplBrand" placeholder="四季果先" />
             <div class="tpl-checks">
@@ -442,6 +451,37 @@
               <label class="switch"><input type="checkbox" id="batchTplShowPrice" checked /> <span>价格</span></label>
               <label class="switch"><input type="checkbox" id="batchTplShowHuman" checked /> <span>条码下方数字</span></label>
             </div>
+            <div class="cover-actions retail-label-toolbar">
+              <button type="button" class="btn sm" id="retailLabelRefresh">刷新菜单</button>
+              <label>默认张数
+                <input id="retailLabelDefaultCopies" type="number" min="0" max="200" value="10" style="width:72px" />
+              </label>
+              <button type="button" class="btn sm" id="retailLabelFillCopies">全部填入</button>
+              <button type="button" class="btn sm" id="retailLabelClearCopies">清空张数</button>
+              <button type="button" class="btn sm primary" id="retailLabelPrint">打印条形码</button>
+            </div>
+            <div class="table-wrap retail-label-wrap">
+              <table class="data-table" id="retailLabelTable">
+                <thead>
+                  <tr>
+                    <th>品名</th>
+                    <th>规格</th>
+                    <th>价格</th>
+                    <th>条码</th>
+                    <th>打印张数</th>
+                  </tr>
+                </thead>
+                <tbody id="retailLabelBody">
+                  <tr><td colspan="5" class="muted">打开本页或点「刷新菜单」加载上架什锦</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="muted" id="retailLabelHint"></p>
+          </div>
+
+          <div class="panel prose">
+            <h3>④ 其它批量 · 连号 / 手动</h3>
+            <p class="muted">用于杯贴预印、货架码、临时码。改完上方模板后选一种方式生成并打印。</p>
 
             <div class="batch-mode">
               <label class="switch"><input type="radio" name="batchMode" value="serial" checked /> <span>连号生成</span></label>

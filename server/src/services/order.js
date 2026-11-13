@@ -216,11 +216,22 @@ function normalizeOrderItemsInput(input = {}) {
   ];
 }
 
+function assertExtraPick(product, extras) {
+  const need = Math.max(0, Number(product && product.extraPick) || 0);
+  if (!need) return;
+  const allowed = new Set((product.extras || []).map((e) => e && e.id).filter(Boolean));
+  const picked = [...new Set((extras || []).filter((id) => allowed.has(id)))];
+  if (picked.length !== need) {
+    throw Object.assign(new Error(`请自选 ${need} 种水果（已选 ${picked.length}）`), { status: 400 });
+  }
+}
+
 /** 单行计价（不含小食套餐） */
 function priceOrderLine(db, raw) {
   const product = db.products.find((p) => p.id === raw.productId && p.status === 1);
   if (!product) throw Object.assign(new Error('商品不存在'), { status: 404 });
   if (!raw.specId) throw Object.assign(new Error('请选择商品和规格'), { status: 400 });
+  assertExtraPick(product, raw.extras || []);
   const toppingItems = resolveOrderToppings(db, product, raw.toppingIds);
   const line = calcAmount(product, raw.specId, raw.extras || [], raw.quantity, {
     toppingItems,

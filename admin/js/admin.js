@@ -467,15 +467,28 @@ function bindProductDrag() {
   });
 }
 
+function selectedProductIds() {
+  return $$('#productTable .product-check:checked').map((el) => el.value).filter(Boolean);
+}
+
+function updateProductSelectionHint() {
+  const hint = $('#productSelectionHint');
+  if (!hint) return;
+  const n = selectedProductIds().length;
+  hint.textContent = `已选 ${n}`;
+}
+
 function renderProductList() {
   const cat = currentProductCat();
   const shown = shownProductsForSort();
   if (!shown.length) {
     $('#productTable').innerHTML = '<p class="muted" style="padding:16px">该分类暂无商品</p>';
     updateProductOrderToolbar();
+    updateProductSelectionHint();
     return;
   }
   const canDrag = !!cat;
+  const prevSelected = new Set(selectedProductIds());
   $('#productTable').innerHTML = shown
     .map((p, i) => {
       const specs = (p.specs || []).map((s) => `${s.name}¥${s.price}`).join(' / ');
@@ -484,8 +497,12 @@ function renderProductList() {
         : '<div class="product-thumb"></div>';
       const sales = Number(p.sales) || 0;
       const mode = p.sortMode === 'manual' ? '手动序' : '销量序';
-      return `<div class="product-card" data-id="${p.id}" ${canDrag ? 'draggable="true"' : ''}>
-        ${canDrag ? '<div class="drag-handle" title="拖拽排序">⋮⋮</div>' : ''}
+      const checked = prevSelected.has(p.id) ? 'checked' : '';
+      return `<div class="product-card ${checked ? 'selected' : ''}" data-id="${p.id}" ${canDrag ? 'draggable="true"' : ''}>
+        <label class="product-side">
+          <input class="product-check" type="checkbox" value="${p.id}" ${checked} title="勾选后可批量上架/下架" />
+          ${canDrag ? '<span class="drag-handle" title="拖拽排序">⋮⋮</span>' : ''}
+        </label>
         ${thumb}
         <div class="info">
           <div><strong>${p.name}</strong> · ${p.status === 1 ? '上架' : '下架'} · 销量 ${sales} · ${mode} · #${i + 1}</div>
@@ -495,7 +512,11 @@ function renderProductList() {
             ${canDrag ? `<button type="button" class="btn sm" data-nudge="up" data-id="${p.id}" ${i === 0 ? 'disabled' : ''}>上移</button>
             <button type="button" class="btn sm" data-nudge="down" data-id="${p.id}" ${i === shown.length - 1 ? 'disabled' : ''}>下移</button>` : ''}
             <button type="button" class="btn sm" data-edit='${JSON.stringify(p).replace(/'/g, '&#39;')}' onclick="editProduct(JSON.parse(this.dataset.edit))">编辑</button>
-            ${p.status === 1 ? `<button type="button" class="btn sm" onclick="offProduct('${p.id}')">下架</button>` : ''}
+            ${
+              p.status === 1
+                ? `<button type="button" class="btn sm" onclick="offProduct('${p.id}')">下架</button>`
+                : `<button type="button" class="btn sm primary" onclick="onProduct('${p.id}')">上架</button>`
+            }
           </div>
         </div>
       </div>`;
@@ -509,7 +530,32 @@ function renderProductList() {
       nudgeProduct(btn.dataset.id, btn.dataset.nudge);
     });
   });
+  $$('#productTable .product-check').forEach((box) => {
+    box.addEventListener('click', (e) => e.stopPropagation());
+    box.addEventListener('change', () => {
+      const card = box.closest('.product-card');
+      if (card) card.classList.toggle('selected', box.checked);
+      updateProductSelectionHint();
+    });
+  });
   updateProductOrderToolbar();
+  updateProductSelectionHint();
+}
+
+async function batchSetProductStatus(status) {
+  const ids = selectedProductIds();
+  if (!ids.length) {
+    toast('请先勾选商品');
+    return;
+  }
+  const label = status === 1 ? '上架' : '下架';
+  if (!confirm(`确认批量${label} ${ids.length} 个商品？`)) return;
+  const data = await api('/api/admin/products/batch-status', {
+    method: 'POST',
+    body: JSON.stringify({ ids, status }),
+  });
+  toast(`已${label} ${data.count || 0} 个`);
+  await loadProducts();
 }
 
 function previewCurrentCatBySales() {
@@ -767,8 +813,19 @@ async function onCoverFilePicked(e) {
 window.offProduct = async function offProduct(id) {
   if (!confirm('确认下架？')) return;
   await api(`/api/admin/products/${id}`, { method: 'DELETE' });
+  toast('已下架');
   loadProducts();
 };
+
+window.onProduct = async function onProduct(id) {
+  if (!confirm('确认重新上架？')) return;
+  await api(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify({ status: 1 }) });
+  toast('已上架');
+  loadProducts();
+};
+
+window.batchOnProducts = () => batchSetProductStatus(1);
+window.batchOffProducts = () => batchSetProductStatus(0);
 
 window.setStatus = async function setStatus(id, status) {
   await api(`/api/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
@@ -1999,6 +2056,9 @@ async function refresh() {
     if (state.tab === 'wallet') await loadWallet();
     if (state.tab === 'reports') await loadSalesReport();
     if (state.tab === 'purchases') await loadPurchases();
+    if (state.tab === 'hardware' && window.DetongPrint?.loadRetailMixLabels) {
+      await window.DetongPrint.loadRetailMixLabels();
+    }
   } catch (e) {
     if (String(e.message).includes('登录') || String(e.message).includes('过期') || String(e.message).includes('权限')) logout();
     else console.error(e);
@@ -2182,6 +2242,28 @@ $('#saveProductOrderBtn')?.addEventListener('click', () => saveCurrentProductOrd
 $('#previewSalesOrderBtn')?.addEventListener('click', () => previewCurrentCatBySales());
 $('#resetSalesOrderBtn')?.addEventListener('click', () =>
   resetCurrentProductOrderToSales().catch((e) => toast(e.message))
+);
+$('#selectAllProductsBtn')?.addEventListener('click', () => {
+  $$('#productTable .product-check').forEach((box) => {
+    box.checked = true;
+    const card = box.closest('.product-card');
+    if (card) card.classList.add('selected');
+  });
+  updateProductSelectionHint();
+});
+$('#clearProductSelectionBtn')?.addEventListener('click', () => {
+  $$('#productTable .product-check').forEach((box) => {
+    box.checked = false;
+    const card = box.closest('.product-card');
+    if (card) card.classList.remove('selected');
+  });
+  updateProductSelectionHint();
+});
+$('#batchOnProductsBtn')?.addEventListener('click', () =>
+  batchSetProductStatus(1).catch((e) => toast(e.message || '批量上架失败'))
+);
+$('#batchOffProductsBtn')?.addEventListener('click', () =>
+  batchSetProductStatus(0).catch((e) => toast(e.message || '批量下架失败'))
 );
 $('#addSmProteinBtn')?.addEventListener('click', () => {
   if (!state.sideMeal) state.sideMeal = { proteins: [], carbs: [] };

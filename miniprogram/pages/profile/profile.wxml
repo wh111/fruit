@@ -31,7 +31,7 @@
       class="row phone-btn"
       open-type="getPhoneNumber"
       bindgetphonenumber="onGetPhone"
-    >授权手机号（同步优惠）</button>
+    >手机号快捷登录</button>
     <view class="row" wx:else>
       <text>手机号</text>
       <text class="muted">{{user.phoneMasked}}</text>
@@ -42,6 +42,6 @@
   <view class="card tip">
     <view class="title">取餐说明</view>
     <view class="muted">支付成功后会生成取餐号。我们按取餐时间现切，保证取餐前最多40分钟制作完成；到柜台报号，店员对一下即可。</view>
-    <view class="muted" style="margin-top:12rpx">授权手机号后，同一号码的优惠券会保持一致。</view>
+    <view class="muted" style="margin-top:12rpx">登录手机号后，同一号码的优惠券会保持一致。</view>
   </view>
 </view>

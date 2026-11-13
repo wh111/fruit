@@ -1,7 +1,7 @@
 <view class="page">
   <view class="card tip-card">
     <view class="tip-title">自定义金额付款</view>
-    <view class="tip-desc">输入应付金额，完成微信支付。可用于散装称重、临时加购等场景。</view>
+    <view class="tip-desc">输入应付金额，可用会员余额或在线支付。可用于散装称重、临时加购等场景。</view>
   </view>
 
   <view class="card">
@@ -19,6 +19,30 @@
       />
     </view>
     <view class="hint">最少 0.01 元，最多 999.99 元</view>
+  </view>
+
+  <view class="card" wx:if="{{walletEnabled}}">
+    <view class="label">支付方式</view>
+    <view class="muted" style="margin-bottom:16rpx">余额 ¥{{balance}} · 默认会员支付，不可与微信混付</view>
+    <view class="modes">
+      <view
+        class="mode {{payChannel === 'balance' ? 'on' : ''}}"
+        data-channel="balance"
+        bindtap="onPayChannel"
+      >
+        <view class="mode-name">会员支付</view>
+        <view class="mode-desc">{{balanceEnough ? '整单扣余额' : (canPay ? '请充值' : '输入金额后扣余额')}}</view>
+      </view>
+      <view
+        class="mode {{payChannel === 'wechat' ? 'on' : ''}}"
+        data-channel="wechat"
+        bindtap="onPayChannel"
+      >
+        <view class="mode-name">微信支付</view>
+        <view class="mode-desc">整单微信付款</view>
+      </view>
+    </view>
+    <view class="recharge-link" wx:if="{{canPay && !balanceEnough}}" bindtap="goRecharge">请充值 ›</view>
   </view>
 
   <view class="card">
@@ -43,7 +67,7 @@
       loading="{{paying}}"
       disabled="{{paying || !canPay}}"
       bindtap="submit"
-    >确认支付</button>
+    >{{payChannel === 'balance' ? (balanceEnough || !canPay ? '会员支付' : '请充值') : '微信支付'}}</button>
     <button
       wx:else
       class="btn-primary pay phone-pay"
@@ -51,6 +75,6 @@
       bindgetphonenumber="onPhoneThenPay"
       loading="{{paying}}"
       disabled="{{paying || !canPay}}"
-    >授权手机号并支付</button>
+    >手机号快捷登录并支付</button>
   </view>
 </view>

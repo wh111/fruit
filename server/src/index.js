@@ -1551,6 +1551,32 @@ async function handleApi(req, res, pathname) {
     }
   }
 
+  if (pathname === '/api/admin/products/batch-status' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+    const status = Number(body.status) === 1 ? 1 : 0;
+    if (!ids.length) return send(res, 400, { error: '请先勾选商品' });
+    const db = await load();
+    const idSet = new Set(ids);
+    let count = 0;
+    for (const p of db.products || []) {
+      if (!p || !idSet.has(p.id)) continue;
+      if (p.status === status) continue;
+      p.status = status;
+      p.updatedAt = Date.now();
+      count += 1;
+    }
+    await save(db);
+    const { listAdminProducts, getProductOrderMap } = require('./services/products');
+    return send(res, 200, {
+      ok: true,
+      count,
+      status,
+      list: listAdminProducts(db),
+      productOrder: getProductOrderMap(db),
+    });
+  }
+
   const adminProduct = pathname.match(/^\/api\/admin\/products\/([^/]+)$/);
   if (adminProduct) {
     if (!requireAdmin(req, res)) return;

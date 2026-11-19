@@ -29,7 +29,12 @@ Page({
         list: list.map((o) => {
           const items = Array.isArray(o.items) ? o.items : [];
           const lineSummary = items.length
-            ? items.map((it) => `${it.productName}×${it.quantity}`).join('、')
+            ? items
+                .map((it) => {
+                  const tops = (it.toppings || []).map((t) => t.name).filter(Boolean);
+                  return `${it.productName}×${it.quantity}${tops.length ? `（${tops.join('、')}）` : ''}`;
+                })
+                .join('、')
             : `${o.specName || ''} ×${o.quantity}`;
           return {
             ...o,

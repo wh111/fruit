@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#1f2a1f" />
   <title>四季果先 · 门店管理</title>
-  <link rel="stylesheet" href="/admin/css/admin.css" />
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20261114pos82" />
 </head>
 <body>
   <div id="app">
@@ -16,7 +16,7 @@
       <div class="login-card">
         <img class="logo" src="/assets/logo.png" alt="四季果先" />
         <h1>门店管理端</h1>
-        <p class="muted">手机接单 · 出码 · 打印贴纸</p>
+        <p class="muted">手机接单 · 出码 · 厨房小票</p>
         <label>账号</label>
         <input id="username" value="" autocomplete="username" placeholder="账号" />
         <label>密码</label>
@@ -62,11 +62,11 @@
           <div class="top-actions">
             <label class="switch">
               <input type="checkbox" id="autoPrint" />
-              <span>新单自动打印</span>
+              <span>新单自动打小票</span>
             </label>
             <label class="switch">
               <input type="checkbox" id="soundOn" checked />
-              <span>新单提示音</span>
+              <span>读单子名称</span>
             </label>
             <button type="button" id="refreshBtn" class="btn">刷新</button>
             <button type="button" id="logoutBtnMobile" class="btn ghost mobile-only">退出</button>
@@ -140,7 +140,11 @@
           </div>
           <div class="product-cat-tabs" id="productCatTabs" role="tablist" aria-label="商品分类">
             <button type="button" class="cat-tab on" data-cat="">全部</button>
+            <button type="button" class="cat-tab" data-cat="酸奶捞">酸奶捞</button>
+            <button type="button" class="cat-tab" data-cat="网红小吃">网红小吃</button>
+            <button type="button" class="cat-tab" data-cat="新鲜现剥">新鲜现剥</button>
             <button type="button" class="cat-tab" data-cat="果切系列">果切系列</button>
+            <button type="button" class="cat-tab" data-cat="鲜榨果汁">鲜榨果汁</button>
             <button type="button" class="cat-tab" data-cat="水果零售">水果零售</button>
             <button type="button" class="cat-tab" data-cat="水果捞">水果捞</button>
             <button type="button" class="cat-tab" data-cat="热果奶">热果奶</button>
@@ -403,6 +407,7 @@
           <div class="panel prose">
             <h3>① 德佟打印机</h3>
             <p class="muted" id="detongStatus">正在检测打印助手…</p>
+            <p class="muted">间隙纸要贴齐两边导轨。标签还偏的话，用下面微调，先打一张试。</p>
             <label class="switch"><input type="checkbox" id="detongEnabled" checked /> <span>启用德佟本地打印</span></label>
             <div class="cover-fields" style="margin-top:12px;gap:8px">
               <label>打印机</label>
@@ -414,14 +419,29 @@
                 <input id="detongHeight" type="number" min="15" max="60" value="30" style="width:72px" />
               </div>
               <div class="cover-actions">
+                <label>左右微调(mm)</label>
+                <input id="detongOffsetX" type="number" step="0.5" value="0" style="width:72px" />
+                <label>上下微调(mm)</label>
+                <input id="detongOffsetY" type="number" step="0.5" value="0" style="width:72px" />
+              </div>
+              <div class="cover-actions">
                 <button type="button" class="btn sm" id="detongRefresh">刷新设备</button>
+                <button type="button" class="btn sm" id="detongUsbBridge">打开本机打印通道</button>
                 <button type="button" class="btn sm primary" id="detongTest">测试订单标签</button>
               </div>
             </div>
           </div>
 
           <div class="panel prose">
-            <h3>② 订单标签自定义</h3>
+            <h3>② 热敏小票机 POS-80</h3>
+            <p class="muted">厨房看的 80mm 小票，取餐码和自选水果会放大。USB 插在店里这台 Windows 电脑上，线上管理端同样要点「打开本机打印通道」。</p>
+            <div class="cover-actions">
+              <button type="button" class="btn sm primary" id="receiptTest">测试厨房小票</button>
+            </div>
+          </div>
+
+          <div class="panel prose">
+            <h3>③ 订单标签自定义</h3>
             <p class="muted">贴在杯子上给顾客看。默认是大号取餐码和品名，不印店员扫码用的二维码。</p>
             <label>品牌名</label>
             <input id="orderTplBrand" placeholder="四季果先" />
@@ -441,8 +461,8 @@
           </div>
 
           <div class="panel prose">
-            <h3>③ 水果零售 · 什锦包装标签</h3>
-            <p class="muted">从「商品 → 水果零售」上架菜单读取 400g / 500g 等规格，包装时按张数打印条形码。</p>
+            <h3>④ 水果零售 · 什锦包装标签</h3>
+            <p class="muted">用德佟打包装条码。先勾选要打的品种，再填张数；不会一次打完全部。</p>
             <label>批量标签品牌</label>
             <input id="batchTplBrand" placeholder="四季果先" />
             <div class="tpl-checks">
@@ -453,17 +473,21 @@
             </div>
             <div class="cover-actions retail-label-toolbar">
               <button type="button" class="btn sm" id="retailLabelRefresh">刷新菜单</button>
+              <label>搜品种
+                <input id="retailLabelFilter" type="search" placeholder="例如 哈密瓜" style="width:140px" />
+              </label>
               <label>默认张数
                 <input id="retailLabelDefaultCopies" type="number" min="0" max="200" value="10" style="width:72px" />
               </label>
-              <button type="button" class="btn sm" id="retailLabelFillCopies">全部填入</button>
-              <button type="button" class="btn sm" id="retailLabelClearCopies">清空张数</button>
-              <button type="button" class="btn sm primary" id="retailLabelPrint">打印条形码</button>
+              <button type="button" class="btn sm" id="retailLabelFillCopies">给已选填张数</button>
+              <button type="button" class="btn sm" id="retailLabelClearCopies">取消已选</button>
+              <button type="button" class="btn sm primary" id="retailLabelPrint">打印已选</button>
             </div>
             <div class="table-wrap retail-label-wrap">
               <table class="data-table" id="retailLabelTable">
                 <thead>
                   <tr>
+                    <th class="pick-cell"><input type="checkbox" id="retailLabelSelectAll" title="全选当前列表" /></th>
                     <th>品名</th>
                     <th>规格</th>
                     <th>价格</th>
@@ -472,7 +496,7 @@
                   </tr>
                 </thead>
                 <tbody id="retailLabelBody">
-                  <tr><td colspan="5" class="muted">打开本页或点「刷新菜单」加载上架什锦</td></tr>
+                  <tr><td colspan="6" class="muted">打开本页或点「刷新菜单」加载上架什锦</td></tr>
                 </tbody>
               </table>
             </div>
@@ -480,7 +504,7 @@
           </div>
 
           <div class="panel prose">
-            <h3>④ 其它批量 · 连号 / 手动</h3>
+            <h3>⑤ 其它批量 · 连号 / 手动</h3>
             <p class="muted">用于杯贴预印、货架码、临时码。改完上方模板后选一种方式生成并打印。</p>
 
             <div class="batch-mode">
@@ -532,7 +556,8 @@
             <h3>其它</h3>
             <ol>
               <li>安装德佟 <strong>dtpweb 打印助手</strong>并保持运行</li>
-              <li>右上角勾选「新单自动打印」：顾客支付后自动出订单杯贴</li>
+              <li>右上角勾选「新单自动打小票」：顾客支付后自动出 POS-80 厨房小票，不再打杯贴</li>
+              <li>什锦包装标签仍用德佟：先勾选品种再打印</li>
             </ol>
             <p>完整说明见 <code>docs/HARDWARE.md</code>。</p>
           </div>
@@ -583,7 +608,11 @@
       <input id="p_name" required />
       <label>类型</label>
       <select id="p_category" required>
+        <option value="酸奶捞">酸奶捞</option>
+        <option value="网红小吃">网红小吃</option>
+        <option value="新鲜现剥">新鲜现剥</option>
         <option value="果切系列">果切系列</option>
+        <option value="鲜榨果汁">鲜榨果汁</option>
         <option value="水果零售">水果零售</option>
         <option value="水果捞">水果捞</option>
         <option value="热果奶">热果奶</option>
@@ -619,8 +648,8 @@
   </dialog>
 
   <script src="/admin/js/dtpweb.umd.js"></script>
-  <script src="/admin/js/detong-print.js"></script>
-  <script src="/admin/js/admin.js"></script>
+  <script src="/admin/js/detong-print.js?v=20261114mix2"></script>
+  <script src="/admin/js/admin.js?v=20261114ean13"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       if (window.DetongPrint) DetongPrint.init();

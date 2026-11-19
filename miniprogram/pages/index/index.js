@@ -193,7 +193,7 @@ Page({
           minPrice: min ? min.toFixed(1) : '0',
         };
       });
-      const catOrder = ['果切系列', '水果零售', '水果捞', '热果奶', '经典热饮'];
+      const catOrder = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '鲜榨果汁', '水果零售', '水果捞', '热果奶', '经典热饮'];
       const seen = new Set();
       const ordered = catOrder.filter((c) => {
         if (!products.some((p) => p.category === c)) return false;
@@ -243,7 +243,7 @@ Page({
       const reserveAmt =
         (campaign && campaign.reserveOffAmount) ||
         (loginRes && loginRes.campaign && loginRes.campaign.reserveOffAmount) ||
-        3;
+        2;
       this._pendingAfterLottery = { grantedCount, monthlyCount, reserveAmt };
 
       this.maybeShowLottery().then((shown) => {

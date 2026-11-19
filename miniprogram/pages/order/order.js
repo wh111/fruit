@@ -64,20 +64,22 @@ Page({
       const data = await request(`/api/orders/${this.id}`);
       const extrasList = data.order.extras || [];
       const items = Array.isArray(data.order.items) ? data.order.items : [];
-      const itemLines = items.map((it) => {
-        const tops = (it.toppings || []).map((t) => t.name).filter(Boolean);
-        return {
-          name: `${it.productName} · ${it.specName}×${it.quantity}${
-            tops.length ? `（${tops.join('、')}）` : ''
-          }`,
-        };
+      const itemLines = items.map((it) => ({
+        name: `${it.productName} · ${it.specName}×${it.quantity}`,
+      }));
+      const toppingNames = [];
+      const seenTop = new Set();
+      const addTop = (n) => {
+        const name = String(n || '').trim();
+        if (!name || seenTop.has(name)) return;
+        seenTop.add(name);
+        toppingNames.push(name);
+      };
+      items.forEach((it) => (it.toppings || []).forEach((t) => addTop(t && t.name)));
+      extrasList.forEach((e) => {
+        if (e && e.kind !== 'sideMeal') addTop(e.name);
       });
-      const toppings = items.length
-        ? ''
-        : extrasList
-            .filter((e) => e && e.kind !== 'sideMeal')
-            .map((e) => e.name)
-            .join('、');
+      const toppings = toppingNames.join('、');
       const sideFromExtras = extrasList.find((e) => e && e.kind === 'sideMeal');
       const sideMealText =
         (sideFromExtras && sideFromExtras.name) ||

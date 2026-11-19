@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>四季果先 · 本机打印通道</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; color: #1f2937; }
+    p { line-height: 1.6; }
+    .ok { color: #15803d; }
+  </style>
+</head>
+<body>
+  <p class="ok">本机 USB 打印通道已打开。</p>
+  <p>请不要关闭这个窗口。线上管理端会把杯贴送到德佟，把厨房小票送到 POS-80。</p>
+  <p id="log" class="muted"></p>
+  <script>
+    function ping() {
+      if (window.opener) window.opener.postMessage({ type: 'sg-usb-ready' }, '*');
+    }
+    ping();
+    setInterval(ping, 2000);
+
+    function reply(ev, id, ok, data, error) {
+      ev.source.postMessage({
+        type: 'sg-usb-result',
+        id,
+        ok,
+        data,
+        error,
+      }, ev.origin);
+    }
+
+    window.addEventListener('message', async (ev) => {
+      const d = ev.data || {};
+      const log = document.getElementById('log');
+      try {
+        if (d.type === 'sg-usb-print') {
+          const resp = await fetch('/api/admin/print/usb', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pages: d.pages }),
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (log) log.textContent = resp.ok ? '最近一次：杯贴已送到德佟' : (data.error || '打印失败');
+          reply(ev, d.id, resp.ok, data, data.error);
+          return;
+        }
+        if (d.type === 'sg-receipt-print') {
+          const resp = await fetch('/api/admin/print/receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticket: d.ticket }),
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (log) log.textContent = resp.ok ? '最近一次：小票已送到 POS-80' : (data.error || '打印失败');
+          reply(ev, d.id, resp.ok, data, data.error);
+        }
+      } catch (e) {
+        if (log) log.textContent = e.message || '打印失败';
+        reply(ev, d.id, false, null, e.message || 'USB 打印失败');
+      }
+    });
+  </script>
+</body>
+</html>

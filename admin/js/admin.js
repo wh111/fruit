@@ -3,6 +3,7 @@ const state = {
   token: localStorage.getItem('sg_admin_token') || '',
   tab: 'dashboard',
   knownPaidIds: new Set(JSON.parse(localStorage.getItem('sg_known_paid') || '[]')),
+  receiptPrintedIds: new Set(),
   bootstrapped: false,
 };
 
@@ -64,6 +65,66 @@ function switchTab(tab) {
   refresh();
 }
 
+function extraFruitNames(list) {
+  return (list || [])
+    .filter((e) => e && e.kind !== 'topping' && e.kind !== 'sideMeal')
+    .map((e) => (typeof e === 'string' ? e : e.name))
+    .map((n) => String(n || '').trim())
+    .filter(Boolean);
+}
+
+function uniqueNames(list) {
+  const names = [];
+  const seen = new Set();
+  (list || []).forEach((n) => {
+    const name = String(n || '').trim();
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    names.push(name);
+  });
+  return names;
+}
+
+function collectAddons(o) {
+  return uniqueNames([
+    ...(o?.toppings || []).map((t) => t && t.name),
+    ...(o?.items || []).flatMap((it) => (it.toppings || []).map((t) => t && t.name)),
+    ...(o?.extras || []).filter((e) => e && e.kind !== 'sideMeal').map((e) => e.name),
+  ]);
+}
+
+function kitchenPicks(o, it) {
+  const fruits = uniqueNames([
+    ...extraFruitNames(it ? it.extras : o?.extras),
+    ...(it ? [] : (o?.items || []).flatMap((row) => extraFruitNames(row.extras))),
+  ]);
+  const tops = uniqueNames([
+    ...(it ? it.toppings || [] : o?.toppings || []).map((t) => t && t.name),
+    ...(!it ? (o?.items || []).flatMap((row) => (row.toppings || []).map((t) => t && t.name)) : []),
+    ...(it ? it.extras || [] : o?.extras || [])
+      .filter((e) => e && e.kind === 'topping')
+      .map((e) => e.name),
+  ]);
+  return { fruits, tops };
+}
+
+function orderGoodsHtml(o) {
+  const items = Array.isArray(o.items) && o.items.length ? o.items : null;
+  const block = (title, picks) => {
+    const fruitTip = picks.fruits.length
+      ? `<div class="order-picks">${picks.fruits.join('、')}</div>`
+      : '';
+    const tip = picks.tops.length ? `<div class="order-toppings">小料 ${picks.tops.join('、')}</div>` : '';
+    return `<div class="order-title">${title}</div>${fruitTip}${tip}`;
+  };
+  if (items) {
+    return items
+      .map((it) => block(`${it.productName} · ${it.specName} ×${it.quantity}`, kitchenPicks(o, it)))
+      .join('');
+  }
+  return block(`${o.productName} · ${o.specName} ×${o.quantity}`, kitchenPicks(o));
+}
+
 function toast(msg) {
   const el = $('#toast');
   el.textContent = msg;
@@ -72,27 +133,57 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.add('hidden'), 4000);
 }
 
-function playBeep() {
-  if (!$('#soundOn').checked) return;
+function unlockAudio() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = 880;
-    g.gain.value = 0.08;
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    setTimeout(() => {
-      o.frequency.value = 1175;
-    }, 120);
-    setTimeout(() => {
-      o.stop();
-      ctx.close();
-    }, 320);
+    if (!window.speechSynthesis) return;
+    speechSynthesis.getVoices();
   } catch {
     /* ignore */
+  }
+}
+
+function chineseVoice() {
+  const voices = window.speechSynthesis ? speechSynthesis.getVoices() || [] : [];
+  return (
+    voices.find((v) => /^zh(-|$)/i.test(v.lang) && /CN|China|Chinese| Huihui| Xiaoxiao| Yaoyao/i.test(`${v.lang} ${v.name}`)) ||
+    voices.find((v) => /^zh(-|$)/i.test(v.lang)) ||
+    null
+  );
+}
+
+function orderSpeakText(o) {
+  const items = Array.isArray(o.items) && o.items.length ? o.items : null;
+  const fromItems = items
+    ? items.map((it) => String(it.productName || '').trim()).filter(Boolean).join('，')
+    : '';
+  return fromItems || String(o.productName || '').trim() || '新订单';
+}
+
+function speakText(text) {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) {
+      resolve();
+      return;
+    }
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'zh-CN';
+    utter.rate = 0.92;
+    utter.pitch = 1;
+    utter.volume = 1;
+    const voice = chineseVoice();
+    if (voice) utter.voice = voice;
+    utter.onend = () => resolve();
+    utter.onerror = () => resolve();
+    speechSynthesis.speak(utter);
+  });
+}
+
+async function announceOrders(orders) {
+  if (!$('#soundOn')?.checked || !orders.length) return;
+  unlockAudio();
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  for (const o of orders) {
+    await speakText(orderSpeakText(o));
   }
 }
 
@@ -113,13 +204,13 @@ async function watchNewOrders(list) {
 
   fresh.forEach((o) => state.knownPaidIds.add(o.id));
   persistKnown();
-  playBeep();
+  announceOrders(fresh);
   toast(`新订单 ${fresh.map((o) => o.pickupCode).join('、')} · ${fresh[0].productName}`);
 
   if ($('#autoPrint').checked) {
     for (const o of fresh) {
-      await printLabel(o.id, { skipPrinted: true });
-      await new Promise((r) => setTimeout(r, 600));
+      await printReceipt(o.id, { skipPrinted: true });
+      await new Promise((r) => setTimeout(r, 400));
     }
   }
 }
@@ -213,12 +304,12 @@ async function loadStats() {
         <label class="pick"><input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" ${kept.has(o.id) ? 'checked' : ''} /></label>
         <div class="pickup">${o.pickupCode || '--'}</div>
         <div class="order-main">
-          <div class="order-title">${o.productName} · ${o.specName} ×${o.quantity}</div>
+          ${orderGoodsHtml(o)}
           <div class="muted">${STATUS_TEXT[o.status]} · ${fulfillmentNote(o)} · ${amountNote(o)}${o.printed ? ' · 已打标' : ''}</div>
           ${batchNote}
         </div>
         <div class="actions">
-          <button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
+          <button type="button" class="btn sm green" onclick="printReceipt('${o.id}')">打印小票</button>
           <button type="button" class="btn sm" onclick="setStatus('${o.id}','making')">制作中</button>
           <button type="button" class="btn sm primary" onclick="setStatus('${o.id}','ready')">${handoff}</button>
         </div>
@@ -233,11 +324,11 @@ async function loadStats() {
       <div class="order-card waiting">
         <div class="pickup">${o.pickupCode || '--'}</div>
         <div class="order-main">
-          <div class="order-title">${o.productName} · ${o.specName} ×${o.quantity}</div>
+          ${orderGoodsHtml(o)}
           <div class="muted">${o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐'} · ${fulfillmentNote(o)}</div>
         </div>
         <div class="actions">
-          <button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>
+          <button type="button" class="btn sm green" onclick="printReceipt('${o.id}')">打印小票</button>
         </div>
       </div>`
         )
@@ -284,7 +375,7 @@ async function batchSetStatus(status) {
     const sel = $('#selectAllPending');
     if (sel) sel.checked = false;
     if (status === 'making') {
-      for (const id of ids) await printLabel(id, { skipPrinted: true });
+      for (const id of ids) await printReceipt(id, { skipPrinted: true });
     }
     refresh();
   } catch (e) {
@@ -310,10 +401,10 @@ async function loadOrders() {
           <div class="code">${o.pickupCode || '-'}</div>
           <span class="tag ${o.status}">${STATUS_TEXT[o.status] || o.status}</span>
         </div>
-        <div><strong>${o.productName}</strong> · ${o.specName} ×${o.quantity}</div>
+        ${orderGoodsHtml(o)}
         <div class="meta">${fulfillmentNote(o)} · ${amountNote(o)} · ${ts}${o.printed ? ' · 已打标' : ''}</div>
         <div class="actions">
-          ${o.pickupCode ? `<button type="button" class="btn sm green" onclick="printLabel('${o.id}')">打印标签</button>` : ''}
+          ${o.pickupCode ? `<button type="button" class="btn sm green" onclick="printReceipt('${o.id}')">打印小票</button>` : ''}
           ${['paid', 'making'].includes(o.status) ? `<button type="button" class="btn sm primary" onclick="setStatus('${o.id}','ready')">${
             o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐'
           }</button>` : ''}
@@ -345,7 +436,7 @@ function setCoverPreview(url) {
   });
 }
 
-const PRODUCT_CATS = ['果切系列', '水果零售', '水果捞', '热果奶', '经典热饮'];
+const PRODUCT_CATS = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '鲜榨果汁', '水果零售', '水果捞', '热果奶', '经典热饮'];
 
 function currentProductCat() {
   return state.productCat || '';
@@ -670,12 +761,14 @@ function readSpecsFromEditor() {
       const stock = Number(row.querySelector('.spec-stock')?.value);
       if (!name || !(price >= 0)) return null;
       const id = (row.dataset.id || `s${i + 1}`).replace(/\s+/g, '_');
-      return {
+      const next = {
         id,
         name,
         price: Math.round(price * 100) / 100,
         stock: Number.isFinite(stock) && stock >= 0 ? Math.floor(stock) : 999,
       };
+      if (row.dataset.barcode) next.barcode = row.dataset.barcode;
+      return next;
     })
     .filter(Boolean);
 }
@@ -686,6 +779,7 @@ function addSpecRow(spec = {}) {
   const row = document.createElement('div');
   row.className = 'spec-row';
   row.dataset.id = spec.id || `s${Date.now().toString(36)}`;
+  if (spec.barcode) row.dataset.barcode = spec.barcode;
   row.innerHTML = `
     <input class="spec-name" placeholder="规格名 如 250g" value="${spec.name || ''}" />
     <input class="spec-price" type="number" min="0" step="0.1" placeholder="价格" value="${spec.price != null ? spec.price : ''}" />
@@ -829,11 +923,36 @@ window.batchOffProducts = () => batchSetProductStatus(0);
 
 window.setStatus = async function setStatus(id, status) {
   await api(`/api/orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
-  if (status === 'making') await printLabel(id, { skipPrinted: true });
+  if (status === 'making') await printReceipt(id, { skipPrinted: true });
   refresh();
 };
 
+window.printReceipt = async function printReceipt(orderId, opts = {}) {
+  if (opts.skipPrinted && state.receiptPrintedIds.has(orderId)) return false;
+  if (window.DetongPrint && DetongPrint.prepareUsb) DetongPrint.prepareUsb();
+  if (!window.DetongPrint || !DetongPrint.printOrderReceipt) {
+    if (!opts.quiet) toast('本机打印未就绪');
+    return false;
+  }
+  try {
+    const data = await api(`/api/print/label/${orderId}`);
+    if (!data.order?.pickupCode) throw new Error('订单无取餐码');
+    await DetongPrint.printOrderReceipt({
+      order: data.order,
+      shopName: data.shopName || '四季果先',
+    });
+    state.receiptPrintedIds.add(orderId);
+    if (!opts.quiet) toast(`小票已打印 ${data.order.pickupCode || ''}`);
+    return true;
+  } catch (e) {
+    console.warn('[receipt]', e);
+    if (!opts.quiet) toast((e && e.message) || '热敏打印失败');
+    return false;
+  }
+};
+
 window.printLabel = async function printLabel(orderId, opts = {}) {
+  if (window.DetongPrint && DetongPrint.prepareUsb) DetongPrint.prepareUsb();
   const data = await api(`/api/print/label/${orderId}`);
   if (opts.skipPrinted && data.order?.printed) return false;
 
@@ -925,7 +1044,10 @@ async function verify() {
       }
     }
     const data = await api('/api/orders/verify', { method: 'POST', body: JSON.stringify(body) });
-    $('#verifyResult').textContent = `已确认取餐\n取餐号 ${data.order.pickupCode}\n${data.order.productName} · ${data.order.specName}\n¥${data.order.amount}`;
+    const addons = collectAddons(data.order);
+    $('#verifyResult').textContent = `已确认取餐\n取餐号 ${data.order.pickupCode}\n${data.order.productName} · ${data.order.specName}${
+      addons.length ? `\n小料 ${addons.join('、')}` : ''
+    }\n¥${data.order.amount}`;
     $('#verifyInput').value = '';
     refresh();
   } catch (e) {
@@ -1227,7 +1349,7 @@ async function loadOff153Scope() {
       state.products = [];
     }
   }
-  const bowls = (state.products || []).filter((p) => p.category === '水果捞' && p.status !== 0);
+  const bowls = (state.products || []).filter((p) => (p.category === '水果捞' || p.category === '酸奶捞') && p.status !== 0);
   const cuts = (state.products || []).filter((p) => p.category === '果切系列' && p.status !== 0);
   const scope = await api('/api/admin/coupons/off15-3-scope');
   fillProductSelect($('#off153Bowl'), bowls, scope.fruitBowlProductId, '选择一款水果捞');
@@ -2065,14 +2187,25 @@ async function refresh() {
   }
 }
 
-$('#autoPrint').checked = localStorage.getItem('sg_auto_print') === '1';
+$('#autoPrint').checked = localStorage.getItem('sg_auto_print') !== '0';
 $('#soundOn').checked = localStorage.getItem('sg_sound') !== '0';
 $('#autoPrint').addEventListener('change', () => {
   localStorage.setItem('sg_auto_print', $('#autoPrint').checked ? '1' : '0');
 });
 $('#soundOn').addEventListener('change', () => {
   localStorage.setItem('sg_sound', $('#soundOn').checked ? '1' : '0');
+  if ($('#soundOn').checked) {
+    unlockAudio();
+    speakText('来单会读出单子名称');
+    toast('新单会语音播报品名和小料');
+  }
 });
+document.addEventListener('click', unlockAudio);
+document.addEventListener('keydown', unlockAudio);
+if (window.speechSynthesis) {
+  speechSynthesis.getVoices();
+  speechSynthesis.addEventListener('voiceschanged', () => speechSynthesis.getVoices());
+}
 
 $('#loginBtn').addEventListener('click', login);
 $('#logoutBtn')?.addEventListener('click', logout);

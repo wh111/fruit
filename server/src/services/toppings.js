@@ -98,7 +98,7 @@ function resolveToppingItems(list, ids = []) {
 function isFruitBowlOrder(order) {
   if (!order) return false;
   const cat = String(order.productCategory || '');
-  if (cat === '水果捞') return true;
+  if (cat === '水果捞' || cat === '酸奶捞') return true;
   return /水果捞|捞$/.test(String(order.productName || ''));
 }
 

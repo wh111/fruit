@@ -24,6 +24,7 @@ const { URL } = require('url');
 
 const { load, save, ensure } = require('./db');
 const { writeHexPages } = require('./usbPrint');
+const { printReceipt } = require('./receiptPrint');
 const {
   createOrder,
   createBulkOrder,
@@ -182,6 +183,7 @@ function send(res, status, data, headers = {}) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Private-Network': 'true',
     ...headers,
   });
   res.end(body);
@@ -1641,12 +1643,26 @@ async function handleApi(req, res, pathname) {
   }
 
   if (pathname === '/api/admin/print/usb' && method === 'POST') {
-    if (!requireAdmin(req, res)) return;
+    const ip = String(req.socket?.remoteAddress || '');
+    const loopback = ip === '127.0.0.1' || ip === '::1' || ip.endsWith('127.0.0.1');
+    if (!loopback && !requireAdmin(req, res)) return;
     try {
       const result = await writeHexPages(body.pages);
       return send(res, 200, result);
     } catch (e) {
       return send(res, e.status || 500, { error: e.message || 'USB 打印失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/print/receipt' && method === 'POST') {
+    const ip = String(req.socket?.remoteAddress || '');
+    const loopback = ip === '127.0.0.1' || ip === '::1' || ip.endsWith('127.0.0.1');
+    if (!loopback && !requireAdmin(req, res)) return;
+    try {
+      const result = await printReceipt(body);
+      return send(res, 200, result);
+    } catch (e) {
+      return send(res, e.status || 500, { error: e.message || '热敏打印失败' });
     }
   }
 

@@ -166,8 +166,8 @@ function selectedIds() {
 function isFruitBowl(order) {
   if (!order) return false;
   const cat = String(order.productCategory || '');
-  if (cat === '水果捞') return true;
-  if (Array.isArray(order.items) && order.items.some((it) => it && it.productCategory === '水果捞')) {
+  if (cat === '水果捞' || cat === '酸奶捞') return true;
+  if (Array.isArray(order.items) && order.items.some((it) => it && (it.productCategory === '水果捞' || it.productCategory === '酸奶捞'))) {
     return true;
   }
   return /水果捞|捞$/.test(String(order.productName || ''));
@@ -178,9 +178,18 @@ function orderItemsHtml(o) {
   if (items) {
     return items
       .map((it) => {
+        const fruits = (it.extras || [])
+          .filter((e) => e && e.kind !== 'topping' && e.kind !== 'sideMeal')
+          .map((e) => e.name)
+          .filter(Boolean);
         const tops = (it.toppings || []).map((t) => t.name).filter(Boolean);
-        const tip = tops.length ? ` · 小料 ${tops.join('/')}` : '';
-        return `<div>${it.productName} · ${it.specName}×${it.quantity}${tip}</div>`;
+        const tip = [
+          fruits.length ? fruits.join('、') : '',
+          tops.length ? `小料 ${tops.join('/')}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        return `<div>${it.productName} · ${it.specName}×${it.quantity}${tip ? ` · ${tip}` : ''}</div>`;
       })
       .join('');
   }

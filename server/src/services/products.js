@@ -9,7 +9,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const CATEGORY_ORDER = ['果切系列', '水果零售', '水果捞', '热果奶', '经典热饮'];
+const CATEGORY_ORDER = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '鲜榨果汁', '水果零售', '水果捞', '热果奶', '经典热饮'];
 const ROOT = path.join(__dirname, '..', '..', '..');
 
 function productThumbPath(cover, size = 'list') {

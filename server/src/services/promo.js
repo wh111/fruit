@@ -166,14 +166,18 @@ function applyDiscount(originalAmount, disc) {
 }
 
 /** 默认支持预定的大分类（水果零售等成品永不参与预定） */
-const DEFAULT_RESERVE_CATEGORIES = ['果切系列', '水果捞'];
+const DEFAULT_RESERVE_CATEGORIES = ['果切系列', '酸奶捞', '网红小吃', '新鲜现剥', '水果捞', '鲜榨果汁'];
 
 /** 永不支持预定的分类（成品零售现取） */
 const NO_RESERVE_CATEGORIES = new Set(['水果零售', '零售什锦']);
 
 /** 管理端可选的全部大分类（不含水果零售） */
 const ALL_PRODUCT_CATEGORIES = [
+  '酸奶捞',
+  '网红小吃',
+  '新鲜现剥',
   '果切系列',
+  '鲜榨果汁',
   '水果捞',
   '热果奶',
   '经典热饮',

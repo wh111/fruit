@@ -1,6 +1,6 @@
 /**
  * 新人券包 + 周五会员日 + 下单用券
- * - 预定立减 ×15（仅预定）；面额由开业阶段决定（对客只展示当前面额，不写阶段策略）
+ * - 预定立减 ×5（仅预定）；面额 2 元
  * - 每周五会员日：已充值会员登录送无门槛减1元 ×1（现取/预定均可），甜蜜迎周末
  * - 每单限 1 张
  * - 满15减3：仅限管理端配置的一款水果捞 + 一款果切（可改）
@@ -44,8 +44,12 @@ function updateOff15_3Scope(db, body = {}) {
     if (!sid) return '';
     const p = products.find((x) => x && x.id === sid);
     if (!p) throw Object.assign(new Error(`商品不存在：${sid}`), { status: 400 });
-    if (expectCat && p.category !== expectCat) {
-      throw Object.assign(new Error(`请选择「${expectCat}」商品`), { status: 400 });
+    if (expectCat) {
+      const ok =
+        expectCat === '水果捞'
+          ? p.category === '水果捞' || p.category === '酸奶捞'
+          : p.category === expectCat;
+      if (!ok) throw Object.assign(new Error(`请选择「${expectCat}」商品`), { status: 400 });
     }
     return p.id;
   };
@@ -134,8 +138,9 @@ function productAllowedForCoupon(db, coupon, product) {
 /** 内部策略：开业日起算前 N 个月预定券面额，之后切换。勿写入对客文案。 */
 const SHOP_OPENING_AT = process.env.SHOP_OPENING_AT || '';
 const OPENING_PROMO_MONTHS = 3;
-const RESERVE_OFF_OPENING = 3;
-const RESERVE_OFF_NORMAL = 1.8;
+const RESERVE_OFF_OPENING = 2;
+const RESERVE_OFF_NORMAL = 2;
+const WELCOME_RESERVE_COUNT = 5;
 
 function isOpeningPromo(now = Date.now()) {
   if (!SHOP_OPENING_AT) return true;
@@ -160,13 +165,13 @@ function welcomeTemplates(now = Date.now()) {
   const reserveAmt = reserveOffAmount(now);
   return [
     {
-      templateId: reserveAmt >= 3 ? 'welcome_reserve3' : 'welcome_reserve18',
+      templateId: 'welcome_reserve2',
       title: reserveOffTitle(reserveAmt),
       type: 'reserve_off',
       threshold: 0,
       amount: reserveAmt,
       fulfillment: 'reserve',
-      count: 15,
+      count: WELCOME_RESERVE_COUNT,
     },
   ];
 }
@@ -222,7 +227,7 @@ function campaignInfo(now = Date.now()) {
     title: '新人见面礼',
     subtitle: '登录送预定立减券',
     bannerTitle: '预定立减更划算',
-    bannerSub: `新人礼：${reserveLabel}×15 · 每周五会员日送无门槛减1元`,
+    bannerSub: `新人礼：${reserveLabel}×${WELCOME_RESERVE_COUNT} · 每周五会员日送无门槛减1元`,
     faceValue,
     validDays: VALID_DAYS,
     /** 当前预定券面额，供前端展示「现在能领什么」；不含阶段策略说明 */
@@ -819,6 +824,7 @@ module.exports = {
   SHOP_OPENING_AT,
   RESERVE_OFF_OPENING,
   RESERVE_OFF_NORMAL,
+  WELCOME_RESERVE_COUNT,
   VALID_DAYS,
   isOpeningPromo,
   reserveOffAmount,

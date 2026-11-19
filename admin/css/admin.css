@@ -110,6 +110,19 @@ body {
   font-size: 12px;
   word-break: break-all;
 }
+#retailLabelTable .pick-cell {
+  width: 36px;
+  text-align: center;
+}
+#retailLabelTable .pick-cell input,
+#retailLabelFilter {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+#retailLabelFilter {
+  width: 140px !important;
+}
 #tab-hardware .panel + .panel { margin-top: 14px; }
 #tab-hardware input[type="text"],
 #tab-hardware input:not([type]),
@@ -279,10 +292,10 @@ a.nav.link {
   align-items: center;
 }
 .pickup {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--green-deep);
-  min-width: 72px;
+  min-width: 56px;
 }
 .toolbar { margin-bottom: 12px; display: flex; gap: 10px; }
 .table-wrap { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); overflow: auto; padding: 12px; }
@@ -372,9 +385,25 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .bottom-nav { display: none; }
 
 .order-card .order-main { flex: 1; min-width: 0; }
-.order-card .order-title { font-size: 15px; font-weight: 600; line-height: 1.35; }
+.order-card .order-title { font-size: 20px; font-weight: 700; line-height: 1.4; }
+.order-picks {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #9a3412;
+  line-height: 1.35;
+  letter-spacing: 0.5px;
+}
+.order-toppings {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #c2410c;
+}
 .order-card .actions .btn { min-height: 36px; }
 
+.list-card .order-title { font-size: 18px; font-weight: 700; line-height: 1.4; }
+.list-card .order-picks { font-size: 20px; }
 .list-card {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -643,10 +672,12 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
     height: 22px;
   }
   .order-card .pickup {
-    font-size: 32px;
+    font-size: 20px;
     min-width: 0;
     flex: 1;
   }
+  .order-card .order-title { font-size: 20px; }
+  .order-toppings { font-size: 17px; }
   .order-card .order-main {
     flex: 1 1 100%;
     order: 3;

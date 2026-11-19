@@ -8,6 +8,8 @@
     printer: 'sg_detong_printer',
     width: 'sg_detong_label_w',
     height: 'sg_detong_label_h',
+    offsetX: 'sg_detong_offset_x',
+    offsetY: 'sg_detong_offset_y',
     enabled: 'sg_detong_enabled',
     orderTpl: 'sg_detong_order_tpl',
     batchTpl: 'sg_detong_batch_tpl',
@@ -23,10 +25,10 @@
     showDelivery: true,
     codeType: 'text', // text 杯贴给顾客 | barcode 条形码
     brandFont: 2.6,
-    codeFont: 9,
-    nameFont: 2.8,
-    subFont: 2.4,
-    footFont: 2.2,
+    codeFont: 5.2,
+    nameFont: 3.8,
+    subFont: 4.4,
+    footFont: 2.0,
   };
 
   const DEFAULT_BATCH_TPL = {
@@ -38,8 +40,9 @@
     brandFont: 2.6,
     titleFont: 3.2,
     priceFont: 2.8,
-    barcodeHeight: 12,
-    textHeight: 3,
+    barcodeHeight: 7,
+    textHeight: 2.2,
+    slogan: '免洗什锦 臭氧消毒 低农残',
   };
 
   const state = {
@@ -52,6 +55,63 @@
 
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function migrateOrderTpl(tpl) {
+    const next = { ...DEFAULT_ORDER_TPL, ...(tpl || {}) };
+    if (Number(next.codeFont) >= 8) next.codeFont = DEFAULT_ORDER_TPL.codeFont;
+    if (Number(next.nameFont) <= 3) next.nameFont = DEFAULT_ORDER_TPL.nameFont;
+    if (Number(next.subFont) <= 2.8) next.subFont = DEFAULT_ORDER_TPL.subFont;
+    return next;
+  }
+
+  function extraFruitNames(list) {
+    return (list || [])
+      .filter((e) => e && e.kind !== 'topping' && e.kind !== 'sideMeal')
+      .map((e) => (typeof e === 'string' ? e : e.name))
+      .map((n) => String(n || '').trim())
+      .filter(Boolean);
+  }
+
+  function kitchenPicks(order, item) {
+    const fruits = [];
+    const tops = [];
+    const seenF = new Set();
+    const seenT = new Set();
+    const addF = (n) => {
+      const name = String(n || '').trim();
+      if (!name || seenF.has(name)) return;
+      seenF.add(name);
+      fruits.push(name);
+    };
+    const addT = (n) => {
+      const name = String(n || '').trim();
+      if (!name || seenT.has(name)) return;
+      seenT.add(name);
+      tops.push(name);
+    };
+    if (item) {
+      extraFruitNames(item.extras).forEach(addF);
+      (item.toppings || []).forEach((t) => addT(t && t.name));
+      (item.extras || []).forEach((e) => {
+        if (e && e.kind === 'topping') addT(e.name);
+      });
+    } else {
+      extraFruitNames(order.extras).forEach(addF);
+      (order.items || []).forEach((it) => extraFruitNames(it.extras).forEach(addF));
+      (order.toppings || []).forEach((t) => addT(t && t.name));
+      (order.items || []).forEach((it) => (it.toppings || []).forEach((t) => addT(t && t.name)));
+      (order.extras || []).forEach((e) => {
+        if (e && e.kind === 'topping') addT(e.name);
+      });
+      (order.items || []).forEach((it) =>
+        (it.extras || []).forEach((e) => {
+          if (e && e.kind === 'topping') addT(e.name);
+        })
+      );
+    }
+    const picksLine = [fruits.join('、'), tops.length ? `小料${tops.join('、')}` : ''].filter(Boolean).join('  ');
+    return { fruits, tops, picksLine };
   }
 
   function loadJson(key, fallback) {
@@ -69,8 +129,10 @@
       printer: localStorage.getItem(KEY.printer) || '',
       width: Number(localStorage.getItem(KEY.width) || 40),
       height: Number(localStorage.getItem(KEY.height) || 30),
+      offsetX: Number(localStorage.getItem(KEY.offsetX) || 0),
+      offsetY: Number(localStorage.getItem(KEY.offsetY) || 0),
       enabled: localStorage.getItem(KEY.enabled) !== '0',
-      orderTpl: loadJson(KEY.orderTpl, DEFAULT_ORDER_TPL),
+      orderTpl: migrateOrderTpl(loadJson(KEY.orderTpl, DEFAULT_ORDER_TPL)),
       batchTpl: loadJson(KEY.batchTpl, DEFAULT_BATCH_TPL),
     };
   }
@@ -86,6 +148,8 @@
     localStorage.setItem(KEY.printer, next.printer || '');
     localStorage.setItem(KEY.width, String(next.width || 40));
     localStorage.setItem(KEY.height, String(next.height || 30));
+    localStorage.setItem(KEY.offsetX, String(next.offsetX || 0));
+    localStorage.setItem(KEY.offsetY, String(next.offsetY || 0));
     localStorage.setItem(KEY.enabled, next.enabled ? '1' : '0');
     localStorage.setItem(KEY.orderTpl, JSON.stringify(next.orderTpl));
     localStorage.setItem(KEY.batchTpl, JSON.stringify(next.batchTpl));
@@ -126,25 +190,191 @@
     });
   }
 
+  /** 间隙纸 + 中速，避免走纸漂、标签越打越歪 */
+  function prepareLabelPrinter(api) {
+    try {
+      if (typeof api.setGapType === 'function') api.setGapType(2);
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      if (typeof api.setPrintSpeed === 'function') api.setPrintSpeed(2);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   function printPages(res) {
     const pages = res && (res.printData || (res.resultInfo && res.resultInfo.printData));
     if (!Array.isArray(pages) || !pages.length) return [];
     return pages;
   }
 
-  async function sendToUsb(pages) {
+  const LOCAL_USB_ORIGIN = 'http://127.0.0.1:3000';
+
+  function isLocalAdminHost() {
+    return location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+  }
+
+  async function postUsbPages(url, pages) {
     const token = localStorage.getItem('sg_admin_token') || '';
-    const resp = await fetch('/api/admin/print/usb', {
+    const resp = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: token ? `Bearer ${token}` : '',
       },
       body: JSON.stringify({ pages }),
+      signal: AbortSignal.timeout(4000),
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'USB 打印失败');
     return data;
+  }
+
+  function waitForUsbBridge(ms = 6000) {
+    return new Promise((resolve, reject) => {
+      if (window.sgUsbBridge && !window.sgUsbBridge.closed && window.sgUsbBridgeReady) {
+        resolve(window.sgUsbBridge);
+        return;
+      }
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', onMsg);
+        reject(new Error('本机打印通道未连上。请点「打开本机打印通道」，并允许弹出窗口。'));
+      }, ms);
+      function onMsg(ev) {
+        if (ev.origin !== LOCAL_USB_ORIGIN && ev.origin !== 'http://localhost:3000') return;
+        if (!ev.data || ev.data.type !== 'sg-usb-ready') return;
+        window.sgUsbBridgeReady = true;
+        if (ev.source) window.sgUsbBridge = ev.source;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMsg);
+        resolve(window.sgUsbBridge);
+      }
+      window.addEventListener('message', onMsg);
+    });
+  }
+
+  function sendViaLocalBridge(type, payload) {
+    return new Promise((resolve, reject) => {
+      const w = window.sgUsbBridge;
+      if (!w || w.closed) {
+        reject(new Error('请先点「打开本机打印通道」，用店里这台电脑接下 USB 打印'));
+        return;
+      }
+      const id = 'usb-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', onMsg);
+        reject(new Error('本机打印超时，请确认打印通道窗口还开着'));
+      }, 25000);
+      function onMsg(ev) {
+        if (ev.origin !== LOCAL_USB_ORIGIN && ev.origin !== 'http://localhost:3000') return;
+        const d = ev.data || {};
+        if (d.type !== 'sg-usb-result' || d.id !== id) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMsg);
+        if (d.ok) resolve(d.data || { ok: true });
+        else reject(new Error(d.error || 'USB 打印失败'));
+      }
+      window.addEventListener('message', onMsg);
+      try {
+        w.postMessage({ type, id, ...payload }, '*');
+      } catch (e) {
+        clearTimeout(timer);
+        window.removeEventListener('message', onMsg);
+        reject(new Error('本机打印通道已失效，请再点一次「打开本机打印通道」'));
+      }
+    });
+  }
+
+  function openLocalUsbBridge() {
+    window.sgUsbBridgeReady = false;
+    const w = window.open(LOCAL_USB_ORIGIN + '/admin/usb-bridge.html', 'sg-usb-bridge', 'width=420,height=240');
+    window.sgUsbBridge = w;
+    if (!w) throw new Error('浏览器拦截了本机打印窗口，请允许弹出窗口后重试');
+    return w;
+  }
+
+  function prepareUsb() {
+    if (isLocalAdminHost()) return;
+    try {
+      if (!window.sgUsbBridge || window.sgUsbBridge.closed) openLocalUsbBridge();
+    } catch (_) {
+      /* 自动打印可能没有点击手势 */
+    }
+  }
+
+  async function sendToUsb(pages) {
+    if (isLocalAdminHost()) {
+      return postUsbPages('/api/admin/print/usb', pages);
+    }
+    // 线上是 https，不能直接 fetch 本机 http，否则会被浏览器拦住或一直转圈。
+    if (!window.sgUsbBridge || window.sgUsbBridge.closed || !window.sgUsbBridgeReady) {
+      prepareUsb();
+      await waitForUsbBridge();
+    }
+    return sendViaLocalBridge('sg-usb-print', { pages });
+  }
+
+  async function postReceipt(url, ticket) {
+    const token = localStorage.getItem('sg_admin_token') || '';
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify({ ticket }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || '热敏打印失败');
+    return data;
+  }
+
+  async function sendReceipt(ticket) {
+    if (isLocalAdminHost()) {
+      return postReceipt('/api/admin/print/receipt', ticket);
+    }
+    if (!window.sgUsbBridge || window.sgUsbBridge.closed || !window.sgUsbBridgeReady) {
+      prepareUsb();
+      await waitForUsbBridge();
+    }
+    return sendViaLocalBridge('sg-receipt-print', { ticket });
+  }
+
+  function receiptLines(order) {
+    const items = Array.isArray(order.items) && order.items.length ? order.items : null;
+    if (items) return items;
+    return [
+      {
+        productName: order.productName,
+        specName: order.specName,
+        quantity: order.quantity,
+        extras: order.extras,
+        toppings: order.toppings,
+      },
+    ];
+  }
+
+  function itemTitle(item) {
+    const name = String((item && item.productName) || '').trim();
+    const spec = String((item && item.specName) || '').trim();
+    if (name && spec && spec !== '标准') return `${name} · ${spec}`;
+    return name || spec || '水果捞';
+  }
+
+  function buildReceiptTicket(order, shopName, item) {
+    const picks = kitchenPicks(order, item);
+    return {
+      shop: shopName || '四季果先',
+      code: String(order.pickupCode || ''),
+      title: itemTitle(item),
+      fruits: picks.fruits,
+      toppingLine: picks.tops.length ? `小料 ${picks.tops.join('、')}` : '',
+      qty: Number(item.quantity) || 1,
+      time: formatPickup(order),
+    };
   }
 
   function commitJob(api) {
@@ -169,13 +399,16 @@
     });
   }
 
-  function beginJob(api, width, height) {
+  function beginJob(api, width, height, extra) {
     const started = api.startJob({
       width,
       height,
+      orientation: 0,
       jobName: 'Print',
       // 当前 dtpweb 2.6 只接受 action=1 才会真正出纸，4096 会返回参数错误。
       action: 1,
+      gapType: 2,
+      ...(extra || {}),
     });
     if (!started) throw new Error('无法开始打印，请确认打印机已开机并装好标签纸');
   }
@@ -200,6 +433,7 @@
   }
 
   async function withPrinter(fn) {
+    prepareUsb();
     const api = state.api;
     if (!api || !state.ready) throw new Error('德佟打印助手未连接');
     const settings = loadSettings();
@@ -207,6 +441,7 @@
     const ok = await openPrinter(api, settings.printer);
     if (!ok) throw new Error('打开德佟打印机失败');
     try {
+      prepareLabelPrinter(api);
       return await fn(api, settings);
     } finally {
       try {
@@ -227,14 +462,21 @@
       const W = settings.width || 40;
       const H = settings.height || 30;
       const qrText = String(order.qrPayload || order.orderNo || order.id);
+      const picks = kitchenPicks(order);
       const title = `${order.productName || ''} · ${order.specName || ''}`.trim();
-      const sub = `×${order.quantity || 1}${tpl.showPrice ? ` · ¥${order.amount ?? ''}` : ''}`;
+      const sub = [
+        picks.picksLine,
+        Number(order.quantity) > 1 ? `×${order.quantity}` : '',
+        tpl.showPrice ? `¥${order.amount ?? ''}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
       const footParts = [];
       if (tpl.showTime) footParts.push(formatPickup(order));
       if (tpl.showDelivery) footParts.push(deliveryText(order));
       const foot = footParts.join(' · ');
 
-      beginJob(api, W, H);
+      beginJob(api, W, H, jobOffset(settings));
 
       let tx = 2;
       let tw = W - 4;
@@ -296,46 +538,47 @@
           });
         }
       } else {
-        let y = 1.2;
+        let y = 0.8;
         const x = 2;
         const w = W - 4;
-        const brandH = 3.2;
-        // 店名单独靠下。40×30 贴纸只有 30mm 高，从上边再加 30mm 会印出纸外，所以贴在底边。
-        const brandY = tpl.showBrand ? Math.max(1.2, H - brandH - 0.4) : H;
-        const contentBottom = tpl.showBrand ? brandY - 0.6 : H;
+        const brandH = 2.8;
+        const brandY = tpl.showBrand ? Math.max(1.2, H - brandH - 0.3) : H;
+        const contentBottom = tpl.showBrand ? brandY - 0.4 : H;
         if (tpl.showCode) {
-          const codeH = Math.max(6, Math.min(12, contentBottom - y - 7));
+          const codeH = 5.4;
           api.drawText({
             text: String(order.pickupCode),
             x,
             y,
             width: w,
             height: codeH,
-            fontHeight: Math.min(tpl.codeFont || 9, codeH - 0.6),
+            fontHeight: Math.min(tpl.codeFont || 5.2, 5.4),
             fontStyle: 1,
           });
-          y += codeH + 0.4;
+          y += codeH + 0.2;
         }
         if (tpl.showName) {
           api.drawText({
-            text: title.slice(0, 22),
+            text: title.slice(0, 24),
             x,
             y,
             width: w,
-            height: 3.8,
-            fontHeight: tpl.nameFont,
+            height: 4.4,
+            fontHeight: Math.max(tpl.nameFont || 3.8, 3.6),
+            fontStyle: 1,
           });
-          y += 4;
+          y += 4.5;
         }
-        const detail = [tpl.showPrice || order.quantity ? sub : '', foot].filter(Boolean).join('  ');
-        if (detail && y < contentBottom - 1) {
+        const pickText = picks.picksLine || sub;
+        if (pickText && y < contentBottom - 1) {
           api.drawText({
-            text: detail.slice(0, 36),
+            text: pickText,
             x,
-            y: Math.min(y, contentBottom - 3.4),
+            y,
             width: w,
-            height: 3.4,
-            fontHeight: tpl.subFont,
+            height: Math.max(6, contentBottom - y - (foot ? 2.4 : 0.2)),
+            fontHeight: Math.max(tpl.subFont || 4.4, 4.2),
+            fontStyle: 1,
           });
         }
         if (tpl.showBrand) {
@@ -356,72 +599,110 @@
     });
   }
 
+  async function printOrderReceipt(payload) {
+    const order = payload && payload.order;
+    if (!order || !order.pickupCode) throw new Error('订单无取餐码');
+    prepareUsb();
+    const shopName = payload.shopName || loadSettings().orderTpl.brand || '四季果先';
+    const lines = receiptLines(order);
+    for (const item of lines) {
+      await sendReceipt(buildReceiptTicket(order, shopName, item));
+    }
+    return { ok: true, count: lines.length };
+  }
+
+  function jobOffset(settings) {
+    const offsetX = Number(settings && settings.offsetX) || 0;
+    const offsetY = Number(settings && settings.offsetY) || 0;
+    const extra = {};
+    if (offsetX) extra.offsetX = offsetX;
+    if (offsetY) extra.offsetY = offsetY;
+    return extra;
+  }
+
+  function drawCenteredText(api, text, x, y, width, height, fontHeight, fontStyle) {
+    api.drawText({
+      text,
+      x,
+      y,
+      width,
+      height,
+      fontHeight,
+      fontStyle: fontStyle || 0,
+      horizontalAlignment: 1,
+      verticalAlignment: 1,
+    });
+  }
+
   /**
    * 打印一张商品/库存条形码标签
-   * item: { code, title?, price?, brand? }
+   * item: { code, title?, name?, spec?, price?, brand? }
    */
+  async function drawBarcodeLabel(api, settings, item, overrides) {
+    const tpl = { ...DEFAULT_BATCH_TPL, ...settings.batchTpl, ...(overrides || {}) };
+    const W = settings.width || 40;
+    const H = settings.height || 30;
+    const code = String(item.code || '').trim();
+    if (!code) throw new Error('条码内容为空');
+
+    beginJob(api, W, H, jobOffset(settings));
+    const pad = 1.5;
+    const innerW = W - pad * 2;
+    let y = 0.6;
+    if (tpl.showBrand) {
+      drawCenteredText(api, item.brand || tpl.brand, pad, y, innerW, 2.3, 2.1, 1);
+      y += 2.4;
+    }
+    const name = String(item.name || '').trim();
+    const spec = String(item.spec || '').trim();
+    const title = name || String(item.title || '').trim();
+    if (tpl.showTitle && title) {
+      const twoLine = title.length > 10;
+      drawCenteredText(api, title, pad, y, innerW, twoLine ? 4.8 : 2.8, twoLine ? 2.3 : 2.6, 1);
+      y += twoLine ? 5.0 : 3.0;
+    }
+    const slogan = String(item.slogan != null ? item.slogan : tpl.slogan || '').trim();
+    if (slogan) {
+      drawCenteredText(api, slogan, pad, y, innerW, 2.4, 1.85, 0);
+      y += 2.5;
+    }
+    const footBits = [];
+    if (spec) footBits.push(spec);
+    if (tpl.showPrice && (item.price || item.price === 0)) footBits.push(`¥${item.price}`);
+    const ean = isEan13Code(code) || /^\d{13}$/.test(code);
+    const human = tpl.showHuman;
+    const footH = footBits.length ? 2.8 : 0;
+    const humanH = human ? 2.0 : 0;
+    const barH = Math.max(6, Math.min(7.2, H - y - footH - humanH - 1.0));
+    const barW = Math.min(ean ? 24 : innerW * 0.72, innerW);
+    const barX = pad + (innerW - barW) / 2;
+    api.draw1DBarcode({
+      text: ean ? toEan13(code) : code,
+      x: barX,
+      y,
+      width: barW,
+      height: barH,
+      textHeight: human ? humanH : 0,
+      barPixels: 2,
+      barcodeType: ean ? EAN13_TYPE : CODE128_TYPE,
+      horizontalAlignment: 1,
+    });
+    y += barH + (human ? humanH + 0.3 : 0.5);
+    if (footBits.length) {
+      drawCenteredText(api, footBits.join('  '), pad, Math.min(y, H - 3.0), innerW, 2.8, 2.4, 1);
+    }
+    await commitJob(api);
+  }
+
   function printBarcodeLabel(item, overrides) {
     return withPrinter(async (api, settings) => {
-      const tpl = { ...DEFAULT_BATCH_TPL, ...settings.batchTpl, ...(overrides || {}) };
-      const W = settings.width || 40;
-      const H = settings.height || 30;
-      const code = String(item.code || '').trim();
-      if (!code) throw new Error('条码内容为空');
-
-      beginJob(api, W, H);
-      let y = 1.2;
-      if (tpl.showBrand) {
-        api.drawText({
-          text: item.brand || tpl.brand,
-          x: 2,
-          y,
-          width: W - 4,
-          height: 3.2,
-          fontHeight: tpl.brandFont,
-          fontStyle: 1,
-        });
-        y += 3.4;
-      }
-      if (tpl.showTitle && item.title) {
-        api.drawText({
-          text: String(item.title).slice(0, 32),
-          x: 2,
-          y,
-          width: W - 4,
-          height: 4,
-          fontHeight: tpl.titleFont,
-        });
-        y += 4.2;
-      }
-      const barH = Math.min(tpl.barcodeHeight || 12, H - y - (tpl.showPrice || tpl.showHuman ? 7 : 2));
-      api.draw1DBarcode({
-        text: code,
-        x: 2,
-        y,
-        width: W - 4,
-        height: Math.max(8, barH),
-        textHeight: tpl.showHuman ? tpl.textHeight || 3 : 0,
-        barPixels: 2,
-      });
-      y += Math.max(8, barH) + (tpl.showHuman ? (tpl.textHeight || 3) + 1.5 : 1);
-      if (tpl.showPrice && (item.price || item.price === 0)) {
-        api.drawText({
-          text: `¥${item.price}`,
-          x: 2,
-          y: Math.min(y, H - 4),
-          width: W - 4,
-          height: 3.5,
-          fontHeight: tpl.priceFont,
-          fontStyle: 1,
-        });
-      }
-      await commitJob(api);
+      await drawBarcodeLabel(api, settings, item, overrides);
       return { ok: true };
     });
   }
 
   /** 批量打印，items: [{code,title,price,copies?}] */
-  async function printBarcodeBatch(items, { onProgress, gapMs = 350 } = {}) {
+  async function printBarcodeBatch(items, { onProgress, gapMs = 80 } = {}) {
     if (state.batchRunning) throw new Error('批量打印进行中');
     const list = (items || []).filter((x) => x && x.code);
     if (!list.length) throw new Error('没有可打印的条码');
@@ -434,15 +715,17 @@
       total += Math.max(1, Number(it.copies) || 1);
     });
     try {
-      for (const it of list) {
-        const copies = Math.max(1, Math.min(200, Number(it.copies) || 1));
-        for (let i = 0; i < copies; i++) {
-          await printBarcodeLabel(it);
-          done += 1;
-          if (onProgress) onProgress({ done, total, current: it });
-          if (gapMs > 0) await new Promise((r) => setTimeout(r, gapMs));
+      await withPrinter(async (api, settings) => {
+        for (const it of list) {
+          const copies = Math.max(1, Math.min(200, Number(it.copies) || 1));
+          for (let i = 0; i < copies; i++) {
+            await drawBarcodeLabel(api, settings, it);
+            done += 1;
+            if (onProgress) onProgress({ done, total, current: it });
+            if (gapMs > 0) await new Promise((r) => setTimeout(r, gapMs));
+          }
         }
-      }
+      });
       return { ok: true, printed: done };
     } finally {
       state.batchRunning = false;
@@ -506,7 +789,12 @@
     const el = $('detongStatus');
     if (!el) return;
     if (state.ready) {
-      el.textContent = `已连接打印助手 · 检测到 ${state.printers.length} 台设备`;
+      const usbHint = isLocalAdminHost()
+        ? ''
+        : window.sgUsbBridge && !window.sgUsbBridge.closed
+          ? ' · 本机 USB 通道已开'
+          : ' · 线上打印请先点「打开本机打印通道」';
+      el.textContent = `已连接打印助手 · 检测到 ${state.printers.length} 台设备${usbHint}`;
       el.className = 'muted ok-line';
     } else {
       el.textContent = state.lastError || '未检测到德佟打印助手（需在本机安装并启动）';
@@ -549,6 +837,8 @@
     set('detongEnabled', s.enabled, true);
     set('detongWidth', s.width);
     set('detongHeight', s.height);
+    set('detongOffsetX', s.offsetX || 0);
+    set('detongOffsetY', s.offsetY || 0);
     set('orderTplBrand', ot.brand);
     set('orderTplShowBrand', ot.showBrand, true);
     set('orderTplShowCode', ot.showCode, true);
@@ -598,25 +888,43 @@
       .filter((x) => x.code);
   }
 
-  /** 稳定条码：优先规格/商品自带 barcode，否则由商品 id + 规格 id 生成 */
+  const EAN13_TYPE = 22; // dtpweb LPA_1DBT_EAN13
+  const CODE128_TYPE = 28;
+
+  function ean13CheckDigit(d12) {
+    const s = String(d12)
+      .replace(/\D/g, '')
+      .padStart(12, '0')
+      .slice(0, 12);
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += Number(s[i]) * (i % 2 === 0 ? 1 : 3);
+    return String((10 - (sum % 10)) % 10);
+  }
+
+  function toEan13(raw) {
+    const digits = String(raw || '').replace(/\D/g, '');
+    const body = (digits.length >= 13 ? digits.slice(0, 12) : digits.slice(-12)).padStart(12, '0');
+    return body + ean13CheckDigit(body);
+  }
+
+  function isEan13Code(code) {
+    const s = String(code || '').trim();
+    return /^\d{13}$/.test(s) && s === toEan13(s);
+  }
+
+  /** 稳定 13 位 EAN-13：优先规格/商品自带 barcode，否则由商品 id 生成 */
   function skuBarcode(product, spec) {
-    const clean = (raw) =>
-      String(raw || '')
-        .replace(/[^0-9A-Za-z\-]/g, '')
-        .slice(0, 22);
-    if (spec && spec.barcode) {
-      const c = clean(spec.barcode);
-      if (c) return c;
+    const stored = (spec && spec.barcode) || (product && product.barcode) || '';
+    const storedDigits = String(stored).replace(/\D/g, '');
+    if (storedDigits.length >= 12) return toEan13(storedDigits);
+
+    const key = `${product && product.id ? product.id : 'x'}|${(spec && spec.id) || 'std'}`;
+    let h = 2166136261;
+    for (let i = 0; i < key.length; i++) {
+      h ^= key.charCodeAt(i);
+      h = Math.imul(h, 16777619);
     }
-    if (product && product.barcode) {
-      const c = clean(product.barcode);
-      if (c) return c;
-    }
-    const pid = String(product && product.id ? product.id : '')
-      .replace(/-/g, '')
-      .slice(-10);
-    const sid = String((spec && spec.id) || 'std').replace(/[^0-9A-Za-z]/g, '') || 'std';
-    return clean(`SG${pid}${sid}`) || `SG${Date.now().toString().slice(-8)}`;
+    return toEan13(`21${String(h >>> 0).padStart(10, '0').slice(-10)}`);
   }
 
   function isRetailMixProduct(p) {
@@ -631,14 +939,51 @@
     return Math.min(200, Math.floor(n));
   }
 
+  function retailRows() {
+    return [...document.querySelectorAll('#retailLabelBody tr[data-code]')];
+  }
+
+  function visibleRetailRows() {
+    return retailRows().filter((tr) => tr.style.display !== 'none');
+  }
+
+  function selectedRetailRows() {
+    return retailRows().filter((tr) => tr.querySelector('.retail-pick')?.checked);
+  }
+
+  function syncRetailSelectAll() {
+    const all = $('retailLabelSelectAll');
+    if (!all) return;
+    const rows = visibleRetailRows();
+    const checked = rows.filter((tr) => tr.querySelector('.retail-pick')?.checked);
+    all.checked = rows.length > 0 && checked.length === rows.length;
+    all.indeterminate = checked.length > 0 && checked.length < rows.length;
+  }
+
+  function filterRetailRows() {
+    const q = String($('retailLabelFilter')?.value || '')
+      .trim()
+      .toLowerCase();
+    retailRows().forEach((tr) => {
+      const hay = `${tr.dataset.name || ''} ${tr.dataset.title || ''} ${tr.dataset.spec || ''}`.toLowerCase();
+      tr.style.display = !q || hay.includes(q) ? '' : 'none';
+    });
+    syncRetailSelectAll();
+  }
+
   function collectRetailPrintItems() {
-    return [...document.querySelectorAll('#retailLabelBody tr[data-code]')]
+    const fallback = retailDefaultCopies();
+    return selectedRetailRows()
       .map((tr) => {
-        const copies = Math.max(0, Math.min(200, Number(tr.querySelector('.retail-copies')?.value) || 0));
+        let copies = Math.max(0, Math.min(200, Number(tr.querySelector('.retail-copies')?.value) || 0));
+        if (copies <= 0) copies = fallback;
         if (copies <= 0) return null;
         return {
           code: tr.dataset.code,
           title: tr.dataset.title || '',
+          name: tr.dataset.name || '',
+          spec: tr.dataset.spec || '',
+          slogan: '免洗什锦 臭氧消毒 低农残',
           price: tr.dataset.price !== '' ? tr.dataset.price : undefined,
           copies,
         };
@@ -650,7 +995,7 @@
     const body = $('retailLabelBody');
     const hint = $('retailLabelHint');
     if (!body) return;
-    body.innerHTML = '<tr><td colspan="5" class="muted">加载中…</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="muted">加载中…</td></tr>';
     if (hint) hint.textContent = '';
     try {
       const token = localStorage.getItem('sg_admin_token') || '';
@@ -680,7 +1025,7 @@
 
       if (!rows.length) {
         body.innerHTML =
-          '<tr><td colspan="5" class="muted">暂无上架的水果零售商品。请到「商品」页把什锦上架（400g / 500g）。</td></tr>';
+          '<tr><td colspan="6" class="muted">暂无上架的水果零售商品。请到「商品」页把什锦上架。</td></tr>';
         if (hint) hint.textContent = '未找到上架菜单';
         return;
       }
@@ -688,7 +1033,8 @@
       const def = retailDefaultCopies();
       body.innerHTML = rows
         .map(
-          (r) => `<tr data-code="${escapeAttr(r.code)}" data-title="${escapeAttr(r.title)}" data-price="${escapeAttr(r.price ?? '')}">
+          (r) => `<tr data-code="${escapeAttr(r.code)}" data-name="${escapeAttr(r.name)}" data-spec="${escapeAttr(r.specName || '')}" data-title="${escapeAttr(r.title)}" data-price="${escapeAttr(r.price ?? '')}">
+            <td class="pick-cell"><input type="checkbox" class="retail-pick" /></td>
             <td>${escapeHtml(r.name)}</td>
             <td>${escapeHtml(r.specName || '-')}</td>
             <td>${r.price != null && r.price !== '' ? '¥' + r.price : '-'}</td>
@@ -697,9 +1043,10 @@
           </tr>`
         )
         .join('');
-      if (hint) hint.textContent = `已加载 ${onShelf.length} 个上架商品 · ${rows.length} 个规格`;
+      if (hint) hint.textContent = `已加载 ${onShelf.length} 个上架商品 · ${rows.length} 个规格。请勾选要打的品种。`;
+      filterRetailRows();
     } catch (e) {
-      body.innerHTML = `<tr><td colspan="5" class="muted">${escapeHtml(e.message || '加载失败')}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHtml(e.message || '加载失败')}</td></tr>`;
       if (hint) hint.textContent = e.message || '加载失败';
       if (typeof toast === 'function') toast(e.message || '加载水果零售菜单失败');
     }
@@ -719,20 +1066,40 @@
 
   function fillRetailCopies(value) {
     const n = Math.max(0, Math.min(200, Number(value) || 0));
-    document.querySelectorAll('#retailLabelBody .retail-copies').forEach((inp) => {
-      inp.value = String(n);
+    const rows = selectedRetailRows();
+    if (!rows.length) {
+      if (typeof toast === 'function') toast('请先勾选要打的品种');
+      return;
+    }
+    rows.forEach((tr) => {
+      const inp = tr.querySelector('.retail-copies');
+      if (inp) inp.value = String(n);
     });
   }
 
+  function clearRetailSelection() {
+    retailRows().forEach((tr) => {
+      const box = tr.querySelector('.retail-pick');
+      if (box) box.checked = false;
+    });
+    syncRetailSelectAll();
+  }
+
   async function printRetailMixLabels() {
+    const picked = selectedRetailRows();
+    if (!picked.length) {
+      if (typeof toast === 'function') toast('请先勾选要打的品种，不会一次打完全部');
+      setBatchProgress('未勾选品种');
+      return;
+    }
     const items = collectRetailPrintItems();
     if (!items.length) {
-      if (typeof toast === 'function') toast('请先填写要打印的张数（大于 0）');
+      if (typeof toast === 'function') toast('已选品种的张数都是 0，请填写张数');
       setBatchProgress('未选择打印张数');
       return;
     }
     const total = items.reduce((sum, it) => sum + it.copies, 0);
-    if (!confirm(`将打印 ${items.length} 种规格，共 ${total} 张条形码标签，确认？`)) return;
+    if (!confirm(`将打印已选的 ${items.length} 种，共 ${total} 张条形码标签，确认？`)) return;
     await runBatch(items);
   }
 
@@ -802,7 +1169,29 @@
     });
     w?.addEventListener('change', () => saveSettings({ width: Number(w.value) || 40 }));
     h?.addEventListener('change', () => saveSettings({ height: Number(h.value) || 30 }));
+    $('detongOffsetX')?.addEventListener('change', (e) => {
+      saveSettings({ offsetX: Number(e.target.value) || 0 });
+    });
+    $('detongOffsetY')?.addEventListener('change', (e) => {
+      saveSettings({ offsetY: Number(e.target.value) || 0 });
+    });
 
+    window.addEventListener('message', (ev) => {
+      if (ev.origin !== LOCAL_USB_ORIGIN && ev.origin !== 'http://localhost:3000') return;
+      if (ev.data && ev.data.type === 'sg-usb-ready') {
+        window.sgUsbBridgeReady = true;
+        if (ev.source) window.sgUsbBridge = ev.source;
+        updateStatusUI();
+      }
+    });
+    $('detongUsbBridge')?.addEventListener('click', () => {
+      try {
+        openLocalUsbBridge();
+        if (typeof toast === 'function') toast('已打开本机打印通道，请不要关掉那个小窗口');
+      } catch (e) {
+        if (typeof toast === 'function') toast(e.message || '打不开本机打印通道');
+      }
+    });
     $('detongRefresh')?.addEventListener('click', () => {
       try {
         if (state.api?.discoveryPrinters) state.api.discoveryPrinters(1);
@@ -838,6 +1227,31 @@
         if (typeof toast === 'function') toast('测试标签已送到打印机');
       } catch (e) {
         if (typeof toast === 'function') toast(e.message || '测试打印失败');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+
+    $('receiptTest')?.addEventListener('click', async () => {
+      const btn = $('receiptTest');
+      if (btn) btn.disabled = true;
+      if (typeof toast === 'function') toast('正在打印测试小票…');
+      try {
+        await printOrderReceipt({
+          shopName: loadSettings().orderTpl.brand || '四季果先',
+          order: {
+            pickupCode: 'A001',
+            productName: '三拼自选水果捞',
+            specName: '标准',
+            quantity: 1,
+            extras: [{ name: '哈密瓜' }, { name: '芒果' }, { name: '凤梨' }, { name: '椰果', kind: 'topping' }],
+            fulfillmentType: 'now',
+            createdAt: Date.now(),
+          },
+        });
+        if (typeof toast === 'function') toast('测试小票已送到 POS-80');
+      } catch (e) {
+        if (typeof toast === 'function') toast(e.message || '热敏打印失败');
       } finally {
         if (btn) btn.disabled = false;
       }
@@ -896,10 +1310,22 @@
       fillRetailCopies(retailDefaultCopies());
     });
     $('retailLabelClearCopies')?.addEventListener('click', () => {
-      fillRetailCopies(0);
+      clearRetailSelection();
     });
     $('retailLabelPrint')?.addEventListener('click', () => {
       printRetailMixLabels();
+    });
+    $('retailLabelFilter')?.addEventListener('input', filterRetailRows);
+    $('retailLabelSelectAll')?.addEventListener('change', (e) => {
+      const on = !!e.target.checked;
+      visibleRetailRows().forEach((tr) => {
+        const box = tr.querySelector('.retail-pick');
+        if (box) box.checked = on;
+      });
+      syncRetailSelectAll();
+    });
+    $('retailLabelBody')?.addEventListener('change', (e) => {
+      if (e.target && e.target.classList.contains('retail-pick')) syncRetailSelectAll();
     });
     // 首次进入管理端时若已在标签页，稍后由 admin.refresh 再拉一次
     setTimeout(() => {
@@ -953,7 +1379,9 @@
   global.DetongPrint = {
     init,
     isAvailable,
+    prepareUsb,
     printOrderLabel,
+    printOrderReceipt,
     printBarcodeLabel,
     printBarcodeBatch,
     buildSerialItems,

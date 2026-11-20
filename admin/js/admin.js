@@ -156,7 +156,8 @@ function orderSpeakText(o) {
   const fromItems = items
     ? items.map((it) => String(it.productName || '').trim()).filter(Boolean).join('，')
     : '';
-  return fromItems || String(o.productName || '').trim() || '新订单';
+  const name = fromItems || String(o.productName || '').trim() || '新订单';
+  return `有新订单，${name}`;
 }
 
 function speakText(text) {
@@ -2196,7 +2197,7 @@ $('#soundOn').addEventListener('change', () => {
   localStorage.setItem('sg_sound', $('#soundOn').checked ? '1' : '0');
   if ($('#soundOn').checked) {
     unlockAudio();
-    speakText('来单会读出单子名称');
+    speakText('有新订单，会读出单子名称');
     toast('新单会语音播报品名和小料');
   }
 });

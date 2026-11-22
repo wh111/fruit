@@ -169,7 +169,7 @@ function applyDiscount(originalAmount, disc) {
 const DEFAULT_RESERVE_CATEGORIES = ['果切系列', '酸奶捞', '网红小吃', '新鲜现剥', '水果捞', '鲜榨果汁'];
 
 /** 永不支持预定的分类（成品零售现取） */
-const NO_RESERVE_CATEGORIES = new Set(['水果零售', '零售什锦']);
+const NO_RESERVE_CATEGORIES = new Set(['免洗什锦', '水果零售', '零售什锦']);
 
 /** 管理端可选的全部大分类（不含水果零售） */
 const ALL_PRODUCT_CATEGORIES = [

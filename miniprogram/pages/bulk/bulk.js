@@ -29,6 +29,10 @@ Page({
     hasPhone: false,
     paying: false,
     walletEnabled: false,
+    member: false,
+    memberSave: '0.00',
+    fridayGift: false,
+    canProcess: false,
     balance: 0,
     payChannel: 'wechat',
     balanceEnough: false,
@@ -46,11 +50,14 @@ Page({
       const data = await request('/api/wallet/mine');
       const balance = Number(data.balance) || 0;
       const amount = parseAmount(this.data.amountText);
+      const pay = this.payAmount(amount, !!data.member);
       const enabled = !!data.enabled;
       const patch = {
         walletEnabled: enabled,
+        member: !!data.member,
         balance,
-        balanceEnough: enabled && amount != null && balance + 0.001 >= amount,
+        ...this.perkPatch(amount, !!data.member),
+        balanceEnough: enabled && pay != null && balance + 0.001 >= pay,
       };
       if (enabled && !this._payChannelTouched) patch.payChannel = 'balance';
       else if (!enabled) patch.payChannel = 'wechat';
@@ -60,23 +67,47 @@ Page({
     }
   },
 
+  payAmount(amount, member) {
+    if (amount == null) return null;
+    if (!member) return amount;
+    const save = Math.round(amount * 10) / 100;
+    const pay = Math.round((amount - save) * 100) / 100;
+    return pay < 0.01 ? 0.01 : pay;
+  },
+
+  perkPatch(amount, member) {
+    const isMember = member != null ? member : this.data.member;
+    const pay = this.payAmount(amount, isMember);
+    const save = amount != null && pay != null ? Math.round((amount - pay) * 100) / 100 : 0;
+    const friday = new Date().getDay() === 5;
+    return {
+      displayAmount: formatDisplay(pay),
+      memberSave: save.toFixed(2),
+      fridayGift: !!(isMember && friday && pay > 0),
+      canProcess: pay != null && pay + 0.001 >= 18,
+    };
+  },
+
   refreshBalanceEnough() {
     const amount = parseAmount(this.data.amountText);
+    const pay = this.payAmount(amount, this.data.member);
     const balance = Number(this.data.balance) || 0;
     this.setData({
-      balanceEnough: this.data.walletEnabled && amount != null && balance + 0.001 >= amount,
+      ...this.perkPatch(amount),
+      balanceEnough: this.data.walletEnabled && pay != null && balance + 0.001 >= pay,
     });
   },
 
   onAmount(e) {
     const amountText = e.detail.value;
     const amount = parseAmount(amountText);
+    const pay = this.payAmount(amount, this.data.member);
     const balance = Number(this.data.balance) || 0;
     this.setData({
       amountText,
-      displayAmount: formatDisplay(amount),
       canPay: amount != null,
-      balanceEnough: this.data.walletEnabled && amount != null && balance + 0.001 >= amount,
+      ...this.perkPatch(amount),
+      balanceEnough: this.data.walletEnabled && pay != null && balance + 0.001 >= pay,
     });
   },
 

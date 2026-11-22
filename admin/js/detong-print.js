@@ -605,8 +605,17 @@
     prepareUsb();
     const shopName = payload.shopName || loadSettings().orderTpl.brand || '四季果先';
     const lines = receiptLines(order);
+    let first = true;
     for (const item of lines) {
-      await sendReceipt(buildReceiptTicket(order, shopName, item));
+      const ticket = buildReceiptTicket(order, shopName, item);
+      if (first) {
+        const notes = [];
+        if (order.fridayGift && order.fridayGift.name) notes.push(`赠${order.fridayGift.name}`);
+        if (order.canProcess) notes.push('可加工');
+        if (notes.length) ticket.fruits = (ticket.fruits || []).concat(notes);
+        first = false;
+      }
+      await sendReceipt(ticket);
     }
     return { ok: true, count: lines.length };
   }
@@ -930,7 +939,7 @@
   function isRetailMixProduct(p) {
     if (!p) return false;
     const cat = String(p.category || '');
-    return cat === '水果零售' || cat === '零售什锦';
+    return cat === '免洗什锦' || cat === '水果零售' || cat === '零售什锦';
   }
 
   function retailDefaultCopies() {
@@ -1025,7 +1034,7 @@
 
       if (!rows.length) {
         body.innerHTML =
-          '<tr><td colspan="6" class="muted">暂无上架的水果零售商品。请到「商品」页把什锦上架。</td></tr>';
+          '<tr><td colspan="6" class="muted">暂无上架的免洗什锦。请到「商品」页把什锦上架。</td></tr>';
         if (hint) hint.textContent = '未找到上架菜单';
         return;
       }
@@ -1048,7 +1057,7 @@
     } catch (e) {
       body.innerHTML = `<tr><td colspan="6" class="muted">${escapeHtml(e.message || '加载失败')}</td></tr>`;
       if (hint) hint.textContent = e.message || '加载失败';
-      if (typeof toast === 'function') toast(e.message || '加载水果零售菜单失败');
+      if (typeof toast === 'function') toast(e.message || '加载免洗什锦菜单失败');
     }
   }
 

@@ -1,4 +1,11 @@
-.page { padding-bottom: 160rpx; }
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding-bottom: 0;
+}
 
 .cart-bar {
   position: fixed;
@@ -40,22 +47,22 @@
 }
 
 .hero {
-  margin: 24rpx;
-  padding: 28rpx;
-  border-radius: 28rpx;
+  margin: 12rpx 24rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 24rpx;
   background: linear-gradient(135deg, #fff8e7 0%, #e8f5e9 100%);
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 16rpx;
 }
-.hero-logo { width: 120rpx; height: 120rpx; background: #fff; border-radius: 24rpx; }
-.brand { display: block; font-size: 40rpx; font-weight: 800; color: #2a2a2a; }
-.slogan { display: block; margin-top: 8rpx; color: #2e7d32; font-size: 28rpx; font-weight: 700; }
-.slogan-sub { display: block; margin-top: 6rpx; color: #4caf50; font-size: 22rpx; }
+.hero-logo { width: 72rpx; height: 72rpx; background: #fff; border-radius: 18rpx; }
+.brand { display: block; font-size: 32rpx; font-weight: 800; color: #2a2a2a; }
+.slogan { display: block; margin-top: 4rpx; color: #2e7d32; font-size: 24rpx; font-weight: 700; }
+.slogan-sub { display: block; margin-top: 2rpx; color: #4caf50; font-size: 20rpx; }
 
 .fresh-pledge {
-  margin: 0 24rpx 16rpx;
-  padding: 16rpx 20rpx;
+  margin: 0 24rpx 8rpx;
+  padding: 10rpx 16rpx;
   background: #fff;
   border: 2rpx solid #c8e6c9;
   border-radius: 16rpx;
@@ -69,8 +76,8 @@
 .fresh-dot { color: #4caf50; font-size: 16rpx; line-height: 1.8; flex-shrink: 0; }
 
 .bulk-entry {
-  margin: 0 24rpx 16rpx;
-  padding: 24rpx 28rpx;
+  margin: 0 24rpx 8rpx;
+  padding: 16rpx 20rpx;
   border-radius: 20rpx;
   background: #fff;
   border: 2rpx solid #ffe0b2;
@@ -167,46 +174,81 @@
   font-size: 24rpx;
   line-height: 1.5;
 }
-.cats {
-  white-space: nowrap;
-  padding: 8rpx 24rpx 16rpx;
-  height: 88rpx;
-  box-sizing: border-box;
+.perk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+  margin: 0 24rpx 12rpx;
+  padding: 12rpx 16rpx;
+  background: #fff8e8;
+  border-radius: 16rpx;
+  color: #9a6b12;
+  font-size: 22rpx;
+  line-height: 1.4;
 }
-.cat {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 64rpx;
-  padding: 0 28rpx;
-  margin-right: 16rpx;
+.menu {
+  flex: 1;
+  min-height: 0;
+  display: flex;
   background: #fff;
-  border-radius: 999rpx;
-  color: #666;
-  font-size: 26rpx;
-  line-height: 1;
-  box-sizing: border-box;
-  vertical-align: middle;
+  border-top: 1rpx solid #f0ebe3;
+}
+.side {
+  width: 168rpx;
+  height: 100%;
+  background: #f6f6f6;
   flex-shrink: 0;
 }
-.cat.on {
-  background: #f5a623;
-  color: #fff;
-  font-weight: 600;
+.side-cat {
+  position: relative;
+  padding: 28rpx 16rpx 28rpx 20rpx;
+  text-align: center;
+  color: #666;
+  font-size: 24rpx;
+  line-height: 1.35;
 }
-.cat-text {
-  line-height: 1.2;
-  display: block;
+.side-cat.on {
+  background: #fff;
+  color: #222;
+  font-weight: 700;
+}
+.side-bar {
+  position: absolute;
+  left: 0;
+  top: 22rpx;
+  bottom: 22rpx;
+  width: 6rpx;
+  border-radius: 0 6rpx 6rpx 0;
+  background: #f5a623;
+}
+.side-text { display: block; }
+.goods { flex: 1; height: 100%; background: #fff; }
+.goods-pad { padding: 8rpx 16rpx calc(150rpx + env(safe-area-inset-bottom)); }
+.member-tag {
+  margin-left: 8rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  background: #fff3df;
+  color: #c47a12;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+.desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .item {
   display: flex;
-  gap: 20rpx;
-  padding: 20rpx !important;
+  gap: 16rpx;
+  padding: 20rpx 8rpx;
+  border-bottom: 1rpx solid #f3f0ea;
 }
 .cover {
-  width: 180rpx;
-  height: 180rpx;
+  width: 148rpx;
+  height: 148rpx;
   border-radius: 20rpx;
   background: #f0ebe3;
   flex-shrink: 0;

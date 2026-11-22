@@ -26,7 +26,7 @@ function saveDelivery(id) {
 }
 
 function isRetailCat(cat) {
-  return cat === '水果零售' || cat === '零售什锦';
+  return cat === '免洗什锦' || cat === '水果零售' || cat === '零售什锦';
 }
 
 function decorateItems(items) {
@@ -64,6 +64,9 @@ Page({
     slotIndex: 0,
     hasDiscount: false,
     discountLabel: '',
+    memberLabel: '',
+    fridayGift: '',
+    canProcess: false,
     promoHint: '',
     allowReserveCategory: false,
     canReserve: false,
@@ -254,8 +257,8 @@ Page({
       else if (!allowReserveCategory) {
         const onlyRetail =
           cats.length > 0 &&
-          cats.every((c) => c === '水果零售' || c === '零售什锦');
-        reserveDesc = onlyRetail ? '水果零售仅支持现取' : '本单有商品不支持预定';
+          cats.every((c) => c === '免洗什锦' || c === '水果零售' || c === '零售什锦');
+        reserveDesc = onlyRetail ? '免洗什锦仅支持现取' : '本单有商品不支持预定';
       }
       this.setData({
         slots,
@@ -328,6 +331,9 @@ Page({
         deliveryFee: Number(quote.deliveryFee) || 0,
         hasDiscount: Number(quote.discountAmount) > 0,
         discountLabel: quote.discountLabel || '',
+        memberLabel: quote.memberLabel || '',
+        fridayGift: quote.fridayGift && quote.fridayGift.name ? `赠送${quote.fridayGift.name}一份` : '',
+        canProcess: !!quote.canProcess,
         coupons,
         couponId: this._couponTouched ? this.data.couponId : selectedId,
         couponLabel,
@@ -350,6 +356,9 @@ Page({
         total: est.toFixed(2),
         hasDiscount: false,
         discountLabel: '',
+        memberLabel: '',
+        fridayGift: '',
+        canProcess: false,
       });
       if (e && e.message) wx.showToast({ title: e.message, icon: 'none' });
     }

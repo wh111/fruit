@@ -396,7 +396,7 @@ function productMatchesCoupon(coupon, product) {
   const cat = String(product.category || '');
   if (coupon.matchCategory && cat === coupon.matchCategory) return true;
   if (coupon.matchNameIncludes && name.includes(coupon.matchNameIncludes)) return true;
-  if (cat === '水果零售' || cat === '零售什锦') return true;
+  if (cat === '免洗什锦' || cat === '水果零售' || cat === '零售什锦') return true;
   if (/什锦|零售/.test(name) && (/水果零售|零售什锦|小盒|免洗/.test(cat) || /零售|免洗|什锦/.test(name))) {
     return true;
   }

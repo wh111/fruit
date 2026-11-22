@@ -59,6 +59,8 @@
     <view class="row" wx:if="{{sideMealText}}"><text>代餐</text><text>{{sideMealText}}</text></view>
     <view class="row"><text>取餐</text><text>{{order.fulfillmentType === 'reserve' ? (order.pickupAtText || '预约') : '现作现取'}}</text></view>
     <view class="row"><text>送达</text><text>{{order.deliveryPointName || '到店取'}}<text wx:if="{{order.deliveryFee > 0}}"> · 配送费¥{{order.deliveryFee}}</text></text></view>
+    <view class="row" wx:if="{{order.fridayGift}}"><text>赠送</text><text>精美果切一份</text></view>
+    <view class="row" wx:if="{{order.canProcess}}"><text>加工</text><text>已满18元，可加工</text></view>
     <view class="row" wx:if="{{order.discountAmount > 0}}"><text>优惠</text><text>{{order.discountLabel}}</text></view>
     <view class="row" wx:if="{{order.loyaltySave > 0}}"><text>月折</text><text>{{order.loyaltyLabel}} -¥{{order.loyaltySave}}</text></view>
     <view class="row" wx:if="{{order.couponSave > 0}}"><text>立减</text><text>-¥{{order.couponSave}}</text></view>

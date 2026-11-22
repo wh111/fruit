@@ -207,13 +207,6 @@ async function watchNewOrders(list) {
   persistKnown();
   announceOrders(fresh);
   toast(`新订单 ${fresh.map((o) => o.pickupCode).join('、')} · ${fresh[0].productName}`);
-
-  if ($('#autoPrint').checked) {
-    for (const o of fresh) {
-      await printReceipt(o.id, { skipPrinted: true });
-      await new Promise((r) => setTimeout(r, 400));
-    }
-  }
 }
 
 async function login() {
@@ -437,7 +430,7 @@ function setCoverPreview(url) {
   });
 }
 
-const PRODUCT_CATS = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '鲜榨果汁', '水果零售', '水果捞', '热果奶', '经典热饮'];
+const PRODUCT_CATS = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '免洗什锦', '水果捞', '热果奶', '经典热饮', '鲜榨果汁'];
 
 function currentProductCat() {
   return state.productCat || '';
@@ -953,43 +946,7 @@ window.printReceipt = async function printReceipt(orderId, opts = {}) {
 };
 
 window.printLabel = async function printLabel(orderId, opts = {}) {
-  if (window.DetongPrint && DetongPrint.prepareUsb) DetongPrint.prepareUsb();
-  const data = await api(`/api/print/label/${orderId}`);
-  if (opts.skipPrinted && data.order?.printed) return false;
-
-  // 优先走德佟本地标签机（需本机安装 dtpweb 打印助手）
-  if (window.DetongPrint && DetongPrint.isAvailable()) {
-    try {
-      await DetongPrint.printOrderLabel({
-        order: data.order,
-        shopName: data.shopName || '四季果先',
-      });
-      toast(`德佟已打印 ${data.order?.pickupCode || ''}`);
-      try {
-        await api(`/api/orders/${orderId}/printed`, { method: 'POST', body: '{}' });
-      } catch {
-        /* ignore */
-      }
-      return;
-    } catch (e) {
-      console.warn('[detong]', e);
-      toast((e && e.message) || '德佟打印失败');
-      return;
-    }
-  }
-
-  const w = window.open('', '_blank', 'width=420,height=320');
-  if (!w) {
-    toast('浏览器拦截了弹窗，请允许后重试（或检查德佟打印助手）');
-    return;
-  }
-  w.document.write(data.html);
-  w.document.close();
-  try {
-    await api(`/api/orders/${orderId}/printed`, { method: 'POST', body: '{}' });
-  } catch {
-    /* ignore */
-  }
+  return printReceipt(orderId, opts);
 };
 
 let pendingUpload = { orderId: '', makeBatchId: '' };

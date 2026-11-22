@@ -227,8 +227,10 @@ function markRechargePaid(db, rechargeId, { transactionId, payMode } = {}) {
 function minePayload(db, userId) {
   ensureWallet(db);
   const balance = getBalance(db, userId);
+  const { hasRecharged } = require('./coupon');
   return {
     balance,
+    member: hasRecharged(db, userId),
     ...publicConfig(db),
   };
 }

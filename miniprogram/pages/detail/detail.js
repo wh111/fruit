@@ -44,7 +44,7 @@ Page({
     try {
       const p = await request(`/api/products/${this.productId}`);
       const specId = (p.specs && p.specs[0] && p.specs[0].id) || '';
-      const isRetail = p.category === '水果零售' || p.category === '零售什锦';
+      const isRetail = p.category === '免洗什锦' || p.category === '水果零售' || p.category === '零售什锦';
       const isFruitBowl = p.category === '水果捞' || p.category === '酸奶捞' || /水果捞|捞$/.test(String(p.name || ''));
       const extraPick = Math.max(0, Number(p.extraPick) || 0);
       this.setData({

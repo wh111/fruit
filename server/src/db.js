@@ -101,7 +101,7 @@ function fruitCutMenuProducts(now, img) {
     // —— 网红小吃 ——
     base({
       id: 'cut-single-plum-tomato',
-      name: '乌梅小番茄',
+      name: '乌梅小番茄（250g/400g）',
       desc: '乌梅小番茄 · 可选 250g / 400g',
       cover: img('cut-plum-tomato.jpg'),
       category: '网红小吃',
@@ -110,7 +110,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-plum-pineapple',
-      name: '乌梅凤梨',
+      name: '乌梅凤梨（250g/400g）',
       desc: '乌梅凤梨 · 可选 250g / 400g',
       cover: img('cut-plum-pineapple.jpg'),
       category: '网红小吃',
@@ -119,7 +119,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-plum-tomato-pineapple',
-      name: '乌梅小番茄＋乌梅凤梨',
+      name: '乌梅小番茄＋乌梅凤梨（250g/400g）',
       desc: '乌梅小番茄＋乌梅凤梨 · 可选 250g / 400g',
       cover: img('cut-duo-plum-tomato-pineapple.jpg'),
       category: '网红小吃',
@@ -128,27 +128,27 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-plum-shine',
-      name: '乌梅阳光玫瑰',
+      name: '乌梅阳光玫瑰（250g/400g）',
       desc: '乌梅阳光玫瑰 · 可选 250g / 400g',
-      cover: img('retail-shine-jujube.jpg'),
+      cover: img('cut-shine-grape.jpg'),
       category: '网红小吃',
       sort: 40,
       specs: two(11.8, 13.8),
     }),
     base({
       id: 'cut-plum-strawberry',
-      name: '乌梅草莓',
+      name: '乌梅草莓（250g/400g）',
       desc: '乌梅草莓 · 可选 250g / 400g',
-      cover: img('cut-plum-pineapple.jpg'),
+      cover: img('cut-plum-strawberry.jpg'),
       category: '网红小吃',
       sort: 50,
       specs: two(18.8, 21.8),
     }),
     base({
       id: 'cut-duo-plum-strawberry-pineapple',
-      name: '乌梅草莓＋乌梅凤梨',
+      name: '乌梅草莓＋乌梅凤梨（250g/400g）',
       desc: '乌梅草莓＋乌梅凤梨 · 可选 250g / 400g',
-      cover: img('cut-duo-plum-tomato-pineapple.jpg'),
+      cover: img('cut-duo-plum-strawberry-pineapple.jpg'),
       category: '网红小吃',
       sort: 60,
       specs: two(21.8, 24.8),
@@ -156,7 +156,7 @@ function fruitCutMenuProducts(now, img) {
     // —— 新鲜现剥 ——
     base({
       id: 'cut-single-red-pomelo',
-      name: '现剥红心蜜柚肉',
+      name: '现剥红心蜜柚肉（250g/400g）',
       desc: '现剥红心蜜柚肉 · 可选 250g / 400g',
       cover: img('cut-red-pomelo.jpg'),
       category: '新鲜现剥',
@@ -165,26 +165,38 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-jackfruit',
-      name: '现剥菠萝蜜肉',
+      name: '现剥菠萝蜜肉（250g/400g）',
       desc: '现剥菠萝蜜肉 · 可选 250g / 400g',
-      cover: img('cut-pineapple.png'),
+      cover: img('cut-jackfruit.jpg'),
       category: '新鲜现剥',
       sort: 20,
       specs: two(12.8, 15.8),
     }),
     base({
       id: 'cut-duo-jackfruit-pomelo',
-      name: '菠萝蜜肉＋红柚肉',
+      name: '菠萝蜜肉＋红柚肉（250g/400g）',
       desc: '菠萝蜜肉＋红柚肉 · 可选 250g / 400g',
-      cover: img('cut-red-pomelo.jpg'),
+      cover: img('cut-jackfruit-pomelo.jpg'),
       category: '新鲜现剥',
       sort: 30,
       specs: two(11.8, 14.8),
     }),
+    base({
+      id: 'cut-sugarcane',
+      name: '去皮去节甘蔗肉（250g/500g）',
+      desc: '去皮去节甘蔗肉 · 可选 250g / 500g',
+      cover: img('cut-sugarcane-ref.jpg'),
+      category: '新鲜现剥',
+      sort: 40,
+      specs: [
+        { id: 's250', name: '250g', price: 11.8, stock: 999 },
+        { id: 's500', name: '500g', price: 21.8, stock: 999 },
+      ],
+    }),
     // —— 果切单拼 ——
     base({
       id: 'cut-single-watermelon',
-      name: '西瓜',
+      name: '西瓜（250g/400g）',
       desc: '单拼现切西瓜 · 可选 250g / 400g',
       cover: img('cut-watermelon.png'),
       category: '果切系列',
@@ -193,7 +205,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-honeydew',
-      name: '甜瓜',
+      name: '甜瓜（250g/400g）',
       desc: '单拼现切甜瓜 · 可选 250g / 400g',
       cover: img('cut-honeydew.png'),
       category: '果切系列',
@@ -202,7 +214,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-hami',
-      name: '哈密瓜',
+      name: '哈密瓜（250g/400g）',
       desc: '单拼现切哈密瓜 · 可选 250g / 400g',
       cover: img('cut-hami.png'),
       category: '果切系列',
@@ -211,7 +223,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-pineapple',
-      name: '凤梨',
+      name: '凤梨（250g/400g）',
       desc: '单拼现切凤梨 · 可选 250g / 400g',
       cover: img('cut-pineapple.png'),
       category: '果切系列',
@@ -220,7 +232,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-papaya',
-      name: '木瓜',
+      name: '木瓜（250g/400g）',
       desc: '单拼现切木瓜 · 可选 250g / 400g',
       cover: img('cut-papaya.png'),
       category: '果切系列',
@@ -229,7 +241,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-mango',
-      name: '芒果',
+      name: '芒果（250g/400g）',
       desc: '单拼现切芒果 · 可选 250g / 400g',
       cover: img('cut-mango.png'),
       category: '果切系列',
@@ -238,7 +250,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-dragon',
-      name: '火龙果',
+      name: '火龙果（250g/400g）',
       desc: '单拼现切火龙果 · 可选 250g / 400g',
       cover: img('cut-dragon.png'),
       category: '果切系列',
@@ -247,18 +259,18 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-single-orange',
-      name: '橙子',
+      name: '橙子（250g/400g）',
       desc: '单拼现切橙子 · 可选 250g / 400g',
-      cover: img('cut-duo-orange-kiwi.png'),
+      cover: img('cut-orange.jpg'),
       category: '果切系列',
       sort: 80,
       specs: two(12.8, 15.8),
     }),
     base({
       id: 'cut-single-kiwi',
-      name: '猕猴桃',
+      name: '猕猴桃（250g/400g）',
       desc: '单拼现切猕猴桃 · 可选 250g / 400g',
-      cover: img('cut-duo-orange-kiwi.png'),
+      cover: img('cut-kiwi.jpg'),
       category: '果切系列',
       sort: 90,
       specs: two(11.8, 13.8),
@@ -266,7 +278,7 @@ function fruitCutMenuProducts(now, img) {
     // —— 双拼 ——
     base({
       id: 'cut-duo-watermelon-honeydew',
-      name: '西瓜＋甜瓜',
+      name: '西瓜＋甜瓜（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
       cover: img('cut-duo-watermelon-honeydew.png'),
       category: '果切系列',
@@ -275,7 +287,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-watermelon-hami',
-      name: '西瓜＋哈密瓜',
+      name: '西瓜＋哈密瓜（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
       cover: img('cut-duo-watermelon-hami.png'),
       category: '果切系列',
@@ -284,7 +296,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-hami-honeydew',
-      name: '哈密瓜＋甜瓜',
+      name: '哈密瓜＋甜瓜（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
       cover: img('cut-duo-hami-honeydew.png'),
       category: '果切系列',
@@ -293,7 +305,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-orange-kiwi',
-      name: '甜橙＋猕猴桃',
+      name: '甜橙＋猕猴桃（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
       cover: img('cut-duo-orange-kiwi.png'),
       category: '果切系列',
@@ -302,7 +314,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-dragon-mango',
-      name: '火龙果＋芒果',
+      name: '火龙果＋芒果（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
       cover: img('cut-duo-dragon-mango.png'),
       category: '果切系列',
@@ -311,7 +323,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-pineapple-watermelon',
-      name: '凤梨＋西瓜',
+      name: '凤梨＋西瓜（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
       cover: img('cut-duo-pineapple-watermelon.png'),
       category: '果切系列',
@@ -320,9 +332,9 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-duo-watermelon-dragon',
-      name: '西瓜＋火龙果',
+      name: '西瓜＋火龙果（250g/400g）',
       desc: '双拼现切 · 可选 250g / 400g',
-      cover: img('cut-watermelon.png'),
+      cover: img('cut-watermelon-dragon.jpg'),
       category: '果切系列',
       sort: 170,
       specs: two(12.8, 14.8),
@@ -330,7 +342,7 @@ function fruitCutMenuProducts(now, img) {
     // —— 三拼 ——
     base({
       id: 'cut-tri-watermelon-hami-honeydew',
-      name: '西瓜＋哈密瓜＋甜瓜',
+      name: '西瓜＋哈密瓜＋甜瓜（250g/400g）',
       desc: '三拼现切 · 可选 250g / 400g',
       cover: img('cut-tri-watermelon-hami-honeydew.png'),
       category: '果切系列',
@@ -339,7 +351,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-tri-mango-dragon-pineapple',
-      name: '芒果＋火龙果＋凤梨',
+      name: '芒果＋火龙果＋凤梨（250g/400g）',
       desc: '三拼现切 · 可选 250g / 400g',
       cover: img('cut-tri-mango-dragon-pineapple.png'),
       category: '果切系列',
@@ -348,7 +360,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-tri-orange-kiwi-dragon',
-      name: '甜橙＋猕猴桃＋火龙果',
+      name: '甜橙＋猕猴桃＋火龙果（250g/400g）',
       desc: '三拼现切 · 可选 250g / 400g',
       cover: img('cut-tri-orange-kiwi-dragon.png'),
       category: '果切系列',
@@ -357,7 +369,7 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-tri-pineapple-hami-honeydew',
-      name: '凤梨＋哈密瓜＋甜瓜',
+      name: '凤梨＋哈密瓜＋甜瓜（250g/400g）',
       desc: '三拼现切 · 可选 250g / 400g',
       cover: img('cut-tri-pineapple-hami-honeydew.png'),
       category: '果切系列',
@@ -366,9 +378,9 @@ function fruitCutMenuProducts(now, img) {
     }),
     base({
       id: 'cut-tri-watermelon-mango-dragon',
-      name: '西瓜＋芒果＋火龙果',
+      name: '西瓜＋芒果＋火龙果（250g/400g）',
       desc: '三拼现切 · 可选 250g / 400g',
-      cover: img('cut-tri-mango-dragon-pineapple.png'),
+      cover: img('cut-watermelon-mango-dragon.jpg'),
       category: '果切系列',
       sort: 250,
       specs: two(14.8, 16.8),
@@ -376,9 +388,9 @@ function fruitCutMenuProducts(now, img) {
     // —— 豪华果拼 ——
     base({
       id: 'cut-luxury-premium',
-      name: '豪华果拼',
+      name: '豪华果拼（500g/800g）',
       desc: '草莓＋红提＋阳光玫瑰＋凤梨＋龙眼＋猕猴桃＋火龙果＋橙子＋芒果',
-      cover: img('cut-tri-mango-dragon-pineapple.png'),
+      cover: img('cut-luxury.jpg'),
       category: '果切系列',
       sort: 300,
       specs: [{ id: 'std', name: '标准份', price: 28.8, stock: 999 }],
@@ -392,7 +404,7 @@ function fruitMixProducts(now, _uid, img) {
   return [
     {
       id: 'mix-diy-3',
-      name: '三拼自选水果捞',
+      name: '三拼自选水果捞（300g/450g）',
       desc: '酸奶底 · 自选 3 种水果',
       cover: img('mix-yogurt-fruit.png'),
       category: '酸奶捞',
@@ -408,9 +420,9 @@ function fruitMixProducts(now, _uid, img) {
     },
     {
       id: 'mix-diy-5',
-      name: '五拼自选水果捞',
+      name: '五拼自选水果捞（300g/450g）',
       desc: '酸奶底 · 自选 5 种水果',
-      cover: img('mix-mango-pomelo.png'),
+      cover: img('mix-diy-5-like3.jpg'),
       category: '酸奶捞',
       status: 1,
       sort: 20,
@@ -444,16 +456,16 @@ function freshJuiceProducts(now, img) {
   return [
     base({
       id: 'juice-honeydew',
-      name: '玉菇甜瓜汁',
+      name: '玉菇甜瓜汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-honeydew.png'),
+      cover: img('drink-honeydew.jpg'),
       category: '鲜榨果汁',
       sort: 10,
       specs: two(9.9, 11.8),
     }),
     base({
       id: 'juice-pear',
-      name: '梨汁（易氧化）',
+      name: '梨汁（易氧化）（300ml/500ml）',
       desc: oxiDesc,
       cover: img('drink-apple-orange.png'),
       category: '鲜榨果汁',
@@ -462,16 +474,16 @@ function freshJuiceProducts(now, img) {
     }),
     base({
       id: 'juice-orange',
-      name: '鲜橙汁',
+      name: '鲜橙汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-duo-orange-kiwi.png'),
+      cover: img('drink-orange.jpg'),
       category: '鲜榨果汁',
       sort: 30,
       specs: two(16.8, 18.8),
     }),
     base({
       id: 'juice-apple',
-      name: '苹果汁（易氧化）',
+      name: '苹果汁（易氧化）（300ml/500ml）',
       desc: oxiDesc,
       cover: img('drink-apple-orange.png'),
       category: '鲜榨果汁',
@@ -480,43 +492,43 @@ function freshJuiceProducts(now, img) {
     }),
     base({
       id: 'juice-kiwi-pear',
-      name: '猕猴桃雪梨汁',
+      name: '猕猴桃雪梨汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-duo-orange-kiwi.png'),
+      cover: img('drink-kiwi-pear.jpg'),
       category: '鲜榨果汁',
       sort: 50,
       specs: two(18.8, 21.8),
     }),
     base({
       id: 'juice-grape',
-      name: '提子汁',
+      name: '提子汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('retail-shine-jujube.jpg'),
+      cover: img('drink-red-grape.jpg'),
       category: '鲜榨果汁',
       sort: 60,
       specs: two(17.8, 19.8),
     }),
     base({
       id: 'juice-watermelon',
-      name: '西瓜汁',
+      name: '西瓜汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-watermelon.png'),
+      cover: img('drink-watermelon.jpg'),
       category: '鲜榨果汁',
       sort: 70,
       specs: two(12.8, 14.8),
     }),
     base({
       id: 'juice-hami',
-      name: '哈密瓜汁',
+      name: '哈密瓜汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-hami.png'),
+      cover: img('drink-hami.jpg'),
       category: '鲜榨果汁',
       sort: 80,
       specs: two(9.9, 11.8),
     }),
     base({
       id: 'juice-banana-milk',
-      name: '香蕉牛奶',
+      name: '香蕉牛奶（300ml/500ml）',
       desc: milkDesc,
       cover: img('drink-banana-milk.png'),
       category: '鲜榨果汁',
@@ -525,16 +537,16 @@ function freshJuiceProducts(now, img) {
     }),
     base({
       id: 'juice-mango-milk',
-      name: '芒果牛奶',
+      name: '芒果牛奶（300ml/500ml）',
       desc: milkDesc,
-      cover: img('cut-mango.png'),
+      cover: img('drink-mango-milk.jpg'),
       category: '鲜榨果汁',
       sort: 100,
       specs: two(11.8, 12.8),
     }),
     base({
       id: 'juice-strawberry-milk',
-      name: '草莓牛奶',
+      name: '草莓牛奶（300ml/500ml）',
       desc: milkDesc,
       cover: img('drink-strawberry-milk.png'),
       category: '鲜榨果汁',
@@ -543,16 +555,16 @@ function freshJuiceProducts(now, img) {
     }),
     base({
       id: 'juice-dragon-pear',
-      name: '火龙果雪梨汁',
+      name: '火龙果雪梨汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-dragon.png'),
+      cover: img('drink-dragon-pear.jpg'),
       category: '鲜榨果汁',
       sort: 120,
       specs: two(11.8, 13.8),
     }),
     base({
       id: 'juice-strawberry-pear',
-      name: '草莓雪梨汁',
+      name: '草莓雪梨汁（300ml/500ml）',
       desc: juiceDesc,
       cover: img('drink-strawberry-milk.png'),
       category: '鲜榨果汁',
@@ -561,9 +573,9 @@ function freshJuiceProducts(now, img) {
     }),
     base({
       id: 'juice-tomato-pear',
-      name: '番茄雪梨汁',
+      name: '番茄雪梨汁（300ml/500ml）',
       desc: juiceDesc,
-      cover: img('cut-plum-tomato.jpg'),
+      cover: img('drink-tomato-pear.jpg'),
       category: '鲜榨果汁',
       sort: 140,
       specs: two(10.8, 12.8),
@@ -598,16 +610,16 @@ function retailMixProducts(now, img) {
       name: '冬枣＋小番茄＋金桔',
       desc,
       cover: img('retail-shine-jujube.jpg'),
-      category: '水果零售',
+      category: '免洗什锦',
       sort: 10,
       specs: box(6.8, 1),
     }),
     base({
       id: 'retail-mix-tangerine-kiwi-longan',
-      name: '沙糖桔＋猕猴桃＋龙眼',
+      name: '沙糖桔＋猕猴桃＋龙眼（350g）',
       desc,
-      cover: img('cut-duo-orange-kiwi.png'),
-      category: '水果零售',
+      cover: img('retail-box-mandarin-kiwi-longan.jpg'),
+      category: '免洗什锦',
       sort: 20,
       specs: box(8.8, 2),
     }),
@@ -616,7 +628,7 @@ function retailMixProducts(now, img) {
       name: '提子＋阳光玫瑰＋菠萝蜜',
       desc,
       cover: img('retail-blueberry-tomato-shine.jpg'),
-      category: '水果零售',
+      category: '免洗什锦',
       sort: 30,
       specs: box(9.8, 3),
     }),
@@ -625,7 +637,7 @@ function retailMixProducts(now, img) {
       name: '牛奶枣＋小番茄＋金桔',
       desc,
       cover: img('retail-shine-jujube.jpg'),
-      category: '水果零售',
+      category: '免洗什锦',
       sort: 40,
       specs: box(7.8, 4),
     }),
@@ -918,6 +930,8 @@ function migrateProductSpecWeights(db) {
     if (!cur || !Array.isArray(cur.specs) || !cur.specs.length) continue;
 
     if (cur.category === '果切系列' || String(cur.id || '').startsWith('cut-')) {
+      // 甘蔗大份是 500g，不要被果切的 500→400 口径改掉
+      if (cur.id === 'cut-sugarcane') continue;
       for (const s of cur.specs) {
         if (renameSpec(s, ['350g'], ['s350'], 's250', '250g')) changed = true;
         else if (renameSpec(s, ['500g'], ['s500'], 's400', '400g')) changed = true;
@@ -1215,7 +1229,7 @@ async function ensureRetailMixMenu(db) {
     }
     const cur = db.products[idx];
     if (!cur.category) {
-      cur.category = '水果零售';
+      cur.category = '免洗什锦';
       changed = true;
     }
     if (!cur.cover && p.cover) {
@@ -1247,7 +1261,7 @@ async function ensureRetailMixMenu(db) {
   for (const cur of db.products) {
     if (!cur) continue;
     const cat = String(cur.category || '');
-    if ((cat === '水果零售' || cat === '零售什锦') && !wantedIds.has(cur.id) && cur.status !== 0) {
+    if ((cat === '免洗什锦' || cat === '水果零售' || cat === '零售什锦') && !wantedIds.has(cur.id) && cur.status !== 0) {
       cur.status = 0;
       cur.updatedAt = now;
       changed = true;

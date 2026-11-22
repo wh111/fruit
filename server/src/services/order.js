@@ -6,6 +6,8 @@ const {
   formatPickupLabel,
   round2,
   categoryAllowsReserve,
+  isShopFriday,
+  todayKey,
 } = require('./promo');
 const {
   findCoupon,
@@ -14,6 +16,7 @@ const {
   listAvailableForOrder,
   consumeCoupon,
   restoreCouponForOrder,
+  hasRecharged,
 } = require('./coupon');
 const { getLoyaltyState, applyLoyaltyAndCoupon } = require('./loyalty');
 const { normalizeDelivery, listDeliveryPoints, getDeliveryScopeNote } = require('./delivery');
@@ -67,7 +70,7 @@ function nextPickupCode(db) {
 /** 成品零售：已做好，支付后直接可取，不进果切排队 */
 function isNoQueueCategory(category) {
   const c = String(category || '');
-  return c === '水果零售' || c === '零售什锦';
+  return c === '免洗什锦' || c === '水果零售' || c === '零售什锦';
 }
 
 function isNoQueueOrder(order) {
@@ -75,6 +78,64 @@ function isNoQueueOrder(order) {
   if (order.orderKind === 'bulk' || order.orderKind === 'retail') return true;
   if (order.skipQueue) return true;
   return isNoQueueCategory(order.productCategory);
+}
+
+/** 称重水果：充值会员 9 折。自定义金额整单按称重计，零售小盒不打折。 */
+function isWeighedCategory(category) {
+  return category === '称重水果';
+}
+
+/** 每位充值会员每周五只送一份，已取消的单不占名额。 */
+function fridayGiftUsed(db, userId, now) {
+  if (!userId) return false;
+  const key = todayKey(now);
+  return (db.orders || []).some((o) => {
+    if (!o || o.userId !== userId || !o.fridayGift) return false;
+    if (o.status === 'cancelled' || o.status === 'refunded') return false;
+    return todayKey(o.createdAt || o.paidAt || now) === key;
+  });
+}
+
+function applyMemberPerks(priced, { db, userId, lines, now, weighedAmount } = {}) {
+  const member = !!(userId && hasRecharged(db, userId));
+  const weighed =
+    weighedAmount != null
+      ? round2(weighedAmount)
+      : round2(
+          (lines || []).reduce(
+            (s, l) => s + (isWeighedCategory(l.productCategory) ? Number(l.lineAmount) || 0 : 0),
+            0
+          )
+        );
+  let memberSave = member && weighed > 0 ? round2(weighed * 0.1) : 0;
+  const before = round2(Number(priced.foodAmount) || 0);
+  let foodAmount = round2(Math.max(0, before - memberSave));
+  if (before > 0 && foodAmount < 0.01) {
+    foodAmount = 0.01;
+    memberSave = round2(before - foodAmount);
+  }
+  const amount = round2(foodAmount + (Number(priced.deliveryFee) || 0));
+  const fridayGift =
+    member && isShopFriday(now) && foodAmount > 0 && !fridayGiftUsed(db, userId, now)
+      ? { name: '精美果切', qty: 1, note: '周五会员消费赠送' }
+      : null;
+  const canProcess = foodAmount + 0.001 >= 18;
+  const memberLabel = memberSave > 0 ? '充值会员称重水果9折' : '';
+  const discountLabel = [priced.discountLabel, memberSave > 0 ? `称重9折省¥${memberSave.toFixed(2)}` : '']
+    .filter(Boolean)
+    .join(' · ');
+  return {
+    ...priced,
+    foodAmount,
+    amount,
+    memberSave,
+    memberLabel,
+    discountAmount: round2((Number(priced.discountAmount) || 0) + memberSave),
+    discountLabel,
+    fridayGift,
+    canProcess,
+    processNote: canProcess ? '消费满18元可加工' : '',
+  };
 }
 
 function calcAmount(product, specId, extras = [], quantity = 1, promoOpts = {}) {
@@ -437,16 +498,19 @@ async function quoteOrder(input = {}) {
     });
   }
 
-  const priced = calcCartAmount(lines, {
-    ...fulfillment,
-    deliveryPoint: input.deliveryPoint,
-    now,
-    coupon,
-    loyalty,
-    settings: db.settings,
-    sideMeal,
-    db,
-  });
+  const priced = applyMemberPerks(
+    calcCartAmount(lines, {
+      ...fulfillment,
+      deliveryPoint: input.deliveryPoint,
+      now,
+      coupon,
+      loyalty,
+      settings: db.settings,
+      sideMeal,
+      db,
+    }),
+    { db, userId: input.userId, lines, now }
+  );
   const availableCoupons = input.userId
     ? listAvailableForOrder(db, input.userId, {
         originalAmount: bare.originalAmount,
@@ -525,16 +589,19 @@ async function createOrder(input = {}) {
     });
   }
 
-  const priced = calcCartAmount(lines, {
-    ...fulfillment,
-    deliveryPoint: input.deliveryPoint,
-    now,
-    coupon,
-    loyalty,
-    settings: db.settings,
-    sideMeal,
-    db,
-  });
+  const priced = applyMemberPerks(
+    calcCartAmount(lines, {
+      ...fulfillment,
+      deliveryPoint: input.deliveryPoint,
+      now,
+      coupon,
+      loyalty,
+      settings: db.settings,
+      sideMeal,
+      db,
+    }),
+    { db, userId: input.userId, lines, now }
+  );
 
   const order = {
     id: crypto.randomUUID(),
@@ -572,6 +639,11 @@ async function createOrder(input = {}) {
     loyaltyLabel: priced.loyaltyLabel || '',
     loyaltyTier: priced.loyaltyTier || 0,
     monthOrderCount: priced.monthOrderCount || 0,
+    memberSave: priced.memberSave || 0,
+    memberLabel: priced.memberLabel || '',
+    fridayGift: priced.fridayGift || null,
+    canProcess: !!priced.canProcess,
+    processNote: priced.processNote || '',
     fulfillmentType: priced.fulfillmentType,
     pickupAt: priced.pickupAt,
     pickupAtText: priced.pickupAtText,
@@ -595,7 +667,7 @@ async function createOrder(input = {}) {
   return order;
 }
 
-/** 自定义金额：顾客自行输入金额支付（无优惠券/会员折） */
+/** 自定义金额：散装称重。充值会员 9 折；周五会员消费赠果切；满 18 元可加工。 */
 async function createBulkOrder({ userId, openid, amount, remark }) {
   const yuan = round2(Number(amount));
   if (!Number.isFinite(yuan) || yuan < 0.01) {
@@ -609,6 +681,17 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
   const now = Date.now();
   const delivery = normalizeDelivery('shop', db.settings);
   const note = String(remark || '').trim().slice(0, 80);
+  const priced = applyMemberPerks(
+    {
+      foodAmount: yuan,
+      amount: yuan,
+      deliveryFee: 0,
+      discountAmount: 0,
+      discountLabel: '',
+      originalAmount: yuan,
+    },
+    { db, userId, lines: [], now, weighedAmount: yuan }
+  );
 
   const order = {
     id: crypto.randomUUID(),
@@ -625,15 +708,15 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
     quantity: 1,
     unitPrice: yuan,
     originalAmount: yuan,
-    foodAmount: yuan,
-    amount: yuan,
+    foodAmount: priced.foodAmount,
+    amount: priced.amount,
     deliveryFee: 0,
     deliveryPoint: delivery.deliveryPoint,
     deliveryPointName: delivery.deliveryPointName,
-    discountAmount: 0,
-    discountRate: 1,
-    discountCode: null,
-    discountLabel: '',
+    discountAmount: priced.discountAmount || 0,
+    discountRate: priced.memberSave > 0 ? 0.9 : 1,
+    discountCode: priced.memberSave > 0 ? 'member_weigh_9' : null,
+    discountLabel: priced.discountLabel || '',
     couponId: null,
     couponSave: 0,
     loyaltyRate: 0,
@@ -641,6 +724,11 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
     loyaltyLabel: '',
     loyaltyTier: 0,
     monthOrderCount: 0,
+    memberSave: priced.memberSave || 0,
+    memberLabel: priced.memberLabel || '',
+    fridayGift: priced.fridayGift || null,
+    canProcess: !!priced.canProcess,
+    processNote: priced.processNote || '',
     fulfillmentType: 'now',
     pickupAt: null,
     pickupAtText: '',

@@ -191,9 +191,10 @@ Page({
           ...p,
           coverUrl: mediaUrl(p.coverList || p.cover),
           minPrice: min ? min.toFixed(1) : '0',
+          weighed: p.category === '称重水果',
         };
       });
-      const catOrder = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '鲜榨果汁', '水果零售', '水果捞', '热果奶', '经典热饮'];
+      const catOrder = ['酸奶捞', '网红小吃', '新鲜现剥', '果切系列', '免洗什锦', '水果捞', '热果奶', '经典热饮', '鲜榨果汁'];
       const seen = new Set();
       const ordered = catOrder.filter((c) => {
         if (!products.some((p) => p.category === c)) return false;

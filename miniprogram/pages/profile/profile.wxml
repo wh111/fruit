@@ -13,12 +13,11 @@
     <view class="row" bindtap="goWallet">
       <text>储值余额</text>
       <text class="badge" wx:if="{{balance > 0}}">¥{{balance}}</text>
-      <text class="muted" wx:else>充值优惠</text>
+      <text class="muted" wx:else>充值有礼</text>
     </view>
-    <view class="row" bindtap="goLottery">
-      <text>开业抽奖</text>
-      <text class="badge" wx:if="{{lotteryActive}}">进行中</text>
-      <text class="muted" wx:elif="{{lotteryHint}}">{{lotteryHint}}</text>
+    <view class="row" bindtap="goActivities">
+      <text>活动中心</text>
+      <text class="muted">福利与往期</text>
     </view>
     <view class="row" bindtap="goCoupons">
       <text>我的优惠券</text>

@@ -70,7 +70,7 @@ function wxLoginWithTimeout(ms = 8000) {
 function rememberGrantPending(data) {
   if (data && data.welcomeGranted) {
     wx.setStorageSync('welcomeGrantedPending', {
-      count: data.welcomeCouponCount || 15,
+      count: data.welcomeCouponCount || 5,
       at: Date.now(),
     });
   }

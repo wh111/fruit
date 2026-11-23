@@ -8,39 +8,31 @@
     </view>
   </view>
 
-  <view class="fresh-pledge">
-    <text class="fresh-dot">●</text>
-    <text>取餐前最多40分钟现切，不卖 B 级果、不卖隔夜切</text>
+  <view class="member-card">
+    <view class="member-card-top">
+      <view class="member-card-title">{{memberCardTitle}}</view>
+      <view class="member-card-chip" wx:if="{{isMember}}">已开通</view>
+    </view>
+    <view class="member-card-sub">{{memberCardSub}}</view>
+    <view class="member-perk" wx:for="{{memberPerks}}" wx:key="*this">{{item}}</view>
   </view>
 
-  <view class="perk-bar">
-    <text>充值会员称重水果9折</text>
-    <text>周五会员消费送精美果切</text>
-    <text>满18元可加工</text>
+  <view class="wallet-entry" wx:if="{{walletEnabled}}" bindtap="goWallet">
+    <view class="wallet-left">
+      <view class="wallet-title">会员充值</view>
+      <view class="wallet-sub">{{walletHint || '充值有礼 · 余额整单付 · 开通会员权益'}}</view>
+    </view>
+    <view class="wallet-go">去充值</view>
   </view>
 
   <view class="bulk-entry" bindtap="goBulk">
     <view class="bulk-left">
       <view class="bulk-title">自定义金额</view>
-      <view class="bulk-sub">自行输入金额完成支付</view>
+      <view class="bulk-sub">散装称重自行输入金额付款</view>
     </view>
     <view class="bulk-go">去付款</view>
   </view>
 
-  <view class="banner" wx:if="{{campaign}}" bindtap="onBanner">
-    <view class="banner-left">
-      <view class="banner-tag">新人礼</view>
-      <view class="banner-title">{{campaign.bannerTitle}}</view>
-      <view class="banner-sub">{{campaign.bannerSub}}</view>
-    </view>
-    <view class="banner-right">
-      <view class="banner-btn">{{couponUnused > 0 ? '去使用' : '登录领取'}}</view>
-      <view class="banner-count" wx:if="{{couponUnused > 0}}">剩余 {{couponUnused}} 张</view>
-    </view>
-  </view>
-
-  <view class="promo" wx:if="{{loyaltyHint}}">{{loyaltyHint}}</view>
-  <view class="promo" wx:if="{{promoHint}}">{{promoHint}}</view>
   <view class="err" wx:if="{{loadError}}">{{loadError}}</view>
 
   <view class="menu">
@@ -71,9 +63,12 @@
             <view class="name">{{item.name}}</view>
             <view class="muted desc">{{item.desc}}</view>
             <view class="row">
-              <text class="price">¥{{item.minPrice}}</text>
-              <text class="muted">起</text>
-              <text class="member-tag" wx:if="{{item.weighed}}">会员9折</text>
+              <view class="price-wrap">
+                <text class="price">¥{{item.minPrice}}</text>
+                <text class="price-origin" wx:if="{{item.showStrike}}">¥{{item.originPrice}}</text>
+                <text class="muted">起</text>
+                <text class="member-tag" wx:if="{{item.priceTag}}">{{item.priceTag}}</text>
+              </view>
               <view class="buy">选规格</view>
             </view>
           </view>
@@ -88,7 +83,10 @@
       <view class="cart-badge">{{cartCount}}</view>
       <view>
         <view class="cart-title">购物车</view>
-        <view class="cart-sub">预估 ¥{{cartEstimate}}</view>
+        <view class="cart-sub">
+          预估 ¥{{cartEstimate}}
+          <text class="cart-origin" wx:if="{{cartShowStrike}}">¥{{cartOriginEstimate}}</text>
+        </view>
       </view>
     </view>
     <view class="cart-go" bindtap="goCheckout">去结算</view>
@@ -137,11 +135,48 @@
     </view>
   </view>
 
-  <!-- 仅用户主动点击「登录领取」等后再出现，不在进店时强制弹出 -->
-  <view class="phone-mask" wx:if="{{showPhoneAuth && !showLottery}}" catchtouchmove="true">
+  <!-- 天天领券弹框：每天二选一 -->
+  <view class="promo-mask" wx:if="{{showPromoPop}}" catchtouchmove="true">
+    <view class="promo-sheet">
+      <view class="promo-close" bindtap="closePromoPop">×</view>
+      <view class="promo-pop-title">今日活动券</view>
+      <view class="promo-pop-hint">{{promoPopHint}}</view>
+      <view
+        class="promo-pop-item theme-{{item.theme}} {{item.claimed ? 'claimed' : ''}} {{item.locked ? 'locked' : ''}}"
+        wx:for="{{promoPopItems}}"
+        wx:key="pack"
+      >
+        <view class="promo-pop-main">
+          <view class="promo-pop-tag">{{item.tag}}</view>
+          <view class="promo-pop-name">{{item.title}}</view>
+          <view class="promo-pop-sub">{{item.sub}}</view>
+          <view class="promo-pop-detail" wx:if="{{item.detail}}">{{item.detail}}</view>
+          <view class="promo-pop-status" wx:if="{{item.claimed}}">领取过</view>
+          <view class="promo-pop-status muted" wx:elif="{{item.locked}}">今日已选其他</view>
+        </view>
+        <view
+          class="promo-pop-btn {{item.claimed ? 'order' : ''}}"
+          wx:if="{{item.claimed}}"
+          data-pack="{{item.pack}}"
+          bindtap="onPromoGoOrder"
+        >去下单</view>
+        <view
+          class="promo-pop-btn"
+          wx:elif="{{!item.locked}}"
+          data-pack="{{item.pack}}"
+          bindtap="onClaimPromo"
+        >{{promoClaimingPack === item.pack ? '领取中…' : '立即领取'}}</view>
+        <view class="promo-pop-btn disabled" wx:else>不可领</view>
+      </view>
+      <view class="promo-pop-skip" bindtap="closePromoPop">先去点单</view>
+    </view>
+  </view>
+
+  <!-- 仅用户主动点击后再出现，不在进店时强制弹出 -->
+  <view class="phone-mask" wx:if="{{showPhoneAuth && !showLottery && !showPromoPop}}" catchtouchmove="true">
     <view class="phone-sheet">
       <view class="phone-title">手机号快捷登录</view>
-      <view class="phone-desc">用于同步优惠券，换机后也能领取同一份福利。</view>
+      <view class="phone-desc">用于同步优惠券，换机后也能继续用同一份福利。</view>
       <button
         class="btn-primary phone-auth-btn"
         open-type="getPhoneNumber"

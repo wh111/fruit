@@ -53,6 +53,7 @@ function switchTab(tab) {
     reserve: '预定分类',
     users: '会员维护',
     coupons: '发券',
+    weekly: '本周活动',
     lottery: '开业抽奖',
     wallet: '储值档位',
     reports: '销售报表',
@@ -123,6 +124,17 @@ function orderGoodsHtml(o) {
       .join('');
   }
   return block(`${o.productName} · ${o.specName} ×${o.quantity}`, kitchenPicks(o));
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/'/g, '&#39;');
 }
 
 function toast(msg) {
@@ -1201,6 +1213,10 @@ async function loadCouponUsers() {
       ${(data.list || []).length > 100 ? '<p class="muted">仅预览前 100 人；发券仍按完整人群。</p>' : ''}`;
   }
   await loadOff153Scope().catch(() => {});
+  await loadMemberDiscount().catch(() => {});
+  await loadCanePromo().catch(() => {});
+  await loadFruitRetailOff().catch(() => {});
+  await loadHomePoster().catch(() => {});
 }
 
 function renderUserLedger(ledger) {
@@ -1295,6 +1311,418 @@ function fillProductSelect(sel, products, selectedId, emptyLabel) {
     )
   );
   sel.innerHTML = opts.join('');
+}
+
+function renderHomePosterPreview(cfg) {
+  const box = $('#homePosterPreview');
+  if (!box) return;
+  const c = cfg || homePosterFormValues();
+  if (!c.enabled || !c.title) {
+    box.className = 'home-poster-preview empty';
+    box.innerHTML = c.enabled
+      ? '已开启但缺少标题，保存前请填写'
+      : '当前关闭：小程序首页不显示活动海报';
+    return;
+  }
+  const themeClass = c.theme === 'winter' || c.theme === 'warm' ? ` theme-${c.theme}` : '';
+  box.className = `home-poster-preview${themeClass}`;
+  box.innerHTML = `
+    <div>
+      <div class="tag">${escapeHtml(c.tag || '活动')}</div>
+      <div class="title">${escapeHtml(c.title)}</div>
+      ${c.sub ? `<div class="sub">${escapeHtml(c.sub)}</div>` : ''}
+    </div>
+    <div class="btn-fake">${escapeHtml(c.btnText || '去看看')}</div>`;
+}
+
+function fillHomePosterForm(poster = {}) {
+  if ($('#homePosterEnabled')) $('#homePosterEnabled').checked = !!poster.enabled;
+  if ($('#homePosterTag')) $('#homePosterTag').value = poster.tag || '';
+  if ($('#homePosterTitle')) $('#homePosterTitle').value = poster.title || '';
+  if ($('#homePosterSub')) $('#homePosterSub').value = poster.sub || '';
+  if ($('#homePosterBtn')) $('#homePosterBtn').value = poster.btnText || '去看看';
+  if ($('#homePosterLinkType')) $('#homePosterLinkType').value = poster.linkType || 'coupons';
+  if ($('#homePosterCategory')) $('#homePosterCategory').value = poster.category || '';
+  if ($('#homePosterImage')) $('#homePosterImage').value = poster.imageUrl || '';
+  if ($('#homePosterTheme')) $('#homePosterTheme').value = poster.theme || 'default';
+  if ($('#homePosterProduct') && poster.productId) {
+    $('#homePosterProduct').value = poster.productId;
+  }
+  const link = poster.linkType || 'coupons';
+  const hint =
+    link === 'product'
+      ? '点击海报 → 商品详情'
+      : link === 'category'
+        ? '点击海报 → 首页切到该分类'
+        : link === 'none'
+          ? '仅展示，点击无跳转'
+          : '点击海报 → 我的优惠券';
+  if ($('#homePosterHint')) {
+    $('#homePosterHint').textContent = poster.enabled
+      ? `已开启。${hint}`
+      : `未开启。${hint}`;
+  }
+  renderHomePosterPreview(poster);
+}
+
+async function loadHomePosterProductOptions(selectedId = '') {
+  const sel = $('#homePosterProduct');
+  if (!sel) return;
+  try {
+    const { list } = await api('/api/admin/products');
+    const products = (list || []).filter((p) => p && p.status !== 0);
+    sel.innerHTML =
+      `<option value="">（跳转商品时选择）</option>` +
+      products
+        .map(
+          (p) =>
+            `<option value="${escapeHtml(p.id)}" ${
+              selectedId && selectedId === p.id ? 'selected' : ''
+            }>${escapeHtml(p.name || p.id)}</option>`
+        )
+        .join('');
+    if (selectedId) sel.value = selectedId;
+  } catch (_) {
+    sel.innerHTML = '<option value="">加载商品失败</option>';
+  }
+}
+
+async function loadHomePoster() {
+  if (!$('#homePosterEnabled')) return;
+  const data = await api('/api/admin/home-poster');
+  const poster = data.poster || {};
+  await loadHomePosterProductOptions(poster.productId || '');
+  fillHomePosterForm(poster);
+}
+
+async function saveHomePoster() {
+  try {
+    const body = homePosterFormValues();
+    const res = await api('/api/admin/home-poster', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    fillHomePosterForm(res.poster || body);
+    toast(res.poster?.enabled ? '已开启并保存：小程序刷新首页即可看到' : '已关闭并保存');
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+function weeklyItemRowHtml(it, idx) {
+  const id = it.id || `new_${idx}`;
+  return `<tr data-id="${escapeAttr(id)}">
+    <td><input type="checkbox" class="wa-enabled" ${it.enabled !== false ? 'checked' : ''} title="展示" /></td>
+    <td><input class="wa-tag" value="${escapeAttr(it.tag || '')}" style="width:88px" /></td>
+    <td><input class="wa-title" value="${escapeAttr(it.title || '')}" style="width:160px" /></td>
+    <td><input class="wa-sub" value="${escapeAttr(it.sub || '')}" style="width:220px" /></td>
+    <td>
+      <select class="wa-theme">
+        <option value="warm" ${it.theme === 'warm' ? 'selected' : ''}>暖橙</option>
+        <option value="winter" ${it.theme === 'winter' ? 'selected' : ''}>清绿</option>
+        <option value="member" ${it.theme === 'member' ? 'selected' : ''}>会员</option>
+        <option value="gold" ${it.theme === 'gold' ? 'selected' : ''}>金色</option>
+        <option value="default" ${!it.theme || it.theme === 'default' ? 'selected' : ''}>默认</option>
+        <option value="muted" ${it.theme === 'muted' ? 'selected' : ''}>灰色</option>
+      </select>
+    </td>
+    <td>
+      <select class="wa-action">
+        <option value="claim" ${it.action === 'claim' ? 'selected' : ''}>去领取(弹框)</option>
+        <option value="order" ${it.action === 'order' ? 'selected' : ''}>去下单</option>
+        <option value="wallet" ${it.action === 'wallet' ? 'selected' : ''}>去充值</option>
+        <option value="none" ${it.action === 'none' ? 'selected' : ''}>无按钮</option>
+      </select>
+    </td>
+    <td>
+      <select class="wa-pack">
+        <option value="" ${!it.claimPack ? 'selected' : ''}>无领券关联</option>
+        <option value="fruit_retail_off" ${it.claimPack === 'fruit_retail_off' ? 'selected' : ''}>免洗什锦券</option>
+        <option value="cane_promo" ${it.claimPack === 'cane_promo' ? 'selected' : ''}>甘蔗券</option>
+      </select>
+    </td>
+    <td><input class="wa-btn" value="${escapeAttr(it.actionText || '')}" placeholder="按钮文案" style="width:88px" /></td>
+    <td><input class="wa-sort" type="number" value="${Number(it.sort) || (idx + 1) * 10}" style="width:64px" /></td>
+    <td><button type="button" class="btn sm wa-del">删</button></td>
+  </tr>
+  <tr class="wa-detail-row" data-for="${escapeAttr(id)}">
+    <td colspan="10">
+      <input class="wa-detail" value="${escapeAttr(it.detail || '')}" placeholder="详情说明（可选）" style="width:100%" />
+    </td>
+  </tr>`;
+}
+
+function collectWeeklyItemsFromDom() {
+  const rows = [...document.querySelectorAll('#weeklyItemsBody tr[data-id]')];
+  return rows.map((tr, idx) => {
+    const id = tr.getAttribute('data-id');
+    const detailRow = [...document.querySelectorAll('#weeklyItemsBody tr.wa-detail-row')].find(
+      (r) => r.getAttribute('data-for') === id
+    );
+    return {
+      id,
+      enabled: !!tr.querySelector('.wa-enabled')?.checked,
+      tag: tr.querySelector('.wa-tag')?.value || '',
+      title: tr.querySelector('.wa-title')?.value || '',
+      sub: tr.querySelector('.wa-sub')?.value || '',
+      detail: detailRow?.querySelector('.wa-detail')?.value || '',
+      theme: tr.querySelector('.wa-theme')?.value || 'default',
+      action: tr.querySelector('.wa-action')?.value || 'order',
+      claimPack: tr.querySelector('.wa-pack')?.value || '',
+      actionText: tr.querySelector('.wa-btn')?.value || '',
+      sort: Number(tr.querySelector('.wa-sort')?.value) || (idx + 1) * 10,
+    };
+  });
+}
+
+function renderWeeklyItems(items) {
+  const box = $('#weeklyItems');
+  if (!box) return;
+  const list = Array.isArray(items) ? items : [];
+  box.innerHTML = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>开</th><th>标签</th><th>标题</th><th>副文案</th><th>主题</th><th>按钮</th><th>领券关联</th><th>按钮文案</th><th>排序</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="weeklyItemsBody">
+        ${list.map((it, i) => weeklyItemRowHtml(it, i)).join('') || ''}
+      </tbody>
+    </table>`;
+  box.querySelectorAll('.wa-del').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tr = btn.closest('tr');
+      const id = tr?.getAttribute('data-id');
+      const detail = id
+        ? [...document.querySelectorAll('#weeklyItemsBody tr.wa-detail-row')].find(
+            (r) => r.getAttribute('data-for') === id
+          )
+        : null;
+      tr?.remove();
+      detail?.remove();
+    });
+  });
+}
+
+async function loadWeeklyActivities() {
+  if (!$('#weeklyLabel')) return;
+  const data = await api('/api/admin/weekly-activities');
+  const cur = data.current || {};
+  state.weeklySuggested = data.suggested || null;
+  $('#weeklyLabel').value = cur.weekLabel || '';
+  $('#weeklyStart').value = cur.startDate || '';
+  $('#weeklyEnd').value = cur.endDate || '';
+  if ($('#weeklyPageHint')) $('#weeklyPageHint').value = cur.hint || '';
+  if ($('#weeklyHint') && data.hint) $('#weeklyHint').textContent = data.hint;
+  renderWeeklyItems(cur.items || []);
+  const hist = (data.history || []).length;
+  if ($('#weeklyMeta')) {
+    $('#weeklyMeta').textContent = `已归档 ${hist} 周。建议本周：${
+      data.suggested ? `${data.suggested.startDate}～${data.suggested.endDate}` : '-'
+    }`;
+  }
+}
+
+async function saveWeeklyActivities() {
+  try {
+    const data = await api('/api/admin/weekly-activities', {
+      method: 'PUT',
+      body: JSON.stringify({
+        weekLabel: ($('#weeklyLabel')?.value || '').trim(),
+        startDate: ($('#weeklyStart')?.value || '').trim(),
+        endDate: ($('#weeklyEnd')?.value || '').trim(),
+        hint: ($('#weeklyPageHint')?.value || '').trim(),
+        items: collectWeeklyItemsFromDom(),
+      }),
+    });
+    const cur = data.current || {};
+    renderWeeklyItems(cur.items || []);
+    toast('本周活动已保存');
+    if ($('#weeklyMeta')) {
+      $('#weeklyMeta').textContent = `已保存 · 档期 ${cur.startDate || ''}～${cur.endDate || ''} · 归档 ${(data.history || []).length} 周`;
+    }
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+async function archiveWeeklyActivities() {
+  if (!confirm('确认归档本周？当前列表会进入「已过期」，并开启下一周（可再编辑）。')) return;
+  try {
+    const data = await api('/api/admin/weekly-activities/archive', {
+      method: 'POST',
+      body: JSON.stringify({ useNextWeek: true, keepItems: false, seedDefaults: true }),
+    });
+    const cur = data.current || {};
+    $('#weeklyLabel').value = cur.weekLabel || '';
+    $('#weeklyStart').value = cur.startDate || '';
+    $('#weeklyEnd').value = cur.endDate || '';
+    if ($('#weeklyPageHint')) $('#weeklyPageHint').value = cur.hint || '';
+    renderWeeklyItems(cur.items || []);
+    toast('已归档并开启新周');
+  } catch (e) {
+    toast(e.message || '归档失败');
+  }
+}
+
+async function loadMemberDiscount() {
+  if (!$('#memberDiscountEnabled')) return;
+  const cfg = await api('/api/admin/member-discount');
+  $('#memberDiscountEnabled').checked = cfg.enabled !== false;
+  if ($('#memberDiscountZhe')) {
+    const factor = Number(cfg.factor) || 0.9;
+    $('#memberDiscountZhe').value = Math.round(factor * 100) / 10;
+  }
+  if ($('#memberDiscountLabel')) $('#memberDiscountLabel').value = cfg.label || '';
+  if ($('#memberDiscountHint')) $('#memberDiscountHint').textContent = cfg.hint || '';
+}
+
+async function saveMemberDiscount() {
+  try {
+    const zhe = Number($('#memberDiscountZhe')?.value || 9);
+    const cfg = await api('/api/admin/member-discount', {
+      method: 'PUT',
+      body: JSON.stringify({
+        enabled: !!$('#memberDiscountEnabled')?.checked,
+        zhe,
+        label: ($('#memberDiscountLabel')?.value || '').trim() || `会员${zhe}折`,
+      }),
+    });
+    if ($('#memberDiscountHint')) $('#memberDiscountHint').textContent = cfg.hint || '';
+    if ($('#memberDiscountLabel')) $('#memberDiscountLabel').value = cfg.label || '';
+    toast(cfg.enabled ? `已开启：${cfg.label || '会员折扣'}` : '已关闭会员折扣');
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+async function loadCanePromo() {
+  if (!$('#canePromoEnabled')) return;
+  const cfg = await api('/api/admin/coupons/cane-promo');
+  $('#canePromoEnabled').checked = !!cfg.enabled;
+  if ($('#canePromoSyncPoster')) $('#canePromoSyncPoster').checked = !!cfg.syncHomePoster;
+  if ($('#canePromoAmount')) $('#canePromoAmount').value = cfg.amount ?? 7.92;
+  if ($('#canePromoDays')) $('#canePromoDays').value = cfg.validDays ?? 1;
+  if ($('#canePromoStart')) $('#canePromoStart').value = cfg.startDate || '';
+  if ($('#canePromoEnd')) $('#canePromoEnd').value = cfg.endDate || '';
+  if ($('#canePromoTitle')) $('#canePromoTitle').value = cfg.title || '';
+  if ($('#canePromoHint')) {
+    $('#canePromoHint').textContent =
+      cfg.hint ||
+      (cfg.productFound === false
+        ? '未找到甘蔗商品 cut-sugarcane，请先在商品里确认上架。'
+        : '');
+  }
+}
+
+async function saveCanePromo() {
+  try {
+    const enabled = !!$('#canePromoEnabled')?.checked;
+    const cfg = await api('/api/admin/coupons/cane-promo', {
+      method: 'PUT',
+      body: JSON.stringify({
+        enabled,
+        syncHomePoster: !!$('#canePromoSyncPoster')?.checked,
+        amount: Number($('#canePromoAmount')?.value || 7.92),
+        validDays: Number($('#canePromoDays')?.value || 1),
+        startDate: ($('#canePromoStart')?.value || '').trim(),
+        endDate: ($('#canePromoEnd')?.value || '').trim(),
+        title: ($('#canePromoTitle')?.value || '').trim() || '去皮甘蔗·3.88元起',
+        productId: 'cut-sugarcane',
+      }),
+    });
+    $('#canePromoEnabled').checked = !!cfg.enabled;
+    if ($('#canePromoStart')) $('#canePromoStart').value = cfg.startDate || '';
+    if ($('#canePromoEnd')) $('#canePromoEnd').value = cfg.endDate || '';
+    if ($('#canePromoHint')) $('#canePromoHint').textContent = cfg.hint || '';
+    toast(
+      cfg.enabled
+        ? `甘蔗活动已开启：天天弹框领（${cfg.startDate || '?'}～${cfg.endDate || '?'}）` +
+            (cfg.syncHomePoster ? ' · 已同步首页海报' : '')
+        : '已保存（活动关闭中，勾选开启后再点保存）'
+    );
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+async function grantCanePromoAll() {
+  if (!$('#canePromoEnabled')?.checked) {
+    return toast('请先勾选「开启活动」并保存');
+  }
+  if (!confirm('确认给尚未领过的全部用户各补发 1 张「冬日甘蔗券」？已领过的会跳过。')) {
+    return;
+  }
+  try {
+    const res = await api('/api/admin/coupons/cane-promo/grant-all', { method: 'POST', body: '{}' });
+    toast(`已补发 ${res.granted} 张 → ${res.userCount} 人（跳过 ${res.skipped || 0}）`);
+  } catch (e) {
+    toast(e.message || '补发失败');
+  }
+}
+
+async function loadFruitRetailOff() {
+  if (!$('#fruitRetailOffEnabled')) return;
+  const cfg = await api('/api/admin/coupons/fruit-retail-off');
+  $('#fruitRetailOffEnabled').checked = !!cfg.enabled;
+  if ($('#fruitRetailOffAmount')) $('#fruitRetailOffAmount').value = cfg.amount ?? 3;
+  if ($('#fruitRetailOffDays')) $('#fruitRetailOffDays').value = cfg.validDays ?? 1;
+  if ($('#fruitRetailOffStart')) $('#fruitRetailOffStart').value = cfg.startDate || '';
+  if ($('#fruitRetailOffEnd')) $('#fruitRetailOffEnd').value = cfg.endDate || '';
+  if ($('#fruitRetailOffTitle')) $('#fruitRetailOffTitle').value = cfg.title || '';
+  if ($('#fruitRetailOffHint')) $('#fruitRetailOffHint').textContent = cfg.hint || '';
+}
+
+async function saveFruitRetailOff() {
+  try {
+    const amount = Number($('#fruitRetailOffAmount')?.value || 3);
+    const title =
+      ($('#fruitRetailOffTitle')?.value || '').trim() ||
+      '免洗什锦·3.8元起';
+    const cfg = await api('/api/admin/coupons/fruit-retail-off', {
+      method: 'PUT',
+      body: JSON.stringify({
+        enabled: !!$('#fruitRetailOffEnabled')?.checked,
+        amount,
+        validDays: Number($('#fruitRetailOffDays')?.value || 1),
+        startDate: ($('#fruitRetailOffStart')?.value || '').trim(),
+        endDate: ($('#fruitRetailOffEnd')?.value || '').trim(),
+        title,
+        matchCategory: '水果零售',
+      }),
+    });
+    if ($('#fruitRetailOffHint')) $('#fruitRetailOffHint').textContent = cfg.hint || '';
+    if ($('#fruitRetailOffTitle')) $('#fruitRetailOffTitle').value = cfg.title || title;
+    if ($('#fruitRetailOffAmount')) $('#fruitRetailOffAmount').value = cfg.amount ?? amount;
+    if ($('#fruitRetailOffStart')) $('#fruitRetailOffStart').value = cfg.startDate || '';
+    if ($('#fruitRetailOffEnd')) $('#fruitRetailOffEnd').value = cfg.endDate || '';
+    toast(
+      cfg.enabled
+        ? `已开启：天天弹框领（${cfg.startDate || '?'}～${cfg.endDate || '?'}）`
+        : '已关闭免洗什锦活动'
+    );
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+async function grantFruitRetailOffAll() {
+  if (!$('#fruitRetailOffEnabled')?.checked) {
+    return toast('请先勾选「开启活动」并保存');
+  }
+  if (!confirm('确认给尚未领过的全部用户各补发 1 张「免洗什锦立减券」？已领过的会跳过。')) {
+    return;
+  }
+  try {
+    const res = await api('/api/admin/coupons/fruit-retail-off/grant-all', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    toast(`已补发 ${res.granted} 张（跳过 ${res.skipped || 0} 人）`);
+  } catch (e) {
+    toast(e.message || '补发失败');
+  }
 }
 
 async function loadOff153Scope() {
@@ -2132,6 +2560,7 @@ async function refresh() {
     if (state.tab === 'reserve') await loadReserveCategories();
     if (state.tab === 'users') await loadUsers();
     if (state.tab === 'coupons') await loadCouponUsers();
+    if (state.tab === 'weekly') await loadWeeklyActivities();
     if (state.tab === 'lottery') await loadLottery();
     if (state.tab === 'wallet') await loadWallet();
     if (state.tab === 'reports') await loadSalesReport();
@@ -2219,6 +2648,61 @@ $('#adjustBalanceBtn')?.addEventListener('click', (e) => {
 });
 $('#grantCouponsBtn')?.addEventListener('click', grantCouponsToSegment);
 $('#saveOff153Btn')?.addEventListener('click', saveOff153Scope);
+$('#saveMemberDiscountBtn')?.addEventListener('click', saveMemberDiscount);
+$('#weeklySaveBtn')?.addEventListener('click', saveWeeklyActivities);
+$('#weeklyReloadBtn')?.addEventListener('click', () =>
+  loadWeeklyActivities().catch((e) => toast(e.message))
+);
+$('#weeklyArchiveBtn')?.addEventListener('click', archiveWeeklyActivities);
+$('#weeklyFillSuggested')?.addEventListener('click', () => {
+  const s = state.weeklySuggested;
+  if (!s) {
+    loadWeeklyActivities()
+      .then(() => {
+        const n = state.weeklySuggested;
+        if (!n) return;
+        $('#weeklyStart').value = n.startDate || '';
+        $('#weeklyEnd').value = n.endDate || '';
+        if (!$('#weeklyLabel').value) $('#weeklyLabel').value = n.weekLabel || '';
+      })
+      .catch((e) => toast(e.message));
+    return;
+  }
+  $('#weeklyStart').value = s.startDate || '';
+  $('#weeklyEnd').value = s.endDate || '';
+  if (!$('#weeklyLabel').value) $('#weeklyLabel').value = s.weekLabel || '';
+});
+$('#weeklyAddItem')?.addEventListener('click', () => {
+  const items = collectWeeklyItemsFromDom();
+  items.push({
+    id: `wa_new_${Date.now()}`,
+    enabled: true,
+    tag: '本周活动',
+    title: '新活动',
+    sub: '',
+    detail: '',
+    theme: 'warm',
+    action: 'claim',
+    claimPack: '',
+    actionText: '去领取',
+    sort: (items.length + 1) * 10,
+  });
+  renderWeeklyItems(items);
+});
+$('#saveHomePosterBtn')?.addEventListener('click', saveHomePoster);
+$('#reloadHomePosterBtn')?.addEventListener('click', () =>
+  loadHomePoster().catch((e) => toast(e.message))
+);
+['homePosterEnabled','homePosterTheme','homePosterTag','homePosterTitle','homePosterSub','homePosterBtn','homePosterLinkType','homePosterProduct','homePosterCategory','homePosterImage'].forEach((id) => {
+  $(`#${id}`)?.addEventListener('input', () => renderHomePosterPreview());
+  $(`#${id}`)?.addEventListener('change', () => renderHomePosterPreview());
+});
+
+$('#saveCanePromoBtn')?.addEventListener('click', saveCanePromo);
+$('#grantCanePromoAllBtn')?.addEventListener('click', grantCanePromoAll);
+$('#saveFruitRetailOffBtn')?.addEventListener('click', saveFruitRetailOff);
+$('#grantFruitRetailOffAllBtn')?.addEventListener('click', grantFruitRetailOffAll);
+
 $('#presetOff153Btn')?.addEventListener('click', presetOff153Grant);
 $('#saveLotteryBtn')?.addEventListener('click', saveLottery);
 $('#reloadLotteryBtn')?.addEventListener('click', () => loadLottery().catch((e) => toast(e.message)));

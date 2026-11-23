@@ -13,11 +13,10 @@
     <view class="mix-tip" wx:if="{{!willQueue}}">全部为成品零售，支付后即可取货</view>
   </view>
 
-  <view class="card promo-card" wx:if="{{promoHint || loyaltyLabel || loyaltyHint}}">
-    <view class="promo-title">优惠说明</view>
-    <view class="promo-line" wx:if="{{loyaltyLabel}}">{{loyaltyLabel}}（可与立减券同享）</view>
+  <view class="card promo-card" wx:if="{{loyaltyLabel || loyaltyHint}}">
+    <view class="promo-title">会员优惠</view>
+    <view class="promo-line" wx:if="{{loyaltyLabel}}">{{loyaltyLabel}}（与立减券同单任选其一）</view>
     <view class="promo-line" wx:elif="{{loyaltyHint}}">{{loyaltyHint}}</view>
-    <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
   </view>
 
   <view class="card" wx:if="{{sideMealAllowed}}">

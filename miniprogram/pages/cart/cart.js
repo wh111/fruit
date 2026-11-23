@@ -1,15 +1,30 @@
-const { mediaUrl } = require('../../utils/api');
+const { mediaUrl, request, ensureLogin } = require('../../utils/api');
 const cart = require('../../utils/cart');
+const { formatPrice, memberFactorFromPromo, displayDeal } = require('../../utils/pricing');
 
-function decorate(list) {
+function decorate(list, priceCtx) {
   return (list || []).map((it) => {
     const parts = [];
     if ((it.extraNames || []).length) parts.push((it.extraNames || []).join('、'));
     if ((it.toppingNames || []).length) parts.push((it.toppingNames || []).join('、'));
+    const origin = Number(it.unitPrice) || 0;
+    const deal = displayDeal(origin, {
+      isMember: priceCtx.isMember,
+      factor: priceCtx.factor,
+      coupons: priceCtx.coupons,
+      productId: it.productId,
+      category: it.productCategory,
+    });
     return {
       ...it,
       coverUrl: it.coverUrl || mediaUrl(it.cover),
       toppingText: parts.join(' · '),
+      displayUnit: formatPrice(deal.sale),
+      originUnit: deal.discounted ? formatPrice(deal.origin) : '',
+      showStrike: !!deal.discounted,
+      priceTag: deal.tag || '',
+      lineSale: deal.sale * (Number(it.quantity) || 0),
+      lineOrigin: deal.origin * (Number(it.quantity) || 0),
     };
   });
 }
@@ -19,18 +34,60 @@ Page({
     items: [],
     count: 0,
     estimate: '0.00',
+    originEstimate: '',
+    showStrike: false,
+    isMember: false,
+    memberFactor: 1,
+    unusedCoupons: [],
   },
 
   onShow() {
+    this.boot();
+  },
+
+  async boot() {
+    await this.loadPriceCtx();
     this.refresh();
   },
 
+  async loadPriceCtx() {
+    let promo = {};
+    let unusedCoupons = [];
+    try {
+      await ensureLogin().catch(() => null);
+      promo = await request('/api/promo').catch(() => ({}));
+      if (wx.getStorageSync('token')) {
+        const mine = await request('/api/coupons/mine').catch(() => null);
+        unusedCoupons = ((mine && mine.list) || []).filter((c) => c && c.status === 'unused');
+      }
+    } catch {
+      /* ignore */
+    }
+    const memberInfo = memberFactorFromPromo(promo);
+    this.setData({
+      isMember: memberInfo.isMember,
+      memberFactor: memberInfo.factor,
+      unusedCoupons,
+    });
+  },
+
   refresh() {
-    const list = decorate(cart.readCart());
+    const priceCtx = {
+      isMember: this.data.isMember,
+      factor: this.data.memberFactor,
+      coupons: this.data.unusedCoupons,
+    };
+    const list = decorate(cart.readCart(), priceCtx);
+    const count = cart.cartCount(list);
+    const saleSum = list.reduce((s, it) => s + (Number(it.lineSale) || 0), 0);
+    const originSum = list.reduce((s, it) => s + (Number(it.lineOrigin) || 0), 0);
+    const showStrike = saleSum + 1e-9 < originSum;
     this.setData({
       items: list,
-      count: cart.cartCount(list),
-      estimate: cart.cartEstimate(list).toFixed(2),
+      count,
+      estimate: formatPrice(saleSum),
+      originEstimate: showStrike ? formatPrice(originSum) : '',
+      showStrike,
     });
   },
 

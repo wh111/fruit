@@ -4,7 +4,31 @@
   background: #f0ebe3;
 }
 .main .name { font-size: 40rpx; font-weight: 800; margin-bottom: 8rpx; }
-.main .price { margin-top: 16rpx; font-size: 40rpx; }
+.price-row {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8rpx 12rpx;
+}
+.price-row.compact { margin-top: 0; }
+.main .price,
+.price-row .price { font-size: 40rpx; font-weight: 800; color: #e65100; }
+.price-origin {
+  color: #9a9a9a;
+  font-size: 26rpx;
+  text-decoration: line-through;
+  font-weight: 400;
+}
+.price-tag {
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  background: #fff3df;
+  color: #c47a12;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.price-tip { margin-top: 8rpx; font-size: 22rpx; }
 
 .section-title { font-weight: 700; margin-bottom: 16rpx; }
 .chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
@@ -14,12 +38,22 @@
   background: #f5f1ea;
   color: #555;
   font-size: 26rpx;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8rpx;
 }
 .chip.on {
   background: #fff3e0;
   color: #e8910f;
   outline: 2rpx solid #f5a623;
   font-weight: 600;
+}
+.chip-price { font-weight: 700; }
+.chip-origin {
+  color: #9a9a9a;
+  font-size: 22rpx;
+  text-decoration: line-through;
+  font-weight: 400;
 }
 
 .qty { display: flex; align-items: center; gap: 28rpx; }

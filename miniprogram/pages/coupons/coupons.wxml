@@ -1,8 +1,8 @@
 <view class="page">
   <view class="hero card" wx:if="{{campaign}}">
-    <view class="hero-title">{{campaign.title}}</view>
-    <view class="hero-sub">{{campaign.subtitle}}</view>
-    <view class="hero-monthly" wx:if="{{campaign.monthlyGift}}">甜蜜迎周末：{{campaign.monthlyGift.desc}}</view>
+    <view class="hero-title">{{campaign.title}} <text class="expired-tag" wx:if="{{campaign.status === 'expired'}}">已过期</text></view>
+    <view class="hero-sub">{{campaign.status === 'expired' ? '本活动已结束，不再发放新人礼' : campaign.subtitle}}</view>
+    <view class="hero-monthly" wx:if="{{campaign.monthlyGift && campaign.status !== 'expired'}}">甜蜜迎周末：{{campaign.monthlyGift.desc}}</view>
     <view class="stats">
       <view class="stat">
         <text class="num">{{summary.unused || 0}}</text>

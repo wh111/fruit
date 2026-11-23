@@ -130,6 +130,13 @@ header {
 .card input { width: 20px; height: 20px; accent-color: var(--orange); }
 .code { font-size: 22px; font-weight: 800; color: var(--orange); min-width: 64px; }
 .meta { flex: 1; font-size: 14px; }
+.meta .ing {
+  margin-top: 4px;
+  color: #a5d6a7;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.35;
+}
 .tag { font-size: 12px; color: var(--muted); }
 .tag.making { color: #81c784; }
 .tag.ready { color: #64b5f6; }

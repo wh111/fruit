@@ -1,7 +1,7 @@
 <view class="page">
   <view class="card tip-card">
     <view class="tip-title">自定义金额付款</view>
-    <view class="tip-desc">散装称重按这里付款。充值会员称重水果9折；周五会员消费任意金额送精美果切一份；满18元可加工。</view>
+    <view class="tip-desc">散装称重按这里付款。充值会员同样享全场折扣；可用活动券（与会员折同单任选其一）；满18元可加工。</view>
   </view>
 
   <view class="card">
@@ -47,6 +47,34 @@
     <view class="recharge-link" wx:if="{{canPay && !balanceEnough}}" bindtap="goRecharge">请充值 ›</view>
   </view>
 
+  <view class="card" wx:if="{{couponOptions.length}}">
+    <view class="label">优惠券</view>
+    <view class="coupon-hint" wx:if="{{couponHint}}">{{couponHint}}</view>
+    <view
+      class="coupon-row {{couponId === item.id ? 'on' : ''}}"
+      wx:for="{{couponOptions}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="onPickCoupon"
+    >
+      <view class="coupon-main">
+        <view class="coupon-title">{{item.title}}</view>
+        <view class="coupon-sub">省 ¥{{item.saveText}} · 应付 ¥{{item.payText}}</view>
+      </view>
+      <view class="coupon-check">{{couponId === item.id ? '✓' : ''}}</view>
+    </view>
+    <view
+      class="coupon-row {{!couponId ? 'on' : ''}}"
+      data-id=""
+      bindtap="onPickCoupon"
+    >
+      <view class="coupon-main">
+        <view class="coupon-title">不使用优惠券</view>
+      </view>
+      <view class="coupon-check">{{!couponId ? '✓' : ''}}</view>
+    </view>
+  </view>
+
   <view class="card">
     <view class="label">备注（选填）</view>
     <input
@@ -61,7 +89,7 @@
   <view class="pay-bar">
     <view class="pay-sum">
       <text class="muted">合计</text>
-      <text class="sum">¥{{displayAmount}}</text>
+      <text class="sum">¥{{payAmount}}</text>
     </view>
     <button
       wx:if="{{hasPhone}}"

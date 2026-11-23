@@ -60,6 +60,50 @@
   font-size: 28rpx;
 }
 
+.coupon-hint {
+  margin: -4rpx 0 16rpx;
+  font-size: 22rpx;
+  color: #8a8a8a;
+  line-height: 1.45;
+}
+
+.coupon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 20rpx 18rpx;
+  margin-bottom: 12rpx;
+  border-radius: 16rpx;
+  background: #f7f4ee;
+  border: 2rpx solid transparent;
+}
+
+.coupon-row.on {
+  background: #fff8e7;
+  border-color: #f5a623;
+}
+
+.coupon-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #2a2a2a;
+}
+
+.coupon-sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #8a8a8a;
+}
+
+.coupon-check {
+  width: 40rpx;
+  text-align: center;
+  color: #e8910f;
+  font-weight: 800;
+  font-size: 28rpx;
+}
+
 .modes {
   display: flex;
   gap: 16rpx;

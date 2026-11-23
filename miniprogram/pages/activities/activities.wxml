@@ -1,0 +1,50 @@
+<view class="page">
+  <view class="hero">
+    <view class="hero-title">活动中心</view>
+    <view class="hero-sub">{{hint || '进行中的福利与往期活动'}}</view>
+    <view class="week-chip" wx:if="{{weekLabel || weekLine}}">{{weekLabel || weekLine}}</view>
+    <view class="member-chip" wx:if="{{memberLabel}}">{{memberLabel}}</view>
+  </view>
+
+  <view class="section-title" wx:if="{{active.length}}">进行中</view>
+  <view
+    class="card act theme-{{item.theme}} status-{{item.status}}"
+    wx:for="{{active}}"
+    wx:key="id"
+  >
+    <view class="act-top">
+      <text class="act-tag">{{item.tag}}</text>
+      <text class="act-status {{item.claimed ? 'claimed' : ''}}">{{item.statusText}}</text>
+    </view>
+    <view class="act-title">{{item.title}}</view>
+    <view class="act-sub">{{item.sub}}</view>
+    <view class="act-detail" wx:if="{{item.detail}}">{{item.detail}}</view>
+    <view class="act-foot">
+      <text class="act-end" wx:if="{{item.endDate}}">至 {{item.endDate}}</text>
+      <view
+        class="act-btn {{item.claimed ? 'order' : ''}}"
+        wx:if="{{item.action !== 'none'}}"
+        data-action="{{item.action}}"
+        data-id="{{item.id}}"
+        bindtap="onAction"
+      >{{item.actionText}}</view>
+    </view>
+  </view>
+
+  <view class="section-title" wx:if="{{expired.length}}">已过期</view>
+  <view
+    class="card act theme-muted status-expired"
+    wx:for="{{expired}}"
+    wx:key="id"
+  >
+    <view class="act-top">
+      <text class="act-tag">{{item.tag}}</text>
+      <text class="act-status expired">{{item.statusText}}</text>
+    </view>
+    <view class="act-title">{{item.title}}</view>
+    <view class="act-sub">{{item.sub}}</view>
+    <view class="act-detail" wx:if="{{item.detail}}">{{item.detail}}</view>
+  </view>
+
+  <view class="empty" wx:if="{{!list.length && !loading}}">暂无活动</view>
+</view>

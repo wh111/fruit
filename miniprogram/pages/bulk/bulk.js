@@ -17,13 +17,14 @@ function parseAmount(text) {
 
 function formatDisplay(n) {
   if (n == null) return '0.00';
-  return n.toFixed(2);
+  return Number(n).toFixed(2);
 }
 
 Page({
   data: {
     amountText: '',
     displayAmount: '0.00',
+    payAmount: '0.00',
     canPay: false,
     remark: '',
     hasPhone: false,
@@ -36,12 +37,19 @@ Page({
     balance: 0,
     payChannel: 'wechat',
     balanceEnough: false,
+    couponOptions: [],
+    couponId: '',
+    couponHint: '',
   },
+
+  _couponTouched: false,
+  _quoteTimer: null,
 
   onShow() {
     const user = wx.getStorageSync('user') || {};
     this.setData({ hasPhone: !!(user.hasPhone || user.phone) });
     this.loadWallet();
+    this.refreshQuote();
   },
 
   async loadWallet() {
@@ -50,7 +58,7 @@ Page({
       const data = await request('/api/wallet/mine');
       const balance = Number(data.balance) || 0;
       const amount = parseAmount(this.data.amountText);
-      const pay = this.payAmount(amount, !!data.member);
+      const pay = Number(this.data.payAmount) || this.payAmount(amount, !!data.member);
       const enabled = !!data.enabled;
       const patch = {
         walletEnabled: enabled,
@@ -90,7 +98,7 @@ Page({
 
   refreshBalanceEnough() {
     const amount = parseAmount(this.data.amountText);
-    const pay = this.payAmount(amount, this.data.member);
+    const pay = Number(this.data.payAmount) || this.payAmount(amount, this.data.member);
     const balance = Number(this.data.balance) || 0;
     this.setData({
       ...this.perkPatch(amount),
@@ -101,18 +109,106 @@ Page({
   onAmount(e) {
     const amountText = e.detail.value;
     const amount = parseAmount(amountText);
+    this._couponTouched = false;
     const pay = this.payAmount(amount, this.data.member);
     const balance = Number(this.data.balance) || 0;
     this.setData({
       amountText,
+      displayAmount: formatDisplay(pay != null ? pay : amount),
+      payAmount: formatDisplay(pay != null ? pay : amount),
       canPay: amount != null,
+      couponId: '',
+      couponOptions: [],
+      couponHint: '',
       ...this.perkPatch(amount),
       balanceEnough: this.data.walletEnabled && pay != null && balance + 0.001 >= pay,
     });
+    this.refreshBalanceEnough();
+    if (this._quoteTimer) clearTimeout(this._quoteTimer);
+    this._quoteTimer = setTimeout(() => this.refreshQuote(), 280);
   },
 
   onRemark(e) {
     this.setData({ remark: e.detail.value });
+  },
+
+  onPickCoupon(e) {
+    const id = e.currentTarget.dataset.id || '';
+    this._couponTouched = true;
+    const amount = parseAmount(this.data.amountText);
+    let pay = amount;
+    if (id) {
+      const hit = (this.data.couponOptions || []).find((c) => c.id === id);
+      if (hit) pay = Number(hit.payAmount);
+    }
+    this.setData({
+      couponId: id,
+      payAmount: formatDisplay(pay),
+    });
+    this.refreshBalanceEnough();
+  },
+
+  async refreshQuote() {
+    const amount = parseAmount(this.data.amountText);
+    if (amount == null) {
+      this.setData({
+        couponOptions: [],
+        couponId: '',
+        couponHint: '',
+        payAmount: '0.00',
+      });
+      return;
+    }
+    try {
+      if (!wx.getStorageSync('token')) await ensureLogin().catch(() => null);
+      if (!wx.getStorageSync('token')) return;
+      const quote = await request('/api/orders/bulk/quote', {
+        method: 'POST',
+        data: { amount },
+      });
+      const list = (quote.availableCoupons || []).map((c) => ({
+        ...c,
+        saveText: formatDisplay(c.save),
+        payText: formatDisplay(c.payAmount),
+        payAmount: Number(c.payAmount),
+      }));
+      let couponId = this._couponTouched ? this.data.couponId || '' : '';
+      if (!this._couponTouched) {
+        // 服务端已比较会员折 vs 用券，取更省的一方
+        couponId = quote.selectedCouponId || '';
+      }
+      if (couponId && !list.some((c) => c.id === couponId)) {
+        couponId = '';
+      }
+      let pay = Number(quote.amount);
+      if (!(pay > 0)) pay = amount;
+      if (couponId) {
+        const hit = list.find((c) => c.id === couponId);
+        if (hit) pay = hit.payAmount;
+      }
+      const loyaltyTip =
+        Number(quote.loyaltySave) > 0
+          ? `已享${quote.loyaltyLabel || '会员折'}（与立减券同单任选其一）`
+          : '';
+      const save = Math.max(0, Math.round((amount - pay) * 100) / 100);
+      this.setData({
+        couponOptions: list,
+        couponId,
+        couponHint: list.length
+          ? `用券则不享受会员折；非会员消费满¥9.9可参与，会员免费${
+              loyaltyTip ? ` · ${loyaltyTip}` : ''
+            }`
+          : loyaltyTip || '',
+        payAmount: formatDisplay(pay),
+        displayAmount: formatDisplay(pay),
+        memberSave: save.toFixed(2),
+        canProcess: pay + 0.001 >= 18,
+        fridayGift: !!(this.data.member && new Date().getDay() === 5 && pay > 0),
+      });
+      this.refreshBalanceEnough();
+    } catch (_) {
+      /* ignore quote errors while typing */
+    }
   },
 
   onPayChannel(e) {
@@ -151,6 +247,7 @@ Page({
         await new Promise((r) => setTimeout(r, 400));
       }
       await this.loadWallet();
+      await this.refreshQuote();
       await this.submit();
     } catch (err) {
       wx.hideLoading();
@@ -183,12 +280,17 @@ Page({
       }
       this.setData({ hasPhone: true });
 
+      const payload = {
+        amount,
+        remark: this.data.remark,
+      };
+      if (this._couponTouched || this.data.couponId) {
+        payload.couponId = this.data.couponId || '';
+      }
+
       const { order } = await request('/api/orders/bulk', {
         method: 'POST',
-        data: {
-          amount,
-          remark: this.data.remark,
-        },
+        data: payload,
       });
       rememberOrderId(order.id);
 
@@ -221,7 +323,10 @@ Page({
       wx.hideLoading();
       try {
         if (pay.mode === 'mock') {
-          const payAmount = pay.order?.amount ?? order.amount;
+          const payAmount =
+            (pay.order && pay.order.amount != null ? pay.order.amount : null) != null
+              ? pay.order.amount
+              : order.amount;
           const { confirm } = await new Promise((resolve) => {
             wx.showModal({
               title: '模拟支付',

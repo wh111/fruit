@@ -2,18 +2,16 @@ const crypto = require('crypto');
 
 function defaultToppings() {
   const now = Date.now();
+  // 葡萄干 / 两种燕麦免费；坚果按成本略分档
   return [
-    { id: 'top-chicken', name: '现炸鸡胸丝', spec: '约70g', price: 8, status: 1, sort: 1, createdAt: now },
-    { id: 'top-egg', name: '水煮蛋', spec: '半个/个', price: 3, status: 1, sort: 2, createdAt: now },
-    { id: 'top-honey', name: '蜂蜜微甜', spec: '少量', price: 2, status: 1, sort: 3, createdAt: now },
-    { id: 'top-almond', name: '巴旦木', spec: '一份', price: 3, status: 1, sort: 10, createdAt: now },
-    { id: 'top-pistachio', name: '开心果', spec: '一份', price: 4, status: 1, sort: 11, createdAt: now },
-    { id: 'top-walnut', name: '核桃碎', spec: '一份', price: 3, status: 1, sort: 12, createdAt: now },
-    { id: 'top-coconut', name: '椰果', spec: '一份', price: 2, status: 1, sort: 13, createdAt: now },
-    { id: 'top-sago', name: '西米', spec: '一份', price: 2, status: 1, sort: 14, createdAt: now },
-    { id: 'top-taro', name: '芋圆', spec: '一份', price: 3, status: 1, sort: 15, createdAt: now },
-    { id: 'top-chia', name: '奇亚籽', spec: '一份', price: 2, status: 1, sort: 16, createdAt: now },
-    { id: 'top-oats', name: '燕麦脆', spec: '一份', price: 2, status: 1, sort: 17, createdAt: now },
+    { id: 'top-raisin', name: '葡萄干', spec: '一份', price: 0, status: 1, sort: 1, createdAt: now },
+    { id: 'top-oat-cocoa', name: '榛子可可燕麦片', spec: '一份', price: 0, status: 1, sort: 2, createdAt: now },
+    { id: 'top-oat-choco', name: '榛子巧克力燕麦', spec: '一份', price: 0, status: 1, sort: 3, createdAt: now },
+    { id: 'top-cranberry', name: '蔓越莓干', spec: '一份', price: 2, status: 1, sort: 4, createdAt: now },
+    { id: 'top-almond', name: '巴旦木仁', spec: '一份', price: 2, status: 1, sort: 5, createdAt: now },
+    { id: 'top-cashew-white', name: '白腰果仁', spec: '一份', price: 3, status: 1, sort: 6, createdAt: now },
+    { id: 'top-cashew-purple', name: '紫衣腰果仁', spec: '一份', price: 3, status: 1, sort: 7, createdAt: now },
+    { id: 'top-pistachio', name: '开心果碎', spec: '一份', price: 4, status: 1, sort: 8, createdAt: now },
   ];
 }
 
@@ -45,10 +43,10 @@ function normalizeToppings(list) {
   });
 }
 
-/** 顾客端：已上架且标价的小料 */
+/** 顾客端：已上架小料（含 0 元免费） */
 function listPublicToppings(list) {
   return (Array.isArray(list) ? list : [])
-    .filter((t) => t && t.status !== 0 && Number(t.price) > 0)
+    .filter((t) => t && t.status !== 0 && Number.isFinite(Number(t.price)) && Number(t.price) >= 0)
     .slice()
     .sort((a, b) => (a.sort || 0) - (b.sort || 0))
     .map((t) => ({

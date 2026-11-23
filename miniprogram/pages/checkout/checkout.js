@@ -337,8 +337,16 @@ Page({
         coupons,
         couponId: this._couponTouched ? this.data.couponId : selectedId,
         couponLabel,
-        loyaltyLabel: (quote.loyalty && quote.loyalty.label) || '',
-        loyaltyHint: (quote.loyalty && quote.loyalty.nextHint) || '',
+        loyaltyLabel:
+          Number(quote.loyaltySave) > 0
+            ? quote.loyaltyLabel || (quote.loyalty && quote.loyalty.label) || ''
+            : '',
+        loyaltyHint:
+          Number(quote.loyaltySave) > 0
+            ? ''
+            : quote.loyalty && quote.loyalty.label && (quote.couponId || selectedId)
+              ? `${quote.loyalty.label}与立减券同单任选其一（当前用券）`
+              : (quote.loyalty && quote.loyalty.nextHint) || '',
         balanceEnough: this.data.walletEnabled && balance + 0.001 >= total,
         deliveryPoints: quote.deliveryPoints || this.data.deliveryPoints,
         deliveryScopeNote:
@@ -594,7 +602,10 @@ Page({
       wx.hideLoading();
       try {
         if (pay.mode === 'mock') {
-          const amount = pay.order?.amount ?? order.amount;
+          const amount =
+            (pay.order && pay.order.amount != null ? pay.order.amount : null) != null
+              ? pay.order.amount
+              : order.amount;
           const { confirm } = await new Promise((resolve) => {
             wx.showModal({
               title: '模拟支付（企业商户直连）',

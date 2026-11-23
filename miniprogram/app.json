@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/index/index",
+    "pages/activities/activities",
     "pages/detail/detail",
     "pages/cart/cart",
     "pages/checkout/checkout",
@@ -30,6 +31,12 @@
         "text": "点单",
         "iconPath": "images/tab-home.png",
         "selectedIconPath": "images/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/activities/activities",
+        "text": "活动",
+        "iconPath": "images/tab-promo.png",
+        "selectedIconPath": "images/tab-promo-active.png"
       },
       {
         "pagePath": "pages/orders/orders",

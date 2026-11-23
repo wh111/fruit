@@ -1,6 +1,7 @@
-const { request, mediaUrl } = require('../../utils/api');
+const { request, mediaUrl, ensureLogin } = require('../../utils/api');
 const cartUtil = require('../../utils/cart');
 const { enableShareMenu, productShare } = require('../../utils/share');
+const { formatPrice, memberFactorFromPromo, displayDeal } = require('../../utils/pricing');
 
 Page({
   data: {
@@ -11,14 +12,22 @@ Page({
     extraMap: {},
     extraPick: 0,
     quantity: 1,
+    originUnitPrice: '0.00',
     unitPrice: '0.00',
+    showStrike: false,
+    priceTag: '',
+    priceTip: '',
     promoHint: '',
     loyaltyHint: '',
+    isMember: false,
+    memberFactor: 1,
+    unusedCoupons: [],
     isRetail: false,
     isFruitBowl: false,
     toppings: [],
     toppingIds: [],
     toppingMap: {},
+    specViews: [],
   },
 
   onLoad(query) {
@@ -42,6 +51,7 @@ Page({
 
   async load() {
     try {
+      await ensureLogin().catch(() => null);
       const p = await request(`/api/products/${this.productId}`);
       const specId = (p.specs && p.specs[0] && p.specs[0].id) || '';
       const isRetail = p.category === '免洗什锦' || p.category === '水果零售' || p.category === '零售什锦';
@@ -61,7 +71,7 @@ Page({
         toppingMap: {},
       });
       if (isFruitBowl) await this.loadToppings();
-      await this.loadPromoHint();
+      await this.loadPromoAndCoupons();
       this.recalcPrice();
     } catch (e) {
       wx.showToast({ title: e.message || '加载失败', icon: 'none' });
@@ -77,30 +87,94 @@ Page({
     }
   },
 
-  async loadPromoHint() {
+  async loadPromoAndCoupons() {
+    let promo = {};
+    let unusedCoupons = [];
     try {
-      const promo = await request('/api/promo');
-      this.setData({
-        promoHint: promo.hint || '',
-        loyaltyHint: (promo.loyalty && promo.loyalty.nextHint) || promo.loyaltyHint || '',
-      });
+      promo = await request('/api/promo');
     } catch {
       /* ignore */
     }
+    try {
+      if (wx.getStorageSync('token')) {
+        const mine = await request('/api/coupons/mine');
+        unusedCoupons = (mine.list || []).filter((c) => c && c.status === 'unused');
+      }
+    } catch {
+      /* ignore */
+    }
+    const memberInfo = memberFactorFromPromo(promo);
+    const loyalty = promo.loyalty || {};
+    let loyaltyHint = '';
+    if (memberInfo.isMember && memberInfo.label) {
+      loyaltyHint = `${memberInfo.label}已生效，下方已显示优惠价`;
+    } else if (loyalty.nextHint) {
+      loyaltyHint = loyalty.nextHint;
+    }
+    this.setData({
+      promoHint: '',
+      loyaltyHint,
+      isMember: memberInfo.isMember,
+      memberFactor: memberInfo.factor,
+      unusedCoupons,
+    });
+  },
+
+  buildSpecViews() {
+    const { product, isMember, memberFactor, unusedCoupons } = this.data;
+    if (!product) return [];
+    return (product.specs || []).map((s) => {
+      const origin = Number(s.price) || 0;
+      const deal = displayDeal(origin, {
+        isMember,
+        factor: memberFactor,
+        coupons: unusedCoupons,
+        productId: product.id,
+        category: product.category,
+      });
+      return {
+        ...s,
+        displayPrice: formatPrice(deal.sale),
+        originPrice: deal.discounted ? formatPrice(deal.origin) : '',
+        showStrike: !!deal.discounted,
+      };
+    });
+  },
+
+  extrasAddAmount() {
+    const { product, extras, toppingIds, toppings } = this.data;
+    let add = 0;
+    (product.extras || []).forEach((item) => {
+      if ((extras || []).includes(item.id)) add += Number(item.price) || 0;
+    });
+    (toppings || []).forEach((item) => {
+      if ((toppingIds || []).includes(item.id)) add += Number(item.price) || 0;
+    });
+    return add;
   },
 
   recalcPrice() {
-    const { product, specId, extras, toppingIds, toppings } = this.data;
+    const { product, specId, isMember, memberFactor, unusedCoupons } = this.data;
     if (!product || !specId) return;
     const spec = (product.specs || []).find((s) => s.id === specId);
     let unit = spec ? Number(spec.price) || 0 : 0;
-    (product.extras || []).forEach((item) => {
-      if ((extras || []).includes(item.id)) unit += Number(item.price) || 0;
+    unit += this.extrasAddAmount();
+    const deal = displayDeal(unit, {
+      isMember,
+      factor: memberFactor,
+      coupons: unusedCoupons,
+      productId: product.id,
+      category: product.category,
     });
-    (toppings || []).forEach((item) => {
-      if ((toppingIds || []).includes(item.id)) unit += Number(item.price) || 0;
+    this.setData({
+      originUnitPrice: formatPrice(deal.origin),
+      unitPrice: formatPrice(deal.sale),
+      showStrike: !!deal.discounted,
+      priceTag: deal.tag || '',
+      priceTip: deal.tip || '',
+      listUnitPrice: deal.origin,
+      specViews: this.buildSpecViews(),
     });
-    this.setData({ unitPrice: unit.toFixed(2) });
   },
 
   onSpec(e) {
@@ -161,7 +235,7 @@ Page({
       toppingIds,
       toppings,
       quantity,
-      unitPrice,
+      listUnitPrice,
       coverUrl,
     } = this.data;
     if (!product || !specId) {
@@ -180,6 +254,8 @@ Page({
     const toppingNames = (toppings || [])
       .filter((t) => (toppingIds || []).includes(t.id))
       .map((t) => t.name);
+    // 购物车存原价，结算由服务端重算会员折/券
+    const originUnit = Number(listUnitPrice);
     return {
       productId: product.id,
       productName: product.name,
@@ -193,7 +269,7 @@ Page({
       toppingIds: toppingIds || [],
       toppingNames,
       quantity: Math.max(1, Number(quantity) || 1),
-      unitPrice: Number(unitPrice) || 0,
+      unitPrice: Number.isFinite(originUnit) ? originUnit : Number(spec && spec.price) || 0,
     };
   },
 

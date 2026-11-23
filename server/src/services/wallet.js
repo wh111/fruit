@@ -74,9 +74,7 @@ function updateConfig(db, body = {}) {
         };
       })
       .filter(Boolean);
-    if (!tiers.length) {
-      throw Object.assign(new Error('至少保留一个有效档位'), { status: 400 });
-    }
+    // 允许清空全部档位（与 ensureWallet「空 tiers 不回填」一致）
     next.tiers = tiers;
   }
   db.settings.wallet = next;

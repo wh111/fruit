@@ -46,6 +46,7 @@
           <button type="button" data-tab="reserve" class="nav">预定分类</button>
           <button type="button" data-tab="users" class="nav">会员</button>
           <button type="button" data-tab="coupons" class="nav">发券</button>
+          <button type="button" data-tab="weekly" class="nav">本周活动</button>
           <button type="button" data-tab="lottery" class="nav">开业抽奖</button>
           <button type="button" data-tab="wallet" class="nav">储值</button>
           <button type="button" data-tab="reports" class="nav">报表</button>
@@ -252,6 +253,75 @@
               券发到用户<strong>小程序券包</strong>，不会自动进微信卡包，也不会微信推送（除非另配订阅消息）。
             </p>
             <div style="margin:0 0 14px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:10px">
+              <h4 style="margin:0 0 8px;font-size:14px">会员全场折扣</h4>
+              <p class="muted" style="margin:0 0 8px" id="memberDiscountHint">
+                充值会员全场折扣（默认 9 折）· 周周活动免费参与 · 与立减券同单任选其一；自定义结账同样生效。
+              </p>
+              <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+                <label class="switch"><input type="checkbox" id="memberDiscountEnabled" checked /> <span>开启</span></label>
+                <label>折数
+                  <input id="memberDiscountZhe" type="number" min="1" max="9.9" step="0.1" value="9" style="width:64px" />
+                </label>
+                <label>标题
+                  <input id="memberDiscountLabel" placeholder="会员9折" style="width:140px" />
+                </label>
+                <button type="button" class="btn primary" id="saveMemberDiscountBtn">保存</button>
+              </div>
+            </div>
+            <div style="margin:0 0 14px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:10px">
+              <h4 style="margin:0 0 8px;font-size:14px">冬日甘蔗券 · 天天弹框领</h4>
+              <p class="muted" style="margin:0 0 8px" id="canePromoHint">
+                去皮甘蔗·3.88元起：非会员消费满¥9.9可参与，会员免费；每天与免洗什锦二选一。默认档期 1 周，券当天有效。
+              </p>
+              <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+                <label class="switch"><input type="checkbox" id="canePromoEnabled" /> <span>开启活动</span></label>
+                <label class="switch"><input type="checkbox" id="canePromoSyncPoster" /> <span>同步首页海报</span></label>
+                <label>面额¥
+                  <input id="canePromoAmount" type="number" min="0.1" step="0.01" value="7.92" style="width:72px" />
+                </label>
+                <label>券有效天
+                  <input id="canePromoDays" type="number" min="1" max="365" value="1" style="width:64px" />
+                </label>
+                <label>开始
+                  <input id="canePromoStart" type="date" style="width:140px" />
+                </label>
+                <label>结束
+                  <input id="canePromoEnd" type="date" style="width:140px" />
+                </label>
+                <label>标题
+                  <input id="canePromoTitle" placeholder="去皮甘蔗·3.88元起" style="width:200px" />
+                </label>
+                <button type="button" class="btn primary" id="saveCanePromoBtn">保存并开启</button>
+                <button type="button" class="btn" id="grantCanePromoAllBtn" title="给今日尚未领过的存量用户补发">给存量用户补发</button>
+              </div>
+            </div>
+            <div style="margin:0 0 14px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:10px">
+              <h4 style="margin:0 0 8px;font-size:14px">免洗什锦 · 天天弹框领</h4>
+              <p class="muted" style="margin:0 0 8px" id="fruitRetailOffHint">
+                免洗什锦·3.8元起：非会员消费满¥9.9可参与，会员免费；每天与甘蔗二选一。默认档期 1 周，券当天有效。
+              </p>
+              <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+                <label class="switch"><input type="checkbox" id="fruitRetailOffEnabled" /> <span>开启活动</span></label>
+                <label>面额¥
+                  <input id="fruitRetailOffAmount" type="number" min="0.1" step="0.1" value="3" style="width:72px" />
+                </label>
+                <label>券有效天
+                  <input id="fruitRetailOffDays" type="number" min="1" max="365" value="1" style="width:64px" />
+                </label>
+                <label>开始
+                  <input id="fruitRetailOffStart" type="date" style="width:140px" />
+                </label>
+                <label>结束
+                  <input id="fruitRetailOffEnd" type="date" style="width:140px" />
+                </label>
+                <label>标题
+                  <input id="fruitRetailOffTitle" placeholder="免洗什锦·3.8元起" style="width:160px" />
+                </label>
+                <button type="button" class="btn primary" id="saveFruitRetailOffBtn">保存</button>
+                <button type="button" class="btn" id="grantFruitRetailOffAllBtn" title="给今日尚未领过的存量用户补发">给存量用户补发</button>
+              </div>
+            </div>
+            <div style="margin:0 0 14px;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:10px">
               <h4 style="margin:0 0 8px;font-size:14px">满15减3 · 限定商品</h4>
               <p class="muted" style="margin:0 0 8px" id="off153Hint">配置后，满15减3 仅可用于指定一款水果捞 + 一款果切。</p>
               <div class="toolbar" style="flex-wrap:wrap;gap:8px">
@@ -298,6 +368,91 @@
               <button type="button" class="btn primary" id="grantCouponsBtn">给当前人群发券</button>
             </div>
             <div id="couponUserTable" class="table-wrap" style="margin-top:12px"></div>
+          </div>
+<div class="panel">
+            <h3>小程序首页活动海报</h3>
+            <p class="muted">
+              开启后显示在小程序点单页顶部（新人礼横幅上方）。换活动只需改这里并保存，
+              <strong>无需再发版小程序</strong>（需已上线支持本配置的小程序版本）。
+            </p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+              <label class="switch"><input type="checkbox" id="homePosterEnabled" /> <span>开启海报</span></label>
+              <label>主题
+                <select id="homePosterTheme">
+                  <option value="default">默认绿橙</option>
+                  <option value="winter">冬日清爽</option>
+                  <option value="warm">暖橙</option>
+                </select>
+              </label>
+              <label>跳转
+                <select id="homePosterLinkType">
+                  <option value="coupons">我的优惠券</option>
+                  <option value="product">指定商品详情</option>
+                  <option value="category">首页某分类</option>
+                  <option value="none">仅展示不跳转</option>
+                </select>
+              </label>
+              <button type="button" class="btn primary" id="saveHomePosterBtn">保存</button>
+              <button type="button" class="btn" id="reloadHomePosterBtn">刷新</button>
+              <button type="button" class="btn" id="presetCanePosterBtn" title="填入冬日甘蔗活动文案">填入甘蔗活动</button>
+            </div>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:flex-start">
+              <label>角标
+                <input id="homePosterTag" placeholder="如 冬日特惠" style="width:120px" />
+              </label>
+              <label>标题
+                <input id="homePosterTitle" placeholder="活动主标题" style="width:260px" />
+              </label>
+              <label>副文案
+                <input id="homePosterSub" placeholder="一行说明" style="width:260px" />
+              </label>
+              <label>按钮文字
+                <input id="homePosterBtn" placeholder="去看看" style="width:100px" />
+              </label>
+              <label>商品
+                <select id="homePosterProduct" style="min-width:180px"></select>
+              </label>
+              <label>分类名
+                <input id="homePosterCategory" placeholder="如 水果零售" style="width:120px" />
+              </label>
+              <label style="flex:1;min-width:220px">配图 URL（可选）
+                <input id="homePosterImage" placeholder="/uploads/xxx.jpg 可空" style="width:100%" />
+              </label>
+            </div>
+            <p class="muted" id="homePosterHint" style="margin-top:12px"></p>
+            <div id="homePosterPreview" class="home-poster-preview" style="margin-top:14px"></div>
+          </div>
+        </div>
+
+        <div id="tab-weekly" class="tab hidden">
+          <div class="panel">
+            <h3>本周活动（活动中心 · 进行中）</h3>
+            <p class="muted" id="weeklyHint">
+              按周配置小程序「活动」页进行中列表。每周改标题/说明/按钮即可；发券仍用「发券」里的甘蔗/免洗开关。
+            </p>
+            <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0">
+              <label>周标题
+                <input id="weeklyLabel" placeholder="如 11.23～11.29 本周福利" style="width:200px" />
+              </label>
+              <label>开始
+                <input id="weeklyStart" type="date" style="width:140px" />
+              </label>
+              <label>结束
+                <input id="weeklyEnd" type="date" style="width:140px" />
+              </label>
+              <button type="button" class="btn" id="weeklyFillSuggested">填入本周一～日</button>
+            </div>
+            <label style="display:block;margin-bottom:12px">活动页提示语
+              <input id="weeklyPageHint" placeholder="本周活动 · 会员免费参与" style="width:100%;max-width:520px" />
+            </label>
+            <div id="weeklyItems" class="table-wrap"></div>
+            <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-top:12px">
+              <button type="button" class="btn" id="weeklyAddItem">添加一条</button>
+              <button type="button" class="btn primary" id="weeklySaveBtn">保存本周活动</button>
+              <button type="button" class="btn" id="weeklyReloadBtn">刷新</button>
+              <button type="button" class="btn" id="weeklyArchiveBtn" title="把当前周移入已过期，并开启下一周">归档本周并开新周</button>
+            </div>
+            <p class="muted" style="margin-top:12px" id="weeklyMeta"></p>
           </div>
         </div>
 
@@ -649,7 +804,7 @@
 
   <script src="/admin/js/dtpweb.umd.js"></script>
   <script src="/admin/js/detong-print.js?v=20261114mix2"></script>
-  <script src="/admin/js/admin.js?v=20261114ean13"></script>
+  <script src="/admin/js/admin.js?v=20261123weekly"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       if (window.DetongPrint) DetongPrint.init();

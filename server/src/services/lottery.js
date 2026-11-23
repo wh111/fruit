@@ -240,10 +240,7 @@ function ensureLottery(db) {
       return '特殊奖「200元券包」中奖率约千分之一，仅 2 个名额：20元无门槛券×10，抽完即止';
     });
   }
-  // 测试期：强制开启，方便联调
-  if (isLotteryTestMode(db.lottery)) {
-    db.lottery.enabled = true;
-  }
+  // 不再因测试模式强制开启；开业转盘已下线，由管理端显式开关
   return db.lottery;
 }
 

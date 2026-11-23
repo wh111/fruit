@@ -96,42 +96,22 @@ function fridayGiftUsed(db, userId, now) {
   });
 }
 
-function applyMemberPerks(priced, { db, userId, lines, now, weighedAmount } = {}) {
+/**
+ * 补齐周五赠品 / 满18可加工等标记。
+ * 金额折扣改由 loyalty 全场会员折负责，这里不再叠称重9折，避免与券/会员折双重扣减。
+ */
+function applyMemberPerks(priced, { db, userId, now } = {}) {
   const member = !!(userId && hasRecharged(db, userId));
-  const weighed =
-    weighedAmount != null
-      ? round2(weighedAmount)
-      : round2(
-          (lines || []).reduce(
-            (s, l) => s + (isWeighedCategory(l.productCategory) ? Number(l.lineAmount) || 0 : 0),
-            0
-          )
-        );
-  let memberSave = member && weighed > 0 ? round2(weighed * 0.1) : 0;
-  const before = round2(Number(priced.foodAmount) || 0);
-  let foodAmount = round2(Math.max(0, before - memberSave));
-  if (before > 0 && foodAmount < 0.01) {
-    foodAmount = 0.01;
-    memberSave = round2(before - foodAmount);
-  }
-  const amount = round2(foodAmount + (Number(priced.deliveryFee) || 0));
+  const foodAmount = round2(Number(priced.foodAmount != null ? priced.foodAmount : priced.amount) || 0);
   const fridayGift =
     member && isShopFriday(now) && foodAmount > 0 && !fridayGiftUsed(db, userId, now)
       ? { name: '精美果切', qty: 1, note: '周五会员消费赠送' }
       : null;
   const canProcess = foodAmount + 0.001 >= 18;
-  const memberLabel = memberSave > 0 ? '充值会员称重水果9折' : '';
-  const discountLabel = [priced.discountLabel, memberSave > 0 ? `称重9折省¥${memberSave.toFixed(2)}` : '']
-    .filter(Boolean)
-    .join(' · ');
   return {
     ...priced,
-    foodAmount,
-    amount,
-    memberSave,
-    memberLabel,
-    discountAmount: round2((Number(priced.discountAmount) || 0) + memberSave),
-    discountLabel,
+    memberSave: Number(priced.loyaltySave) || 0,
+    memberLabel: priced.loyaltyLabel || '',
     fridayGift,
     canProcess,
     processNote: canProcess ? '消费满18元可加工' : '',
@@ -381,6 +361,7 @@ function calcCartAmount(lines, promoOpts = {}) {
   const unitPrice = summary.unitPrice;
   const baseUnitPrice = round2(baseAmount / Math.max(1, summary.quantity));
 
+  const products = lines.map((l) => l.product).filter(Boolean);
   let coupon = promoOpts.coupon || null;
   if (coupon) {
     const check = canUseCoupon(coupon, {
@@ -389,9 +370,12 @@ function calcCartAmount(lines, promoOpts = {}) {
       fulfillmentType,
       now: promoOpts.now || Date.now(),
       product,
+      products,
       unitPrice,
       baseUnitPrice,
       db: promoOpts.db || null,
+      userId: promoOpts.userId || null,
+      orderKind: promoOpts.orderKind || null,
     });
     if (!check.ok) throw Object.assign(new Error(check.reason), { status: 400 });
   }
@@ -438,6 +422,7 @@ function calcCartAmount(lines, promoOpts = {}) {
     cover: summary.cover,
     specId: summary.specId,
     specName: summary.specName,
+    products,
     skipQueue: summary.skipQueue,
     orderKind: summary.orderKind,
     primaryProduct: product,
@@ -477,6 +462,7 @@ async function quoteOrder(input = {}) {
     settings: db.settings,
     sideMeal,
     db,
+    userId: input.userId,
   });
 
   let coupon = null;
@@ -492,10 +478,25 @@ async function quoteOrder(input = {}) {
       fulfillmentType: fulfillment.fulfillmentType,
       now,
       product: bare.primaryProduct,
+      products: bare.products || products,
       unitPrice: bare.unitPrice,
       baseUnitPrice: bare.baseUnitPrice,
       db,
     });
+    // 会员折与券互斥：自动选更省的一方
+    if (coupon) {
+      const withCoupon = applyLoyaltyAndCoupon(bare.originalAmount, loyalty, coupon, {
+        product: bare.primaryProduct,
+        unitPrice: bare.unitPrice,
+      });
+      const withLoyalty = applyLoyaltyAndCoupon(bare.originalAmount, loyalty, null, {
+        product: bare.primaryProduct,
+        unitPrice: bare.unitPrice,
+      });
+      if ((withLoyalty.discountAmount || 0) + 1e-9 >= (withCoupon.discountAmount || 0)) {
+        coupon = null;
+      }
+    }
   }
 
   const priced = applyMemberPerks(
@@ -508,8 +509,9 @@ async function quoteOrder(input = {}) {
       settings: db.settings,
       sideMeal,
       db,
+      userId: input.userId,
     }),
-    { db, userId: input.userId, lines, now }
+    { db, userId: input.userId, now }
   );
   const availableCoupons = input.userId
     ? listAvailableForOrder(db, input.userId, {
@@ -517,8 +519,9 @@ async function quoteOrder(input = {}) {
         baseAmount: bare.baseAmount,
         fulfillmentType: fulfillment.fulfillmentType,
         now,
-        afterLoyaltyAmount: round2(bare.originalAmount - (priced.loyaltySave || 0)),
+        afterLoyaltyAmount: bare.originalAmount,
         product: bare.primaryProduct,
+        products: bare.products || products,
         unitPrice: bare.unitPrice,
         baseUnitPrice: bare.baseUnitPrice,
         db,
@@ -540,6 +543,8 @@ async function quoteOrder(input = {}) {
       shortLabel: loyalty.shortLabel,
       nextHint: loyalty.nextHint || '',
       rules: loyalty.rules || [],
+      applied: !!(priced.loyaltySave > 0),
+      exclusiveWithCoupon: true,
     },
   };
 }
@@ -568,6 +573,7 @@ async function createOrder(input = {}) {
     settings: db.settings,
     sideMeal,
     db,
+    userId: input.userId,
   });
 
   let coupon = null;
@@ -583,10 +589,24 @@ async function createOrder(input = {}) {
       fulfillmentType: fulfillment.fulfillmentType,
       now,
       product: bare.primaryProduct,
+      products: bare.products || products,
       unitPrice: bare.unitPrice,
       baseUnitPrice: bare.baseUnitPrice,
       db,
     });
+    if (coupon) {
+      const withCoupon = applyLoyaltyAndCoupon(bare.originalAmount, loyalty, coupon, {
+        product: bare.primaryProduct,
+        unitPrice: bare.unitPrice,
+      });
+      const withLoyalty = applyLoyaltyAndCoupon(bare.originalAmount, loyalty, null, {
+        product: bare.primaryProduct,
+        unitPrice: bare.unitPrice,
+      });
+      if ((withLoyalty.discountAmount || 0) + 1e-9 >= (withCoupon.discountAmount || 0)) {
+        coupon = null;
+      }
+    }
   }
 
   const priced = applyMemberPerks(
@@ -599,8 +619,9 @@ async function createOrder(input = {}) {
       settings: db.settings,
       sideMeal,
       db,
+      userId: input.userId,
     }),
-    { db, userId: input.userId, lines, now }
+    { db, userId: input.userId, now }
   );
 
   const order = {
@@ -667,8 +688,8 @@ async function createOrder(input = {}) {
   return order;
 }
 
-/** 自定义金额：散装称重。充值会员 9 折；周五会员消费赠果切；满 18 元可加工。 */
-async function createBulkOrder({ userId, openid, amount, remark }) {
+/** 自定义金额：会员折与活动券互斥；周五赠果切；满 18 可加工 */
+async function createBulkOrder({ userId, openid, amount, remark, couponId }) {
   const yuan = round2(Number(amount));
   if (!Number.isFinite(yuan) || yuan < 0.01) {
     throw Object.assign(new Error('请输入有效金额（最少 0.01 元）'), { status: 400 });
@@ -681,16 +702,65 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
   const now = Date.now();
   const delivery = normalizeDelivery('shop', db.settings);
   const note = String(remark || '').trim().slice(0, 80);
-  const priced = applyMemberPerks(
-    {
-      foodAmount: yuan,
-      amount: yuan,
-      deliveryFee: 0,
-      discountAmount: 0,
-      discountLabel: '',
+  const loyalty = resolveLoyalty(db, { userId, openid, now });
+
+  let coupon = null;
+  if (couponId) {
+    coupon = findCoupon(db, couponId, userId);
+    if (!coupon) throw Object.assign(new Error('优惠券不存在'), { status: 400 });
+    const check = canUseCoupon(coupon, {
       originalAmount: yuan,
-    },
-    { db, userId, lines: [], now, weighedAmount: yuan }
+      fulfillmentType: 'now',
+      now,
+      product: { id: 'bulk', name: '自定义金额', category: '' },
+      db,
+      userId,
+      orderKind: 'bulk',
+    });
+    if (!check.ok) throw Object.assign(new Error(check.reason), { status: 400 });
+  }
+
+  let priced = applyLoyaltyAndCoupon(yuan, loyalty, coupon, {
+    product: { id: 'bulk' },
+    unitPrice: yuan,
+  });
+  // 未指定券时：自动选更省的活动券（与 quote 一致）
+  if (couponId == null && userId) {
+    const bare = applyLoyaltyAndCoupon(yuan, loyalty, null, {
+      product: { id: 'bulk' },
+      unitPrice: yuan,
+    });
+    const available = listAvailableForOrder(db, userId, {
+      originalAmount: yuan,
+      fulfillmentType: 'now',
+      now,
+      product: { id: 'bulk', name: '自定义金额', category: '' },
+      unitPrice: yuan,
+      orderKind: 'bulk',
+      afterLoyaltyAmount: bare.amount,
+    });
+    let best = null;
+    let bestSave = bare.discountAmount || 0;
+    for (const row of available) {
+      if (!row.available) continue;
+      const c = findCoupon(db, row.id, userId);
+      if (!c) continue;
+      const withC = applyLoyaltyAndCoupon(yuan, loyalty, c, {
+        product: { id: 'bulk' },
+        unitPrice: yuan,
+      });
+      if ((withC.discountAmount || 0) > bestSave + 1e-9) {
+        bestSave = withC.discountAmount || 0;
+        best = withC;
+      }
+    }
+    if (best) priced = best;
+    else priced = bare;
+  }
+
+  priced = applyMemberPerks(
+    { ...priced, foodAmount: priced.amount, deliveryFee: 0 },
+    { db, userId, now }
   );
 
   const order = {
@@ -707,23 +777,23 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
     extras: [],
     quantity: 1,
     unitPrice: yuan,
-    originalAmount: yuan,
-    foodAmount: priced.foodAmount,
+    originalAmount: priced.originalAmount != null ? priced.originalAmount : yuan,
+    foodAmount: priced.amount,
     amount: priced.amount,
     deliveryFee: 0,
     deliveryPoint: delivery.deliveryPoint,
     deliveryPointName: delivery.deliveryPointName,
     discountAmount: priced.discountAmount || 0,
-    discountRate: priced.memberSave > 0 ? 0.9 : 1,
-    discountCode: priced.memberSave > 0 ? 'member_weigh_9' : null,
+    discountRate: priced.discountRate || 0,
+    discountCode: priced.discountCode || null,
     discountLabel: priced.discountLabel || '',
-    couponId: null,
-    couponSave: 0,
-    loyaltyRate: 0,
-    loyaltySave: 0,
-    loyaltyLabel: '',
-    loyaltyTier: 0,
-    monthOrderCount: 0,
+    couponId: priced.couponId || null,
+    couponSave: priced.couponSave || 0,
+    loyaltyRate: priced.loyaltyRate || 0,
+    loyaltySave: priced.loyaltySave || 0,
+    loyaltyLabel: priced.loyaltyLabel || '',
+    loyaltyTier: priced.loyaltyTier || 0,
+    monthOrderCount: priced.monthOrderCount || 0,
     memberSave: priced.memberSave || 0,
     memberLabel: priced.memberLabel || '',
     fridayGift: priced.fridayGift || null,
@@ -743,9 +813,80 @@ async function createBulkOrder({ userId, openid, amount, remark }) {
     updatedAt: now,
   };
 
+  if (priced.couponId) {
+    consumeCoupon(db, priced.couponId, order.id, userId);
+  }
+
   db.orders.unshift(order);
   await save(db);
   return order;
+}
+
+/** 自定义金额报价：列出可用活动券 */
+async function quoteBulkOrder({ userId, amount }) {
+  const yuan = round2(Number(amount));
+  if (!Number.isFinite(yuan) || yuan < 0.01) {
+    throw Object.assign(new Error('请输入有效金额'), { status: 400 });
+  }
+  const db = await load();
+  const now = Date.now();
+  const loyalty = resolveLoyalty(db, { userId, openid: null, now });
+  const bare = applyLoyaltyAndCoupon(yuan, loyalty, null, {
+    product: { id: 'bulk' },
+    unitPrice: yuan,
+  });
+  const availableCoupons = userId
+    ? listAvailableForOrder(db, userId, {
+        originalAmount: yuan,
+        fulfillmentType: 'now',
+        now,
+        product: { id: 'bulk', name: '自定义金额', category: '' },
+        unitPrice: yuan,
+        orderKind: 'bulk',
+        afterLoyaltyAmount: bare.amount,
+      })
+    : [];
+  const bulkOk = [];
+  for (const row of availableCoupons) {
+    if (!row.available) continue;
+    const c = findCoupon(db, row.id, userId);
+    if (!c) continue;
+    const priced = applyLoyaltyAndCoupon(yuan, loyalty, c, {
+      product: { id: 'bulk' },
+      unitPrice: yuan,
+    });
+    if (!(priced.couponSave > 0)) continue;
+    bulkOk.push({
+      ...row,
+      available: true,
+      save: priced.couponSave,
+      payAmount: priced.amount,
+      loyaltySave: 0,
+      note: loyalty.rate > 0 ? '用券则不享受会员折' : '',
+    });
+  }
+  bulkOk.sort((a, b) => Number(b.save) - Number(a.save));
+  // 默认：会员折与券比更省的一方
+  let withBest = bare;
+  const best = bulkOk[0] || null;
+  if (best) {
+    const withCoupon = applyLoyaltyAndCoupon(yuan, loyalty, findCoupon(db, best.id, userId), {
+      product: { id: 'bulk' },
+      unitPrice: yuan,
+    });
+    if ((withCoupon.discountAmount || 0) > (bare.discountAmount || 0) + 1e-9) {
+      withBest = withCoupon;
+    }
+  }
+  return {
+    originalAmount: yuan,
+    amount: withBest.amount,
+    couponSave: withBest.couponSave || 0,
+    loyaltySave: withBest.loyaltySave || 0,
+    loyaltyLabel: withBest.loyaltyLabel || '',
+    selectedCouponId: withBest.couponId || null,
+    availableCoupons: bulkOk,
+  };
 }
 
 async function markPaid(orderId, { transactionId, payMode, payChannel, balancePaid } = {}) {
@@ -982,6 +1123,7 @@ function getQueueInfo(order, db) {
 module.exports = {
   createOrder,
   createBulkOrder,
+  quoteBulkOrder, // eslint-friendly
   quoteOrder,
   markPaid,
   cancelPendingOrder,

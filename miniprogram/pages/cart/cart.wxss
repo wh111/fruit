@@ -36,3 +36,29 @@
 }
 .total { flex: 1; }
 .pay { flex: 0 0 240rpx; text-align: center; }
+.price-wrap {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6rpx 8rpx;
+}
+.price-origin {
+  color: #9a9a9a;
+  font-size: 22rpx;
+  text-decoration: line-through;
+  font-weight: 400;
+}
+.price-tag {
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  background: #fff3df;
+  color: #c47a12;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+.est-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}

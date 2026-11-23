@@ -28,6 +28,7 @@ const { printReceipt } = require('./receiptPrint');
 const {
   createOrder,
   createBulkOrder,
+  quoteBulkOrder,
   quoteOrder,
   markPaid,
   orderQrDataUrl,
@@ -51,11 +52,19 @@ const { bindPhoneForUser, publicUser } = require('./services/phone');
 const {
   grantLoginCoupons,
   grantManualCoupons,
+  grantFruitRetailOffToUsers,
+  grantCanePromoToUsers,
+  claimPromoCoupon,
+  getPromoPopupPublic,
   listUserCoupons,
   campaignInfo,
   ensureCoupons,
   getOff15_3ScopePublic,
   updateOff15_3Scope,
+  getFruitRetailOffPublic,
+  updateFruitRetailOff,
+  getCanePromoPublic,
+  updateCanePromo,
 } = require('./services/coupon');
 const {
   ensureLottery,
@@ -71,7 +80,22 @@ const {
   resolveToppingItems,
   isFruitBowlOrder,
 } = require('./services/toppings');
-const { getLoyaltyState } = require('./services/loyalty');
+const {
+  getLoyaltyState,
+  getMemberDiscountPublic,
+  updateMemberDiscount,
+} = require('./services/loyalty');
+const {
+  listActivities,
+  getWeeklyActivitiesAdmin,
+  updateWeeklyActivities,
+  archiveWeeklyActivities,
+} = require('./services/activities');
+const {
+  getConfig: getHomePosterConfig,
+  publicConfig: publicHomePoster,
+  updateConfig: updateHomePoster,
+} = require('./services/homePoster');
 const {
   touchLogin,
   listUsersWithActivity,
@@ -406,6 +430,60 @@ async function handleApi(req, res, pathname) {
     return send(res, 200, campaignInfo());
   }
 
+  if (pathname === '/api/activities' && method === 'GET') {
+    const user = auth(req);
+    const db = await load();
+    return send(res, 200, listActivities(db, user && user.userId));
+  }
+
+  if (pathname === '/api/admin/weekly-activities' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, getWeeklyActivitiesAdmin(db));
+  }
+
+  if (pathname === '/api/admin/weekly-activities' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const cfg = updateWeeklyActivities(db, body || {});
+      await save(db);
+      return send(res, 200, cfg);
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/weekly-activities/archive' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const cfg = archiveWeeklyActivities(db, body || {});
+      await save(db);
+      return send(res, 200, cfg);
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '归档失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/member-discount' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, getMemberDiscountPublic(db));
+  }
+
+  if (pathname === '/api/admin/member-discount' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const cfg = updateMemberDiscount(db, body || {});
+      await save(db);
+      return send(res, 200, cfg);
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
   if (pathname === '/api/lottery' && method === 'GET') {
     const db = await load();
     ensureLottery(db);
@@ -456,6 +534,7 @@ async function handleApi(req, res, pathname) {
     const user = auth(req);
     const db = await load();
     const state = getPromoState(Date.now(), db);
+    const memberDiscount = getMemberDiscountPublic(db);
     if (user?.userId) {
       state.loyalty = getLoyaltyState(db, {
         userId: user.userId,
@@ -463,22 +542,37 @@ async function handleApi(req, res, pathname) {
         includeCurrent: false,
       });
     } else {
-      state.loyalty = {
-        monthPaid: 0,
-        monthCount: 0,
-        tier: 0,
-        rate: 0,
-        label: '',
-        nextHint: '',
-        enabled: false,
-        rules: [],
-      };
+      state.loyalty = getLoyaltyState(db, {
+        userId: null,
+        openid: null,
+        includeCurrent: false,
+      });
     }
     return send(res, 200, {
       ...state,
+      memberDiscount,
       deliveryPoints: listDeliveryPoints(db.settings),
       deliveryScopeNote: getDeliveryScopeNote(db.settings),
+      homePoster: publicHomePoster(db),
     });
+  }
+
+  if (pathname === '/api/admin/home-poster' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, { poster: getHomePosterConfig(db) });
+  }
+
+  if (pathname === '/api/admin/home-poster' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const poster = updateHomePoster(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, poster });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
   }
 
   if (pathname === '/api/wallet/mine' && method === 'GET') {
@@ -606,6 +700,20 @@ async function handleApi(req, res, pathname) {
     }
   }
 
+  if (pathname === '/api/orders/bulk/quote' && method === 'POST') {
+    const user = auth(req);
+    if (!user?.userId) return send(res, 401, { error: '请先登录' });
+    try {
+      const quote = await quoteBulkOrder({
+        userId: user.userId,
+        amount: body.amount,
+      });
+      return send(res, 200, quote);
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message });
+    }
+  }
+
   if (pathname === '/api/orders/bulk' && method === 'POST') {
     const user = auth(req);
     try {
@@ -614,10 +722,54 @@ async function handleApi(req, res, pathname) {
         openid: user?.openid,
         amount: body.amount,
         remark: body.remark,
+        couponId: body.couponId,
       });
       return send(res, 200, { order });
     } catch (e) {
       return send(res, e.status || 500, { error: e.message });
+    }
+  }
+
+  if (pathname === '/api/coupons/promo-popup' && method === 'GET') {
+    const u = auth(req);
+    const db = await load();
+    return send(res, 200, getPromoPopupPublic(db, u?.userId || null));
+  }
+
+  if (pathname === '/api/coupons/promo-claim' && method === 'POST') {
+    const u = auth(req);
+    if (!u?.userId) return send(res, 401, { error: '请先登录' });
+    try {
+      const db = await load();
+      const user = db.users.find((x) => x.id === u.userId);
+      if (!user) return send(res, 401, { error: '用户不存在' });
+      const result = claimPromoCoupon(db, user, body.pack);
+      await save(db);
+      const coupon = result.coupons && result.coupons[0];
+      return send(res, 200, {
+        ok: true,
+        pack: result.pack,
+        freeSlot: !!result.freeSlot,
+        threshold: result.threshold,
+        freeLeft: result.freeLeft,
+        coupon: coupon
+          ? {
+              id: coupon.id,
+              title: coupon.title,
+              amount: coupon.amount,
+              threshold: coupon.threshold,
+            }
+          : null,
+        popup: getPromoPopupPublic(db, user.id),
+        note:
+          result.threshold === 0
+            ? result.vip || (result.freeSlot && result.alreadyFree)
+              ? '已领取（会员/无门槛）'
+              : '已领取（今日前 20 名无门槛）'
+            : `已领取（满 ¥${result.threshold} 可用，含自定义结账）`,
+      });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '领取失败' });
     }
   }
 
@@ -1356,6 +1508,75 @@ async function handleApi(req, res, pathname) {
     }
   }
 
+  if (pathname === '/api/admin/coupons/fruit-retail-off' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, getFruitRetailOffPublic(db));
+  }
+
+  if (pathname === '/api/admin/coupons/fruit-retail-off' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const cfg = updateFruitRetailOff(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, ...cfg });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/coupons/cane-promo' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, getCanePromoPublic(db));
+  }
+
+  if (pathname === '/api/admin/coupons/cane-promo' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const cfg = updateCanePromo(db, body || {});
+      await save(db);
+      return send(res, 200, { ok: true, ...cfg });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/coupons/cane-promo/grant-all' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const result = grantCanePromoToUsers(db, db.users || []);
+      await save(db);
+      return send(res, 200, {
+        ok: true,
+        ...result,
+        note: '已给尚未领过的用户补发；已领过的跳过。用户打开小程序「我的优惠券」可见。',
+      });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '补发失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/coupons/fruit-retail-off/grant-all' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      ensureCoupons(db);
+      const result = grantFruitRetailOffToUsers(db, db.users || []);
+      await save(db);
+      return send(res, 200, {
+        ok: true,
+        ...result,
+        note: '已给尚未领过的用户补发；已领过的跳过。用户打开小程序「我的优惠券」可见，无需小程序发版。',
+      });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '补发失败' });
+    }
+  }
+
   if (pathname === '/api/admin/coupons/grant' && method === 'POST') {
     if (!requireAdmin(req, res)) return;
     try {
@@ -1380,6 +1601,7 @@ async function handleApi(req, res, pathname) {
         fulfillment: body.fulfillment,
         count: body.count,
         allowedProductIds: body.allowedProductIds,
+        matchCategory: body.matchCategory,
       });
       await save(db);
       return send(res, 200, {
@@ -1455,7 +1677,23 @@ async function handleApi(req, res, pathname) {
     const status = url.searchParams.get('status');
     let list = db.orders;
     if (status) list = list.filter((o) => o.status === status);
-    return send(res, 200, { list: list.slice(0, 200) });
+    const usersById = new Map((db.users || []).map((u) => [u.id, u]));
+    const usersByOpenid = new Map(
+      (db.users || []).filter((u) => u && u.openid).map((u) => [u.openid, u])
+    );
+    const enriched = list.slice(0, 200).map((o) => {
+      const u =
+        (o.userId && usersById.get(o.userId)) ||
+        (o.openid && usersByOpenid.get(o.openid)) ||
+        null;
+      const phone = String((u && u.phone) || o.contactPhone || o.phone || '').trim();
+      return {
+        ...o,
+        userPhone: phone || '',
+        userNickName: (u && (u.nickName || u.nickname)) || '',
+      };
+    });
+    return send(res, 200, { list: enriched });
   }
 
   if (pathname === '/api/admin/products' && method === 'GET') {
@@ -1579,6 +1817,41 @@ async function handleApi(req, res, pathname) {
     });
   }
 
+  if (pathname === '/api/admin/products/batch-delete' && method === 'POST') {
+    if (!requireAdmin(req, res)) return;
+    const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id || '').trim()).filter(Boolean) : [];
+    if (!ids.length) return send(res, 400, { error: '请先勾选商品' });
+    const db = await load();
+    if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+    const idSet = new Set(ids);
+    const knownCuts = new Set(db.settings.knownCutProductIds || []);
+    const knownRetail = new Set(db.settings.knownRetailPeeledIds || []);
+    let count = 0;
+    db.products = (db.products || []).filter((p) => {
+      if (!p || !idSet.has(p.id)) return true;
+      const id = String(p.id || '');
+      if (id.startsWith('cut-')) knownCuts.add(id);
+      if (id.startsWith('retail-peeled-')) knownRetail.add(id);
+      count += 1;
+      return false;
+    });
+    db.settings.knownCutProductIds = [...knownCuts];
+    db.settings.knownRetailPeeledIds = [...knownRetail];
+    const orderMap = db.settings.productOrder || {};
+    for (const cat of Object.keys(orderMap)) {
+      if (!Array.isArray(orderMap[cat])) continue;
+      orderMap[cat] = orderMap[cat].filter((x) => !idSet.has(x));
+    }
+    await save(db);
+    const { listAdminProducts, getProductOrderMap } = require('./services/products');
+    return send(res, 200, {
+      ok: true,
+      count,
+      list: listAdminProducts(db),
+      productOrder: getProductOrderMap(db),
+    });
+  }
+
   const adminProduct = pathname.match(/^\/api\/admin\/products\/([^/]+)$/);
   if (adminProduct) {
     if (!requireAdmin(req, res)) return;
@@ -1599,9 +1872,29 @@ async function handleApi(req, res, pathname) {
       return send(res, 200, { product: db.products[idx] });
     }
     if (method === 'DELETE') {
-      db.products[idx].status = 0;
+      const removed = db.products[idx];
+      const id = String(removed.id || '');
+      db.products.splice(idx, 1);
+      // 记入 known，避免 ensure 菜单把稳定 SKU 再自动加回
+      if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+      if (id.startsWith('cut-')) {
+        const known = new Set(db.settings.knownCutProductIds || []);
+        known.add(id);
+        db.settings.knownCutProductIds = [...known];
+      }
+      if (id.startsWith('retail-peeled-')) {
+        const known = new Set(db.settings.knownRetailPeeledIds || []);
+        known.add(id);
+        db.settings.knownRetailPeeledIds = [...known];
+      }
+      // 从分类手动顺序里去掉
+      const orderMap = db.settings.productOrder || {};
+      for (const cat of Object.keys(orderMap)) {
+        if (!Array.isArray(orderMap[cat])) continue;
+        orderMap[cat] = orderMap[cat].filter((x) => x !== id);
+      }
       await save(db);
-      return send(res, 200, { ok: true });
+      return send(res, 200, { ok: true, deleted: true, id });
     }
   }
 
@@ -1637,9 +1930,18 @@ async function handleApi(req, res, pathname) {
     const order = db.orders.find((o) => o.id === labelMatch[1]);
     if (!order) return send(res, 404, { error: '订单不存在' });
     if (!order.pickupCode) return send(res, 400, { error: '订单尚未支付，无取餐码' });
-    const qrDataUrl = await orderQrDataUrl(order);
-    const html = buildLabelHtml({ order, qrDataUrl, shopName: db.settings.shopName });
-    return send(res, 200, { order, qrDataUrl, html, shopName: db.settings.shopName });
+    const u =
+      (order.userId && (db.users || []).find((x) => x.id === order.userId)) ||
+      (order.openid && (db.users || []).find((x) => x.openid === order.openid)) ||
+      null;
+    const enriched = {
+      ...order,
+      userPhone: String((u && u.phone) || order.contactPhone || order.phone || '').trim(),
+      userNickName: (u && (u.nickName || u.nickname)) || '',
+    };
+    const qrDataUrl = await orderQrDataUrl(enriched);
+    const html = buildLabelHtml({ order: enriched, qrDataUrl, shopName: db.settings.shopName });
+    return send(res, 200, { order: enriched, qrDataUrl, html, shopName: db.settings.shopName });
   }
 
   if (pathname === '/api/admin/print/usb' && method === 'POST') {

@@ -8,7 +8,11 @@
         <view class="name">{{item.productName}}</view>
         <view class="muted">{{item.specName}}<text wx:if="{{item.toppingText}}"> · {{item.toppingText}}</text></view>
         <view class="bottom">
-          <text class="price">¥{{item.unitPrice}}</text>
+          <view class="price-wrap">
+            <text class="price">¥{{item.displayUnit}}</text>
+            <text class="price-origin" wx:if="{{item.showStrike}}">¥{{item.originUnit}}</text>
+            <text class="price-tag" wx:if="{{item.priceTag}}">{{item.priceTag}}</text>
+          </view>
           <view class="qty">
             <view class="qbtn" data-index="{{index}}" bindtap="dec">-</view>
             <text>{{item.quantity}}</text>
@@ -23,7 +27,10 @@
   <view class="footer" wx:if="{{items.length}}">
     <view class="total">
       <view class="muted">共 {{count}} 件</view>
-      <view>预估 <text class="price">¥{{estimate}}</text></view>
+      <view class="est-row">
+        预估 <text class="price">¥{{estimate}}</text>
+        <text class="price-origin" wx:if="{{showStrike}}">¥{{originEstimate}}</text>
+      </view>
     </view>
     <view class="btn-primary pay" bindtap="goCheckout">去结算</view>
   </view>

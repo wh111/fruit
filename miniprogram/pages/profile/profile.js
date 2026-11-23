@@ -50,6 +50,10 @@ Page({
     wx.navigateTo({ url: '/pages/lottery/lottery' });
   },
 
+  goActivities() {
+    wx.switchTab({ url: '/pages/activities/activities' });
+  },
+
   goCoupons() {
     wx.navigateTo({ url: '/pages/coupons/coupons' });
   },

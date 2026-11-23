@@ -226,9 +226,9 @@ function getPromoState(now = Date.now(), db = null) {
   if (lunchOpen) banners.push('11 点前可预定 11:40 或 12:00 取餐');
   if (eveningOpen) banners.push('5 点前可预定 17:40 或 18:00 取餐');
   if (!lunchOpen && !eveningOpen) {
-    banners.push('今日预定批次已结束，可现作现取');
+    banners.push('今天的提前取餐时段已约满，现在下单可到店现取');
   }
-  let reserveDesc = '今日预定已结束';
+  let reserveDesc = '今天的提前取餐时段已约满';
   if (lunchOpen && eveningOpen) {
     reserveDesc = '可选 11:40 / 12:00 / 17:40 / 18:00（照顾下班早晚）';
   } else if (lunchOpen) {

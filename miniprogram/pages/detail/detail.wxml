@@ -3,18 +3,21 @@
   <view class="card main">
     <view class="name">{{product.name}}</view>
     <view class="muted">{{product.desc}}</view>
-    <view class="price">¥{{unitPrice}}</view>
+    <view class="price-row">
+      <text class="price">¥{{unitPrice}}</text>
+      <text class="price-origin" wx:if="{{showStrike}}">¥{{originUnitPrice}}</text>
+      <text class="price-tag" wx:if="{{priceTag}}">{{priceTag}}</text>
+    </view>
+    <view class="price-tip muted" wx:if="{{priceTip}}">{{priceTip}}已计入上方价格</view>
   </view>
 
   <view class="card" wx:if="{{isRetail}}">
     <view class="muted">成品现取，不参与预定。</view>
   </view>
 
-  <view class="card promo-card" wx:elif="{{promoHint || loyaltyHint}}">
-    <view class="promo-title">优惠说明</view>
-    <view class="promo-line" wx:if="{{loyaltyHint}}">{{loyaltyHint}}</view>
-    <view class="muted" wx:if="{{promoHint}}">{{promoHint}}</view>
-    <view class="muted">现切现做，取餐前约 40 分钟。</view>
+  <view class="card promo-card" wx:elif="{{loyaltyHint}}">
+    <view class="promo-title">会员优惠</view>
+    <view class="promo-line">{{loyaltyHint}}</view>
   </view>
 
   <view class="card">
@@ -22,11 +25,15 @@
     <view class="chips">
       <view
         class="chip {{specId === item.id ? 'on' : ''}}"
-        wx:for="{{product.specs}}"
+        wx:for="{{specViews}}"
         wx:key="id"
         data-id="{{item.id}}"
         bindtap="onSpec"
-      >{{item.name}} ¥{{item.price}}</view>
+      >
+        <text>{{item.name}}</text>
+        <text class="chip-price">¥{{item.displayPrice}}</text>
+        <text class="chip-origin" wx:if="{{item.showStrike}}">¥{{item.originPrice}}</text>
+      </view>
     </view>
   </view>
 
@@ -66,7 +73,7 @@
         wx:key="id"
         data-id="{{item.id}}"
         bindtap="onTopping"
-      >{{item.name}} +¥{{item.price}}</view>
+      >{{item.name}} <text wx:if="{{item.price > 0}}">+¥{{item.price}}</text><text wx:else>免费</text></view>
     </view>
   </view>
 
@@ -81,8 +88,11 @@
 
   <view class="footer dual">
     <view class="total">
-      <view class="muted" style="font-size:22rpx">单价</view>
-      <view class="price">¥{{unitPrice}}</view>
+      <view class="muted" style="font-size:22rpx">{{priceTag || '单价'}}</view>
+      <view class="price-row compact">
+        <text class="price">¥{{unitPrice}}</text>
+        <text class="price-origin" wx:if="{{showStrike}}">¥{{originUnitPrice}}</text>
+      </view>
     </view>
     <view class="btn-ghost" bindtap="addCart">加入购物车</view>
     <view class="btn-primary pay" bindtap="buyNow">立即购买</view>

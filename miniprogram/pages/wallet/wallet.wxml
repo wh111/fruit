@@ -9,8 +9,8 @@
   </view>
 
   <view class="card" wx:elif="{{tiers.length}}">
-    <view class="title">选择充值档位</view>
-    <view class="muted tip">实付档位金额，到账本金+赠金；点餐时可用余额整单支付</view>
+    <view class="title">充值有礼</view>
+    <view class="muted tip">实付档位金额，到账本金+赠金；提前订更优惠，点餐可用余额整单支付</view>
     <view
       class="tier {{tierId === item.id ? 'on' : ''}}"
       wx:for="{{tiers}}"

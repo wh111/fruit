@@ -41,6 +41,7 @@ const {
   getReserveCategories,
   setReserveCategories,
   ALL_PRODUCT_CATEGORIES,
+  getShopOpenState,
 } = require('./services/promo');
 const {
   listDeliveryPoints,
@@ -65,6 +66,9 @@ const {
   updateFruitRetailOff,
   getCanePromoPublic,
   updateCanePromo,
+  getPromoDailyFreeLimit,
+  getPromoDailyFreeLimitPublic,
+  updatePromoDailyFreeLimit,
 } = require('./services/coupon');
 const {
   ensureLottery,
@@ -297,6 +301,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === '/api/shop' && method === 'GET') {
     const db = await load();
     const s = db.settings || {};
+    const shopOpen = getShopOpenState(s);
     return send(res, 200, {
       shopName: s.shopName || '四季果先',
       shopPhone: s.shopPhone || '15701511086',
@@ -305,6 +310,13 @@ async function handleApi(req, res, pathname) {
       groupBuyHint:
         s.groupBuyHint ||
         '企业团购、部门下午茶、会议用果，电话沟通即可。10 份起订。',
+      businessHours: {
+        open: shopOpen.open,
+        close: shopOpen.close,
+        label: shopOpen.label,
+        enabled: shopOpen.enabled,
+      },
+      shopOpen,
     });
   }
 
@@ -765,7 +777,7 @@ async function handleApi(req, res, pathname) {
           result.threshold === 0
             ? result.vip || (result.freeSlot && result.alreadyFree)
               ? '已领取（会员/无门槛）'
-              : '已领取（今日前 20 名无门槛）'
+              : `已领取（今日前 ${result.dailyFreeLimit ?? getPromoDailyFreeLimit(db)} 名无门槛）`
             : `已领取（满 ¥${result.threshold} 可用，含自定义结账）`,
       });
     } catch (e) {
@@ -1164,11 +1176,15 @@ async function handleApi(req, res, pathname) {
         order.openid = openid;
         await save(db);
       }
+      const itemCount = Array.isArray(order.items) && order.items.length > 1 ? order.items.length : 0;
+      const payDesc = itemCount
+        ? `四季果先-拼单${itemCount}件`
+        : `四季果先-${order.productName || '果切'}`;
       const { payment, prepayId, mode: mchMode } = await wechat.createJsapiPrepay({
         orderNo: order.orderNo,
         amountYuan: order.amount,
         openid,
-        description: `四季果先-${order.productName}`,
+        description: payDesc,
         clientIp: clientIp.replace('::ffff:', ''),
       });
       order.prepayId = prepayId;
@@ -1503,6 +1519,24 @@ async function handleApi(req, res, pathname) {
       const scope = updateOff15_3Scope(db, body || {});
       await save(db);
       return send(res, 200, { ok: true, ...scope });
+    } catch (e) {
+      return send(res, e.status || 400, { error: e.message || '保存失败' });
+    }
+  }
+
+  if (pathname === '/api/admin/coupons/promo-daily-free-limit' && method === 'GET') {
+    if (!requireAdmin(req, res)) return;
+    const db = await load();
+    return send(res, 200, getPromoDailyFreeLimitPublic(db));
+  }
+
+  if (pathname === '/api/admin/coupons/promo-daily-free-limit' && method === 'PUT') {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const db = await load();
+      const cfg = updatePromoDailyFreeLimit(db, body?.dailyFreeLimit ?? body?.limit);
+      await save(db);
+      return send(res, 200, { ok: true, ...cfg });
     } catch (e) {
       return send(res, e.status || 400, { error: e.message || '保存失败' });
     }

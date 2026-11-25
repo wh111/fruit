@@ -8,6 +8,9 @@
 const TZ = '+08:00';
 const LUNCH_ORDER_BEFORE = 11 * 60;
 const EVENING_ORDER_BEFORE = 17 * 60;
+/** 默认营业：09:30–20:00（到点闭店，20:00 起不可下单） */
+const DEFAULT_OPEN_MINUTES = 9 * 60 + 30;
+const DEFAULT_CLOSE_MINUTES = 20 * 60;
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -62,6 +65,70 @@ function todayKey(ms = Date.now()) {
 function formatHm(ms) {
   const p = shopParts(ms);
   return `${pad(p.hour)}:${pad(p.minute)}`;
+}
+
+function minutesToHm(mins) {
+  const m = Math.max(0, Math.min(24 * 60, Number(mins) || 0));
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+}
+
+function parseHmToMinutes(text, fallback) {
+  const s = String(text || '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return fallback;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h < 0 || h > 23 || min < 0 || min > 59) {
+    return fallback;
+  }
+  return h * 60 + min;
+}
+
+/** settings.businessHours：open/close 为 HH:mm；enabled 默认 true */
+function getBusinessHours(settings) {
+  const raw = settings && settings.businessHours;
+  const enabled = raw && raw.enabled === false ? false : true;
+  const openMinutes = parseHmToMinutes(raw && raw.open, DEFAULT_OPEN_MINUTES);
+  let closeMinutes = parseHmToMinutes(raw && raw.close, DEFAULT_CLOSE_MINUTES);
+  if (closeMinutes <= openMinutes) closeMinutes = DEFAULT_CLOSE_MINUTES;
+  const open = minutesToHm(openMinutes);
+  const close = minutesToHm(closeMinutes);
+  return {
+    enabled,
+    open,
+    close,
+    openMinutes,
+    closeMinutes,
+    label: `${open}–${close}`,
+  };
+}
+
+function getShopOpenState(settings, now = Date.now()) {
+  const hours = getBusinessHours(settings);
+  if (!hours.enabled) {
+    return {
+      ...hours,
+      isOpen: true,
+      closedMessage: '',
+    };
+  }
+  const n = shopParts(now);
+  const isOpen = n.minutes >= hours.openMinutes && n.minutes < hours.closeMinutes;
+  return {
+    ...hours,
+    isOpen,
+    closedMessage: isOpen
+      ? ''
+      : `门店营业时间 ${hours.label}，当前暂停下单`,
+  };
+}
+
+function assertShopOpen(settings, now = Date.now()) {
+  const st = getShopOpenState(settings, now);
+  if (!st.isOpen) {
+    throw Object.assign(new Error(st.closedMessage), { status: 403, code: 'SHOP_CLOSED' });
+  }
+  return st;
 }
 
 function formatPickupLabel(ms) {
@@ -237,6 +304,10 @@ function getPromoState(now = Date.now(), db = null) {
     reserveDesc = '5 点前预定，可选 17:40 或 18:00 取餐';
   }
   const reserveCategories = getReserveCategories(db);
+  const shopOpen = getShopOpenState(db && db.settings, now);
+  if (!shopOpen.isOpen) {
+    banners.unshift(shopOpen.closedMessage);
+  }
   return {
     now,
     lunchOpen,
@@ -247,7 +318,9 @@ function getPromoState(now = Date.now(), db = null) {
     hint: banners.join('；'),
     reserveDesc,
     reserveCategories,
+    shopOpen,
     rules: [
+      `营业时间 ${shopOpen.label}，非营业时间暂停下单`,
       '11:00 前可预定：11:40（偏早）或 12:00（偏晚）取餐',
       '17:00 前可预定：17:40（偏早）或 18:00（偏晚）取餐',
       '优惠请使用优惠券；预定可用预定立减券',
@@ -288,6 +361,9 @@ module.exports = {
   formatHm,
   formatPickupLabel,
   parsePickupAt,
+  getBusinessHours,
+  getShopOpenState,
+  assertShopOpen,
   discountInfo,
   applyDiscount,
   buildSlots,

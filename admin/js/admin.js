@@ -266,6 +266,17 @@ function amountNote(o) {
   return `¥${o.amount}`;
 }
 
+function contactNote(o) {
+  const phone = String(o.userPhone || o.contactPhone || o.phone || '').trim();
+  const nick = String(o.userNickName || '').trim();
+  if (!phone && !nick) return '';
+  if (phone) {
+    const nickBit = nick ? `${escapeHtml(nick)} · ` : '';
+    return `${nickBit}<a class="phone-link" href="tel:${escapeAttr(phone)}">${escapeHtml(phone)}</a>`;
+  }
+  return escapeHtml(nick);
+}
+
 function sortDeskOrders(list) {
   return [...list].sort((a, b) => {
     const ar = a.fulfillmentType === 'reserve' && a.status === 'paid' ? 1 : 0;
@@ -305,6 +316,7 @@ async function loadStats() {
               : '';
           const handoff =
             o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐';
+          const contact = contactNote(o);
           return `
       <div class="order-card ${o.id === newest ? 'new' : ''}">
         <label class="pick"><input type="checkbox" class="order-check" value="${o.id}" data-code="${o.pickupCode || ''}" ${kept.has(o.id) ? 'checked' : ''} /></label>
@@ -312,6 +324,7 @@ async function loadStats() {
         <div class="order-main">
           ${orderGoodsHtml(o)}
           <div class="muted">${STATUS_TEXT[o.status]} · ${fulfillmentNote(o)} · ${amountNote(o)}${o.printed ? ' · 已打标' : ''}</div>
+          ${contact ? `<div class="order-contact">联系 ${contact}</div>` : '<div class="order-contact muted">未绑定手机号</div>'}
           ${batchNote}
         </div>
         <div class="actions">
@@ -325,19 +338,21 @@ async function loadStats() {
     : '<p class="muted">暂无待制作订单</p>';
   const waitHtml = waiting.length
     ? `<h3 class="pickup-head">取餐中</h3><p class="muted">报码对上就递出，不用再点完成。两小时后自动记为已取餐。</p>${waiting
-        .map(
-          (o) => `
+        .map((o) => {
+          const contact = contactNote(o);
+          return `
       <div class="order-card waiting">
         <div class="pickup">${o.pickupCode || '--'}</div>
         <div class="order-main">
           ${orderGoodsHtml(o)}
           <div class="muted">${o.deliveryPoint && o.deliveryPoint !== 'shop' ? '已放入柜' : '请取餐'} · ${fulfillmentNote(o)}</div>
+          ${contact ? `<div class="order-contact">联系 ${contact}</div>` : '<div class="order-contact muted">未绑定手机号</div>'}
         </div>
         <div class="actions">
           <button type="button" class="btn sm green" onclick="printReceipt('${o.id}')">打印小票</button>
         </div>
-      </div>`
-        )
+      </div>`;
+        })
         .join('')}`
     : '';
   $('#pendingList').innerHTML = workHtml + waitHtml;
@@ -402,6 +417,7 @@ async function loadOrders() {
     .map((o) => {
       const t = new Date(o.paidAt || o.createdAt);
       const ts = `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+      const contact = contactNote(o);
       return `<div class="list-card">
         <div class="row-top">
           <div class="code">${o.pickupCode || '-'}</div>
@@ -409,6 +425,7 @@ async function loadOrders() {
         </div>
         ${orderGoodsHtml(o)}
         <div class="meta">${fulfillmentNote(o)} · ${amountNote(o)} · ${ts}${o.printed ? ' · 已打标' : ''}</div>
+        <div class="meta">${contact ? `联系 ${contact}` : '<span class="muted">未绑定手机号</span>'}</div>
         <div class="actions">
           ${o.pickupCode ? `<button type="button" class="btn sm green" onclick="printReceipt('${o.id}')">打印小票</button>` : ''}
           ${['paid', 'making'].includes(o.status) ? `<button type="button" class="btn sm primary" onclick="setStatus('${o.id}','ready')">${
@@ -1522,6 +1539,7 @@ async function loadWeeklyActivities() {
       data.suggested ? `${data.suggested.startDate}～${data.suggested.endDate}` : '-'
     }`;
   }
+  await loadPromoDailyFreeLimit().catch(() => {});
 }
 
 async function saveWeeklyActivities() {
@@ -1592,6 +1610,36 @@ async function saveMemberDiscount() {
     if ($('#memberDiscountHint')) $('#memberDiscountHint').textContent = cfg.hint || '';
     if ($('#memberDiscountLabel')) $('#memberDiscountLabel').value = cfg.label || '';
     toast(cfg.enabled ? `已开启：${cfg.label || '会员折扣'}` : '已关闭会员折扣');
+  } catch (e) {
+    toast(e.message || '保存失败');
+  }
+}
+
+async function loadPromoDailyFreeLimit() {
+  if (!$('#promoDailyFreeLimit')) return;
+  const cfg = await api('/api/admin/coupons/promo-daily-free-limit');
+  $('#promoDailyFreeLimit').value = cfg.dailyFreeLimit ?? 5;
+  if ($('#promoDailyFreeHint') && cfg.hint) $('#promoDailyFreeHint').textContent = cfg.hint;
+  if ($('#promoDailyFreeStats')) {
+    $('#promoDailyFreeStats').textContent =
+      `今日已领 ${cfg.claimedToday ?? 0} 人 · 无门槛剩余 ${cfg.freeLeft ?? 0}`;
+  }
+}
+
+async function savePromoDailyFreeLimit() {
+  try {
+    const n = Number($('#promoDailyFreeLimit')?.value);
+    const cfg = await api('/api/admin/coupons/promo-daily-free-limit', {
+      method: 'PUT',
+      body: JSON.stringify({ dailyFreeLimit: n }),
+    });
+    $('#promoDailyFreeLimit').value = cfg.dailyFreeLimit ?? n;
+    if ($('#promoDailyFreeHint') && cfg.hint) $('#promoDailyFreeHint').textContent = cfg.hint;
+    if ($('#promoDailyFreeStats')) {
+      $('#promoDailyFreeStats').textContent =
+        `今日已领 ${cfg.claimedToday ?? 0} 人 · 无门槛剩余 ${cfg.freeLeft ?? 0}`;
+    }
+    toast(`已保存：每日前 ${cfg.dailyFreeLimit} 名无门槛`);
   } catch (e) {
     toast(e.message || '保存失败');
   }
@@ -2698,6 +2746,7 @@ $('#reloadHomePosterBtn')?.addEventListener('click', () =>
   $(`#${id}`)?.addEventListener('change', () => renderHomePosterPreview());
 });
 
+$('#savePromoDailyFreeBtn')?.addEventListener('click', savePromoDailyFreeLimit);
 $('#saveCanePromoBtn')?.addEventListener('click', saveCanePromo);
 $('#grantCanePromoAllBtn')?.addEventListener('click', grantCanePromoAll);
 $('#saveFruitRetailOffBtn')?.addEventListener('click', saveFruitRetailOff);

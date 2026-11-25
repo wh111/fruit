@@ -19,6 +19,17 @@
   line-height: 1.5;
 }
 
+.closed-tip {
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .label {
   font-weight: 700;
   margin-bottom: 16rpx;

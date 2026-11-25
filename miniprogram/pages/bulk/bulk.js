@@ -40,6 +40,8 @@ Page({
     couponOptions: [],
     couponId: '',
     couponHint: '',
+    shopClosed: false,
+    shopClosedMessage: '',
   },
 
   _couponTouched: false,
@@ -48,8 +50,23 @@ Page({
   onShow() {
     const user = wx.getStorageSync('user') || {};
     this.setData({ hasPhone: !!(user.hasPhone || user.phone) });
+    this.loadShopOpen();
     this.loadWallet();
     this.refreshQuote();
+  },
+
+  async loadShopOpen() {
+    try {
+      const shop = await request('/api/shop');
+      const shopOpen = (shop && shop.shopOpen) || {};
+      const shopClosed = shopOpen.enabled !== false && shopOpen.isOpen === false;
+      const shopClosedMessage =
+        shopOpen.closedMessage ||
+        `门店营业时间 ${shopOpen.label || '09:30–20:00'}，当前暂停下单`;
+      this.setData({ shopClosed, shopClosedMessage });
+    } catch (_) {
+      /* ignore */
+    }
   },
 
   async loadWallet() {
@@ -166,39 +183,15 @@ Page({
         method: 'POST',
         data: { amount },
       });
-      const list = (quote.availableCoupons || []).map((c) => ({
-        ...c,
-        saveText: formatDisplay(c.save),
-        payText: formatDisplay(c.payAmount),
-        payAmount: Number(c.payAmount),
-      }));
-      let couponId = this._couponTouched ? this.data.couponId || '' : '';
-      if (!this._couponTouched) {
-        // 服务端已比较会员折 vs 用券，取更省的一方
-        couponId = quote.selectedCouponId || '';
-      }
-      if (couponId && !list.some((c) => c.id === couponId)) {
-        couponId = '';
-      }
       let pay = Number(quote.amount);
       if (!(pay > 0)) pay = amount;
-      if (couponId) {
-        const hit = list.find((c) => c.id === couponId);
-        if (hit) pay = hit.payAmount;
-      }
       const loyaltyTip =
-        Number(quote.loyaltySave) > 0
-          ? `已享${quote.loyaltyLabel || '会员折'}（与立减券同单任选其一）`
-          : '';
+        Number(quote.loyaltySave) > 0 ? `已享${quote.loyaltyLabel || '会员折'}` : '';
       const save = Math.max(0, Math.round((amount - pay) * 100) / 100);
       this.setData({
-        couponOptions: list,
-        couponId,
-        couponHint: list.length
-          ? `用券则不享受会员折；非会员消费满¥9.9可参与，会员免费${
-              loyaltyTip ? ` · ${loyaltyTip}` : ''
-            }`
-          : loyaltyTip || '',
+        couponOptions: [],
+        couponId: '',
+        couponHint: loyaltyTip || '自定义金额不支持优惠券，仅可享会员折',
         payAmount: formatDisplay(pay),
         displayAmount: formatDisplay(pay),
         memberSave: save.toFixed(2),
@@ -257,6 +250,13 @@ Page({
 
   async submit() {
     if (this.data.paying) return;
+    if (this.data.shopClosed) {
+      wx.showToast({
+        title: this.data.shopClosedMessage || '非营业时间，暂停下单',
+        icon: 'none',
+      });
+      return;
+    }
     const amount = parseAmount(this.data.amountText);
     if (amount == null) {
       wx.showToast({ title: '请输入有效金额', icon: 'none' });
@@ -280,17 +280,12 @@ Page({
       }
       this.setData({ hasPhone: true });
 
-      const payload = {
-        amount,
-        remark: this.data.remark,
-      };
-      if (this._couponTouched || this.data.couponId) {
-        payload.couponId = this.data.couponId || '';
-      }
-
       const { order } = await request('/api/orders/bulk', {
         method: 'POST',
-        data: payload,
+        data: {
+          amount,
+          remark: this.data.remark,
+        },
       });
       rememberOrderId(order.id);
 

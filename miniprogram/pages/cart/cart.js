@@ -39,6 +39,8 @@ Page({
     isMember: false,
     memberFactor: 1,
     unusedCoupons: [],
+    shopClosed: false,
+    shopClosedMessage: '',
   },
 
   onShow() {
@@ -64,10 +66,17 @@ Page({
       /* ignore */
     }
     const memberInfo = memberFactorFromPromo(promo);
+    const shopOpen = (promo && promo.shopOpen) || {};
+    const shopClosed = shopOpen.enabled !== false && shopOpen.isOpen === false;
+    const shopClosedMessage =
+      shopOpen.closedMessage ||
+      `门店营业时间 ${shopOpen.label || '09:30–20:00'}，当前暂停下单`;
     this.setData({
       isMember: memberInfo.isMember,
       memberFactor: memberInfo.factor,
       unusedCoupons,
+      shopClosed,
+      shopClosedMessage,
     });
   },
 
@@ -114,6 +123,13 @@ Page({
   },
 
   goCheckout() {
+    if (this.data.shopClosed) {
+      wx.showToast({
+        title: this.data.shopClosedMessage || '非营业时间，暂停下单',
+        icon: 'none',
+      });
+      return;
+    }
     const list = cart.readCart();
     if (!list.length) {
       wx.showToast({ title: '购物车是空的', icon: 'none' });

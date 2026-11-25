@@ -400,6 +400,18 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
   font-weight: 700;
   color: #c2410c;
 }
+.order-card .order-contact {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+.phone-link {
+  color: var(--orange-deep, #c45f0a);
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.phone-link:hover { text-decoration: underline; }
 .order-card .actions .btn { min-height: 36px; }
 
 .list-card .order-title { font-size: 18px; font-weight: 700; line-height: 1.4; }

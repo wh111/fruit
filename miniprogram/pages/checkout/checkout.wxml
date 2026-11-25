@@ -161,6 +161,8 @@
     <input class="remark" placeholder="少冰 / 分开装等" value="{{remark}}" bindinput="onRemark" />
   </view>
 
+  <view class="closed-tip" wx:if="{{shopClosed}}">{{shopClosedMessage}}</view>
+
   <view class="footer">
     <view class="total">
       <view wx:if="{{hasDiscount}}" class="save">{{discountLabel}}</view>
@@ -171,7 +173,12 @@
       </view>
     </view>
     <view
-      wx:if="{{hasPhone}}"
+      wx:if="{{shopClosed}}"
+      class="btn-primary pay disabled"
+      bindtap="submit"
+    >已打烊</view>
+    <view
+      wx:elif="{{hasPhone}}"
       class="btn-primary pay"
       bindtap="submit"
     >{{payChannel === 'balance' ? (balanceEnough ? '会员支付' : '去充值') : '微信支付'}}</view>

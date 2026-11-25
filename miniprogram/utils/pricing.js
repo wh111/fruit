@@ -51,8 +51,24 @@ function bestCouponSave(coupons, { productId, category, originAmount }) {
     if (!c || c.status !== 'unused') continue;
     if (c.fulfillment === 'reserve') continue;
     const threshold = Number(c.threshold) || 0;
-    if (origin + 1e-9 < threshold) continue;
     const ids = c.allowedProductIds || [];
+    const pack = String(c.pack || '');
+    const isPromoPack = pack === 'cane_promo' || pack === 'fruit_retail_off';
+    // 活动券满额需另购其他商品：单品页本身是优惠商品时，不按「3.8/3.88」展示
+    if (isPromoPack && threshold > 0) {
+      if (ids.length && ids.map(String).includes(String(productId))) continue;
+      if (c.matchCategory) {
+        const cat = String(category || '');
+        const want = String(c.matchCategory);
+        const retailLike =
+          want === '水果零售' || want === '免洗什锦' || want === '零售什锦';
+        if (retailLike && (cat === '水果零售' || cat === '免洗什锦' || cat === '零售什锦')) {
+          continue;
+        }
+      }
+    } else if (origin + 1e-9 < threshold) {
+      continue;
+    }
     if (ids.length) {
       if (!ids.map(String).includes(String(productId))) continue;
     } else if (c.matchCategory) {

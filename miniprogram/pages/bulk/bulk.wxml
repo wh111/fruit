@@ -1,8 +1,10 @@
 <view class="page">
   <view class="card tip-card">
     <view class="tip-title">自定义金额付款</view>
-    <view class="tip-desc">散装称重按这里付款。充值会员同样享全场折扣；可用活动券（与会员折同单任选其一）；满18元可加工。</view>
+    <view class="tip-desc">散装称重按这里付款。充值会员享全场折扣；自定义金额不支持优惠券；满18元可加工。</view>
   </view>
+
+  <view class="closed-tip" wx:if="{{shopClosed}}">{{shopClosedMessage}}</view>
 
   <view class="card">
     <view class="label">应付金额（元）</view>
@@ -92,7 +94,12 @@
       <text class="sum">¥{{payAmount}}</text>
     </view>
     <button
-      wx:if="{{hasPhone}}"
+      wx:if="{{shopClosed}}"
+      class="btn-primary pay"
+      disabled="{{true}}"
+    >已打烊</button>
+    <button
+      wx:elif="{{hasPhone}}"
       class="btn-primary pay"
       loading="{{paying}}"
       disabled="{{paying || !canPay}}"

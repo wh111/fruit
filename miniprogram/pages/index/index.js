@@ -102,6 +102,9 @@ Page({
     promoPopFreeLeft: 0,
     promoPopVip: false,
     promoClaimingPack: '',
+    shopClosed: false,
+    shopClosedMessage: '',
+    businessHoursLabel: '09:30–20:00',
   },
 
   _lotterySector: 72,
@@ -148,6 +151,13 @@ Page({
   },
 
   goCheckout() {
+    if (this.data.shopClosed) {
+      wx.showToast({
+        title: this.data.shopClosedMessage || '非营业时间，暂停下单',
+        icon: 'none',
+      });
+      return;
+    }
     const list = cartUtil.readCart();
     if (!list.length) {
       wx.showToast({ title: '购物车是空的', icon: 'none' });
@@ -340,6 +350,11 @@ Page({
         homePosterBtnText = homePoster.btnText;
         homePosterImageUrl = homePoster.imageUrl;
       }
+      const shopOpen = (promo && promo.shopOpen) || {};
+      const shopClosed = shopOpen.enabled !== false && shopOpen.isOpen === false;
+      const businessHoursLabel = shopOpen.label || '09:30–20:00';
+      const shopClosedMessage =
+        shopOpen.closedMessage || `门店营业时间 ${businessHoursLabel}，当前暂停下单`;
       const nextCat = cats.includes(this.data.activeCat) ? this.data.activeCat : cats[0] || '';
       this.setData({
         products,
@@ -367,6 +382,9 @@ Page({
         memberPerks,
         promoFoldCount: 0,
         promoFoldSummary: '',
+        shopClosed,
+        shopClosedMessage,
+        businessHoursLabel,
         loadError: '',
       });
       this.filter(nextCat);
@@ -409,6 +427,13 @@ Page({
   },
 
   goBulk() {
+    if (this.data.shopClosed) {
+      wx.showToast({
+        title: this.data.shopClosedMessage || '非营业时间，暂停下单',
+        icon: 'none',
+      });
+      return;
+    }
     wx.navigateTo({ url: '/pages/bulk/bulk' });
   },
 
@@ -534,7 +559,7 @@ Page({
     this.setData({
       promoPopItems: data.items || [],
       promoPopHint: data.hint || '',
-      promoPopDailyLimit: data.dailyFreeLimit || 20,
+      promoPopDailyLimit: data.dailyFreeLimit || 5,
       promoPopFreeLeft: data.freeLeft != null ? data.freeLeft : 0,
       promoPopVip: !!data.vip,
     });

@@ -36,6 +36,7 @@
 }
 .total { flex: 1; }
 .pay { flex: 0 0 240rpx; text-align: center; }
+.pay.disabled { background: #bdbdbd; }
 .price-wrap {
   display: flex;
   align-items: baseline;

@@ -26,6 +26,7 @@ const defaultDb = () => ({
     pickupHint: '取餐前最多40分钟现切，做好后请到柜台报取餐号，店员对一下即可',
     tagline: '现切现做 · 新鲜40分钟',
     groupBuyHint: '企业团购、部门下午茶、会议用果，电话沟通即可。10 份起订。',
+    businessHours: { enabled: true, open: '09:30', close: '20:00' },
   },
   seq: { orderDay: '', pickupNo: 0 },
 });
@@ -777,6 +778,24 @@ function ensureShopFreshCopy(db) {
   };
   patch('pickupHint', defaults.pickupHint);
   patch('tagline', defaults.tagline);
+  if (!s.businessHours || typeof s.businessHours !== 'object') {
+    s.businessHours = { ...defaults.businessHours };
+    changed = true;
+  } else {
+    const bh = s.businessHours;
+    if (!bh.open) {
+      bh.open = defaults.businessHours.open;
+      changed = true;
+    }
+    if (!bh.close) {
+      bh.close = defaults.businessHours.close;
+      changed = true;
+    }
+    if (bh.enabled == null) {
+      bh.enabled = true;
+      changed = true;
+    }
+  }
   return changed;
 }
 

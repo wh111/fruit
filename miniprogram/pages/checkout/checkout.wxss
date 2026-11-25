@@ -162,6 +162,20 @@
   font-weight: 400;
 }
 .pay { flex: 1.2; }
+.pay.disabled {
+  background: #bdbdbd;
+  color: #fff;
+}
+.closed-tip {
+  margin: 0 24rpx 24rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .phone-pay {
   margin: 0;
   border: none;

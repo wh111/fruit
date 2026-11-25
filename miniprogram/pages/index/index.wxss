@@ -45,6 +45,20 @@
   font-weight: 800;
   font-size: 28rpx;
 }
+.cart-go.disabled {
+  background: #9e9e9e;
+}
+
+.closed-banner {
+  margin: 0 24rpx 12rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
 
 .hero {
   margin: 12rpx 24rpx;
@@ -401,11 +415,13 @@
 .goods { flex: 1; height: 100%; background: #fff; }
 .goods-pad { padding: 8rpx 16rpx calc(150rpx + env(safe-area-inset-bottom)); }
 .price-wrap {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 6rpx 8rpx;
-  min-width: 0;
+  gap: 4rpx 8rpx;
+  padding-right: 12rpx;
 }
 .price-origin,
 .cart-origin {
@@ -415,13 +431,13 @@
   font-weight: 400;
 }
 .member-tag {
-  margin-left: 2rpx;
   padding: 2rpx 10rpx;
   border-radius: 8rpx;
   background: #fff3df;
   color: #c47a12;
   font-size: 20rpx;
   font-weight: 700;
+  flex-shrink: 0;
 }
 .desc {
   display: -webkit-box;
@@ -445,7 +461,13 @@
 }
 .info { flex: 1; display: flex; flex-direction: column; }
 .name { font-size: 32rpx; font-weight: 700; margin-bottom: 8rpx; }
-.row { margin-top: auto; display: flex; align-items: baseline; gap: 6rpx; }
+.row {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8rpx;
+}
 .preorder {
   margin-left: 8rpx;
   color: #4caf50;
@@ -453,10 +475,12 @@
   font-weight: 700;
 }
 .buy {
-  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
   background: #4caf50;
   color: #fff;
   font-size: 24rpx;
+  line-height: 1.2;
   padding: 10rpx 22rpx;
   border-radius: 999rpx;
 }

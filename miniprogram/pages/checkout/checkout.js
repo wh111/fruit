@@ -92,6 +92,8 @@ Page({
     balance: 0,
     payChannel: 'balance',
     balanceEnough: false,
+    shopClosed: false,
+    shopClosedMessage: '',
   },
 
   onLoad() {
@@ -260,6 +262,11 @@ Page({
           cats.every((c) => c === '免洗什锦' || c === '水果零售' || c === '零售什锦');
         reserveDesc = onlyRetail ? '免洗什锦仅支持现取' : '本单有商品不支持预定';
       }
+      const shopOpen = promo.shopOpen || {};
+      const shopClosed = shopOpen.enabled !== false && shopOpen.isOpen === false;
+      const shopClosedMessage =
+        shopOpen.closedMessage ||
+        `门店营业时间 ${shopOpen.label || '09:30–20:00'}，当前暂停下单`;
       this.setData({
         slots,
         slotIndex,
@@ -274,6 +281,8 @@ Page({
           promo.deliveryScopeNote ||
           this.data.deliveryScopeNote ||
           '仅配送机器人产业园园区内，园区外暂不支持',
+        shopClosed,
+        shopClosedMessage,
       });
     } catch {
       this.setData({
@@ -537,6 +546,13 @@ Page({
     try {
       const { fulfillmentType, slots, slotIndex, canReserve, couponId, deliveryPoint, payChannel, items, fromCart } =
         this.data;
+      if (this.data.shopClosed) {
+        wx.showToast({
+          title: this.data.shopClosedMessage || '非营业时间，暂停下单',
+          icon: 'none',
+        });
+        return;
+      }
       if (fulfillmentType === 'reserve' && (!canReserve || !slots[slotIndex])) {
         wx.showToast({ title: '请选择取餐时间', icon: 'none' });
         return;

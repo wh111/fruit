@@ -259,6 +259,16 @@ async function code2Session(code) {
  * 小程序统一下单 JSAPI
  * @returns {{ prepayId, payment }} payment 可直接给 wx.requestPayment
  */
+/** 微信统一下单 body 最大 127 字节（UTF-8），按字节截断，避免中文多商品名超限 */
+function truncateUtf8Bytes(str, maxBytes = 127) {
+  const s = String(str || '');
+  const buf = Buffer.from(s, 'utf8');
+  if (buf.length <= maxBytes) return s;
+  let end = maxBytes;
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1;
+  return buf.slice(0, end).toString('utf8');
+}
+
 async function createJsapiPrepay({ orderNo, amountYuan, openid, description, clientIp }) {
   const c = assertPayConfig();
   if (!openid) {
@@ -271,7 +281,7 @@ async function createJsapiPrepay({ orderNo, amountYuan, openid, description, cli
 
   const params = {
     nonce_str: nonceStr(16),
-    body: String(description || '四季果先果切').slice(0, 120),
+    body: truncateUtf8Bytes(description || '四季果先果切', 127),
     out_trade_no: orderNo,
     total_fee: totalFee,
     spbill_create_ip: clientIp || '127.0.0.1',

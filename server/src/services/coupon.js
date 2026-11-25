@@ -25,18 +25,45 @@ const CANE_OFF_AMOUNT = 7.92;
 const PROMO_LATE_THRESHOLD = 9.9;
 /** @deprecated 兼容旧配置名，等同 PROMO_LATE_THRESHOLD */
 const CANE_OFF_THRESHOLD = PROMO_LATE_THRESHOLD;
-/** 每日前 N 位领取无门槛 */
-const PROMO_DAILY_FREE_LIMIT = 20;
+/** 每日前 N 位领取无门槛（默认；后台可改 settings.promoDailyFreeLimit） */
+const PROMO_DAILY_FREE_LIMIT = 5;
 
-/** 对客文案：免洗 / 甘蔗分别说清楚 */
+function getPromoDailyFreeLimit(db) {
+  const n = Number(db?.settings?.promoDailyFreeLimit);
+  if (Number.isFinite(n) && n >= 0) return Math.min(999, Math.floor(n));
+  return PROMO_DAILY_FREE_LIMIT;
+}
+
+function getPromoDailyFreeLimitPublic(db) {
+  const limit = getPromoDailyFreeLimit(db);
+  const claimedToday = todayPromoClaimUserCount(db);
+  return {
+    dailyFreeLimit: limit,
+    claimedToday,
+    freeLeft: Math.max(0, limit - claimedToday),
+    hint: `每日前 ${limit} 名弹框领取无门槛；超出后满¥${PROMO_LATE_THRESHOLD}可用；充值满¥${PROMO_VIP_RECHARGE_MIN}会员不占名额。`,
+  };
+}
+
+function updatePromoDailyFreeLimit(db, value) {
+  if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 999) {
+    throw Object.assign(new Error('每日无门槛名额须为 0～999 的整数'), { status: 400 });
+  }
+  db.settings.promoDailyFreeLimit = Math.floor(n);
+  return getPromoDailyFreeLimitPublic(db);
+}
+
+/** 对客文案：免洗 / 甘蔗分别说清楚；满 9.9 指另购其他商品（不含本活动商品） */
 const FRUIT_PROMO_TITLE = '免洗什锦·3.8元起';
-const FRUIT_PROMO_SUB = `非会员消费满¥${PROMO_LATE_THRESHOLD}可参与 · 会员免费`;
+const FRUIT_PROMO_SUB = `非会员另购其他商品满¥${PROMO_LATE_THRESHOLD} · 会员免费`;
 const FRUIT_PROMO_DETAIL =
-  '鲜果小盒开袋即食；每天与甘蔗二选一弹框领券；会员免费参与，非会员消费满9.9可用';
+  '鲜果小盒开袋即食；每天与甘蔗二选一弹框领券；会员免费参与，非会员需另购其他商品满9.9（不含免洗什锦）';
 const CANE_PROMO_TITLE = '去皮甘蔗·3.88元起';
-const CANE_PROMO_SUB = `非会员消费满¥${PROMO_LATE_THRESHOLD}可参与 · 会员免费`;
+const CANE_PROMO_SUB = `非会员另购其他商品满¥${PROMO_LATE_THRESHOLD} · 会员免费`;
 const CANE_PROMO_DETAIL =
-  '去皮去节现剥；每天与免洗什锦二选一弹框领券；会员免费参与，非会员消费满9.9可用';
+  '去皮去节现剥；每天与免洗什锦二选一弹框领券；会员免费参与，非会员需另购其他商品满9.9（不含甘蔗）';
 
 function isLegacyFruitTitle(title) {
   const t = String(title || '').trim();
@@ -136,13 +163,15 @@ function todayPromoClaimUserCount(db, now = Date.now()) {
 
 function resolvePromoClaimThreshold(db, now = Date.now(), userId = null) {
   const used = todayPromoClaimUserCount(db, now);
-  const freeLeft = Math.max(0, PROMO_DAILY_FREE_LIMIT - used);
-  // 充值满 100 会员：领券即无门槛（不占前 20 名额）
+  const dailyLimit = getPromoDailyFreeLimit(db);
+  const freeLeft = Math.max(0, dailyLimit - used);
+  // 充值满 100 会员：领券即无门槛（不占前 N 名额）
   if (userId && isPromoVip(db, userId)) {
     return {
       threshold: 0,
       freeSlot: true,
       freeLeft,
+      dailyFreeLimit: dailyLimit,
       claimedToday: used,
       alreadyFree: true,
       vip: true,
@@ -165,6 +194,7 @@ function resolvePromoClaimThreshold(db, now = Date.now(), userId = null) {
         threshold: 0,
         freeSlot: true,
         freeLeft,
+        dailyFreeLimit: dailyLimit,
         claimedToday: used,
         alreadyFree: true,
         vip: false,
@@ -176,6 +206,7 @@ function resolvePromoClaimThreshold(db, now = Date.now(), userId = null) {
       threshold: 0,
       freeSlot: true,
       freeLeft,
+      dailyFreeLimit: dailyLimit,
       claimedToday: used,
       alreadyFree: false,
       vip: false,
@@ -185,6 +216,7 @@ function resolvePromoClaimThreshold(db, now = Date.now(), userId = null) {
     threshold: PROMO_LATE_THRESHOLD,
     freeSlot: false,
     freeLeft: 0,
+    dailyFreeLimit: dailyLimit,
     claimedToday: used,
     alreadyFree: false,
     vip: false,
@@ -202,6 +234,94 @@ function userTodayPaidAmount(db, userId, now = Date.now()) {
     const t = o.paidAt || o.createdAt;
     if (!t || todayKey(t) !== day) continue;
     sum = round2(sum + Number(o.amount || 0));
+  }
+  return sum;
+}
+
+/** 活动券门槛：是否为本券优惠的目标商品（甘蔗 / 免洗什锦等） */
+function isPromoTargetProduct(db, coupon, product) {
+  if (!coupon || !product || !isPromoPopupPack(coupon.pack)) return false;
+  const ids = resolveAllowedProductIds(db, coupon);
+  if (ids.length) return ids.includes(String(product.id));
+  if (coupon.matchCategory) return productMatchesCategory(coupon, product);
+  return false;
+}
+
+function lineAmountOfItem(it) {
+  if (!it) return 0;
+  if (Number(it.lineAmount) > 0) return round2(Number(it.lineAmount));
+  const unit = Number(it.unitPrice) || 0;
+  const qty = Math.max(1, Number(it.quantity) || 1);
+  return round2(unit * qty);
+}
+
+/**
+ * 活动券满减基数：本单金额去掉「本券优惠商品」后的其他消费。
+ * 自定义金额（bulk）整单视为其他消费。
+ */
+function promoThresholdBaseAmount(
+  coupon,
+  { originalAmount, products = null, product = null, productLineAmounts = null, db = null, orderKind = null } = {}
+) {
+  const original = round2(originalAmount);
+  if (!coupon || !isPromoPopupPack(coupon.pack) || !(Number(coupon.threshold) > 0)) {
+    return original;
+  }
+  if (orderKind === 'bulk' || (product && product.id === 'bulk')) {
+    return original;
+  }
+  let exclude = 0;
+  const amounts =
+    productLineAmounts && typeof productLineAmounts === 'object' ? productLineAmounts : null;
+  if (amounts && Object.keys(amounts).length) {
+    for (const [pid, amt] of Object.entries(amounts)) {
+      const fromList = (products || []).find((x) => x && String(x.id) === String(pid));
+      const fromDb = db && (db.products || []).find((x) => x && String(x.id) === String(pid));
+      const p =
+        fromList ||
+        (product && String(product.id) === String(pid) ? product : null) ||
+        fromDb ||
+        { id: pid };
+      if (isPromoTargetProduct(db, coupon, p)) {
+        exclude = round2(exclude + (Number(amt) || 0));
+      }
+    }
+  } else {
+    const list = Array.isArray(products) && products.length ? products : product ? [product] : [];
+    if (list.length && list.every((p) => isPromoTargetProduct(db, coupon, p))) {
+      exclude = original;
+    }
+  }
+  return round2(Math.max(0, original - exclude));
+}
+
+/** 当日已付中，剔除活动券目标商品后的「其他消费」合计（按订单原价口径） */
+function userTodayPromoOtherPaid(db, userId, coupon, now = Date.now()) {
+  if (!db || !userId || !coupon) return 0;
+  const day = todayKey(now);
+  let sum = 0;
+  for (const o of db.orders || []) {
+    if (!o || o.userId !== userId) continue;
+    if (!['paid', 'making', 'ready', 'done'].includes(o.status)) continue;
+    const t = o.paidAt || o.createdAt;
+    if (!t || todayKey(t) !== day) continue;
+    if (o.orderKind === 'bulk') {
+      sum = round2(sum + Number(o.originalAmount != null ? o.originalAmount : o.amount || 0));
+      continue;
+    }
+    const original = round2(Number(o.originalAmount != null ? o.originalAmount : o.amount) || 0);
+    let exclude = 0;
+    for (const it of o.items || []) {
+      const fake = {
+        id: it.productId,
+        name: it.productName,
+        category: it.productCategory,
+      };
+      if (isPromoTargetProduct(db, coupon, fake)) {
+        exclude = round2(exclude + lineAmountOfItem(it));
+      }
+    }
+    sum = round2(sum + Math.max(0, original - exclude));
   }
   return sum;
 }
@@ -837,7 +957,7 @@ function hasAnyPromoClaimToday(db, userId, now = Date.now()) {
 
 /**
  * 免洗什锦活动券：弹框天天领（默认 3 元）
- * 每日前 20 人无门槛；其余满 9.9；充值满 100 会员用券无门槛
+ * 每日前 N 人无门槛（PROMO_DAILY_FREE_LIMIT）；其余满 9.9；充值满 100 会员用券无门槛
  */
 function grantFruitRetailOffPack(db, user, now = Date.now(), opts = {}) {
   if (!user || !user.id) return { granted: false, coupons: [] };
@@ -853,7 +973,7 @@ function grantFruitRetailOffPack(db, user, now = Date.now(), opts = {}) {
   if (opts.viaClaim && hasCanePromoToday(db, user.id, now)) {
     return { granted: false, coupons: [], reason: 'daily_one' };
   }
-  // 弹框领取走每日前 20 无门槛；后台补发走满 9.9
+  // 弹框领取走每日前 N 无门槛；后台补发走满 9.9
   const slot = opts.viaClaim
     ? resolvePromoClaimThreshold(db, now, user.id)
     : {
@@ -884,7 +1004,7 @@ function grantFruitRetailOffPack(db, user, now = Date.now(), opts = {}) {
     amount,
     fulfillment: cfg.fulfillment === 'reserve' ? 'reserve' : 'any',
     matchCategory: cfg.matchCategory || '水果零售',
-    allowBulk: true,
+    allowBulk: false,
     status: 'unused',
     orderId: null,
     grantedAt: now,
@@ -903,6 +1023,7 @@ function grantFruitRetailOffPack(db, user, now = Date.now(), opts = {}) {
     count: 1,
     freeSlot: slot.freeSlot,
     freeLeft: freeLeftAfter,
+    dailyFreeLimit: slot.dailyFreeLimit ?? getPromoDailyFreeLimit(db),
     threshold,
     vip: !!slot.vip,
     alreadyFree: !!slot.alreadyFree,
@@ -941,7 +1062,7 @@ function hasCanePromoPack(db, userId) {
 
 /**
  * 冬日甘蔗券：弹框天天领（减 7.92 ≈ 250g 实付 3.88）
- * 每日前 20 人无门槛；其余满 9.9；充值满 100 会员用券无门槛
+ * 每日前 N 人无门槛（PROMO_DAILY_FREE_LIMIT）；其余满 9.9；充值满 100 会员用券无门槛
  */
 function grantCanePromoPack(db, user, now = Date.now(), opts = {}) {
   if (!user || !user.id) return { granted: false, coupons: [] };
@@ -988,7 +1109,7 @@ function grantCanePromoPack(db, user, now = Date.now(), opts = {}) {
     amount,
     fulfillment: cfg.fulfillment === 'reserve' ? 'reserve' : 'any',
     allowedProductIds: [productId],
-    allowBulk: true,
+    allowBulk: false,
     status: 'unused',
     orderId: null,
     grantedAt: now,
@@ -1007,6 +1128,7 @@ function grantCanePromoPack(db, user, now = Date.now(), opts = {}) {
     count: 1,
     freeSlot: slot.freeSlot,
     freeLeft: freeLeftAfter,
+    dailyFreeLimit: slot.dailyFreeLimit ?? getPromoDailyFreeLimit(db),
     threshold,
     vip: !!slot.vip,
     alreadyFree: !!slot.alreadyFree,
@@ -1101,7 +1223,7 @@ function getPromoPopupPublic(db, userId = null, now = Date.now()) {
   return {
     enabled: items.length > 0,
     claimable,
-    dailyFreeLimit: PROMO_DAILY_FREE_LIMIT,
+    dailyFreeLimit: getPromoDailyFreeLimit(db),
     freeLeft: slot.freeLeft,
     claimedToday: slot.claimedToday,
     lateThreshold: PROMO_LATE_THRESHOLD,
@@ -1214,7 +1336,16 @@ function couponPublic(c, db = null) {
     usableHint = '水果零售免1份';
   }
   const allowedProductIds = db ? resolveAllowedProductIds(db, c) : (c.allowedProductIds || []);
-  if (allowedProductIds.length && db) {
+  if (isPromoPopupPack(c.pack) && c.threshold > 0) {
+    const names = allowedProductIds.length && db
+      ? (db.products || [])
+          .filter((p) => allowedProductIds.includes(String(p.id)))
+          .map((p) => p.name)
+      : [];
+    usableHint = names.length
+      ? `另购满¥${c.threshold}（不含${names.join('/')}）`
+      : `另购其他商品满¥${c.threshold}（不含本活动商品）`;
+  } else if (allowedProductIds.length && db) {
     const names = (db.products || [])
       .filter((p) => allowedProductIds.includes(String(p.id)))
       .map((p) => p.name);
@@ -1326,6 +1457,8 @@ function canUseCoupon(
     product = null,
     /** 购物车多商品时传入，用于限定商品券判断 */
     products = null,
+    /** productId -> 行金额；活动券满额时用于剔除本券商品 */
+    productLineAmounts = null,
     unitPrice = 0,
     baseUnitPrice = null,
     db = null,
@@ -1354,7 +1487,10 @@ function canUseCoupon(
   }
   const original = round2(originalAmount);
   const isBulk = orderKind === 'bulk' || (product && product.id === 'bulk');
-  const promoAllowBulk = coupon.allowBulk && isPromoPopupPack(coupon.pack);
+  // 自定义金额（称重自助输入）：不参与任何优惠券，仅可走会员折
+  if (isBulk) {
+    return { ok: false, reason: '自定义金额不支持优惠券，仅可享会员折' };
+  }
   if (coupon.type === 'percent') {
     const max = Number(coupon.maxOriginal) || 30;
     // 小料另计：用商品原价（不含小料）判断是否≤上限，避免加鸡胸后折券失效
@@ -1379,20 +1515,17 @@ function canUseCoupon(
     if (!(save > 0)) return { ok: false, reason: '优惠券不可用' };
     return { ok: true };
   }
-  // 自定义结账：甘蔗/免洗什锦活动券可跳过商品限定，只看门槛
-  if (!(isBulk && promoAllowBulk)) {
-    // 满15减3 / 带 allowedProductIds 的满减券：限指定商品（购物车任一件命中即可）
-    if (db) {
-      const scope = productAllowedForCoupon(db, coupon, product, products);
-      if (!scope.ok) return { ok: false, reason: scope.reason };
-    }
-    // 品类限制（如免洗什锦立减 · 仅限水果零售）
-    if (coupon.matchCategory) {
-      if (!product) return { ok: false, reason: '请选择商品后再用券' };
-      if (!productMatchesCategory(coupon, product)) {
-        const catLabel = coupon.matchCategory === '水果零售' ? '免洗什锦/水果零售' : coupon.matchCategory;
-        return { ok: false, reason: `仅限${catLabel}商品使用` };
-      }
+  // 满15减3 / 带 allowedProductIds 的满减券：限指定商品（购物车任一件命中即可）
+  if (db) {
+    const scope = productAllowedForCoupon(db, coupon, product, products);
+    if (!scope.ok) return { ok: false, reason: scope.reason };
+  }
+  // 品类限制（如免洗什锦立减 · 仅限水果零售）
+  if (coupon.matchCategory) {
+    if (!product) return { ok: false, reason: '请选择商品后再用券' };
+    if (!productMatchesCategory(coupon, product)) {
+      const catLabel = coupon.matchCategory === '水果零售' ? '免洗什锦/水果零售' : coupon.matchCategory;
+      return { ok: false, reason: `仅限${catLabel}商品使用` };
     }
   }
   if (coupon.threshold > 0) {
@@ -1400,14 +1533,29 @@ function canUseCoupon(
     const vipSkip =
       isPromoPopupPack(coupon.pack) && db && userId && isPromoVip(db, userId);
     if (!vipSkip) {
-      const todayPaid = db && userId ? userTodayPaidAmount(db, userId, now) : 0;
-      const metByOrder = original + 1e-9 >= coupon.threshold;
+      // 甘蔗/免洗活动券：满额只看「其他商品」消费，不含本券优惠商品本身
+      const orderGate = isPromoPopupPack(coupon.pack)
+        ? promoThresholdBaseAmount(coupon, {
+            originalAmount: original,
+            products,
+            product,
+            productLineAmounts,
+            db,
+            orderKind,
+          })
+        : original;
+      const todayPaid = db && userId
+        ? isPromoPopupPack(coupon.pack)
+          ? userTodayPromoOtherPaid(db, userId, coupon, now)
+          : userTodayPaidAmount(db, userId, now)
+        : 0;
+      const metByOrder = orderGate + 1e-9 >= coupon.threshold;
       const metByToday = todayPaid + 1e-9 >= coupon.threshold;
       if (!metByOrder && !metByToday) {
-        return {
-          ok: false,
-          reason: `满¥${coupon.threshold}可用（本单或当日已付；充值满¥${PROMO_VIP_RECHARGE_MIN}会员无门槛）`,
-        };
+        const tip = isPromoPopupPack(coupon.pack)
+          ? `需另购其他商品满¥${coupon.threshold}（不含本活动商品；本单或当日已付；充值满¥${PROMO_VIP_RECHARGE_MIN}会员无门槛）`
+          : `满¥${coupon.threshold}可用（本单或当日已付；充值满¥${PROMO_VIP_RECHARGE_MIN}会员无门槛）`;
+        return { ok: false, reason: tip };
       }
     }
   }
@@ -1458,6 +1606,7 @@ function pickBestCoupon(
     now = Date.now(),
     product = null,
     products = null,
+    productLineAmounts = null,
     unitPrice = 0,
     baseUnitPrice = null,
     orderKind = null,
@@ -1475,6 +1624,7 @@ function pickBestCoupon(
       now,
       product,
       products,
+      productLineAmounts,
       unitPrice,
       baseUnitPrice,
       db,
@@ -1505,6 +1655,7 @@ function listAvailableForOrder(
     afterLoyaltyAmount = null,
     product = null,
     products = null,
+    productLineAmounts = null,
     unitPrice = 0,
     baseUnitPrice = null,
     orderKind = null,
@@ -1522,6 +1673,7 @@ function listAvailableForOrder(
       now,
       product,
       products,
+      productLineAmounts,
       unitPrice,
       baseUnitPrice,
       db,
@@ -1660,6 +1812,9 @@ module.exports = {
   CANE_OFF_THRESHOLD,
   PROMO_LATE_THRESHOLD,
   PROMO_DAILY_FREE_LIMIT,
+  getPromoDailyFreeLimit,
+  getPromoDailyFreeLimitPublic,
+  updatePromoDailyFreeLimit,
   PROMO_VIP_RECHARGE_MIN,
   FRUIT_PROMO_TITLE,
   FRUIT_PROMO_SUB,

@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#1f2a1f" />
   <title>四季果先 · 门店管理</title>
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20261114pos82" />
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20261124phone" />
 </head>
 <body>
   <div id="app">
@@ -430,6 +430,19 @@
             <p class="muted" id="weeklyHint">
               按周配置小程序「活动」页进行中列表。每周改标题/说明/按钮即可；发券仍用「发券」里的甘蔗/免洗开关。
             </p>
+            <div style="margin:12px 0;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:10px">
+              <h4 style="margin:0 0 8px;font-size:14px">每日无门槛名额（甘蔗 / 免洗共用）</h4>
+              <p class="muted" style="margin:0 0 8px" id="promoDailyFreeHint">
+                每日前 N 名弹框领券无门槛；超出后满¥9.9可用；充值满¥100会员不占名额。
+              </p>
+              <div class="toolbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+                <label>每日名额
+                  <input id="promoDailyFreeLimit" type="number" min="0" max="999" step="1" value="5" style="width:72px" />
+                </label>
+                <span class="muted" id="promoDailyFreeStats" style="font-size:13px"></span>
+                <button type="button" class="btn primary" id="savePromoDailyFreeBtn">保存名额</button>
+              </div>
+            </div>
             <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0">
               <label>周标题
                 <input id="weeklyLabel" placeholder="如 11.23～11.29 本周福利" style="width:200px" />
@@ -804,7 +817,7 @@
 
   <script src="/admin/js/dtpweb.umd.js"></script>
   <script src="/admin/js/detong-print.js?v=20261114mix2"></script>
-  <script src="/admin/js/admin.js?v=20261123weekly"></script>
+  <script src="/admin/js/admin.js?v=20261124phone"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       if (window.DetongPrint) DetongPrint.init();
